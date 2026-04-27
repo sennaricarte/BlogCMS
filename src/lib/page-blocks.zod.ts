@@ -40,6 +40,8 @@ export const pageBlockZod = z.discriminatedUnion("type", [
     id: z.string(),
     type: z.literal("faq"),
     title: z.string().optional(),
+    /** Texto de destaque (ex.: horário de funcionamento), mostrado acima das perguntas. */
+    horarioFuncionamento: z.string().optional(),
     items: z.array(faqItemZod),
   }),
   z.object({

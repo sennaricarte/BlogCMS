@@ -1,0 +1,39 @@
+---
+import { getImage, type ImageMetadata } from "astro:assets";
+import BlogImage from "./BlogImage.astro";
+
+export interface Props {
+  /** Caminho local (coleção) ou URL absoluta (ex.: imagem no Supabase após importação). */
+  src: ImageMetadata | string;
+  alt: string;
+  width: number;
+  height: number;
+  class?: string;
+  sizes: string;
+  quality?: number;
+  priority?: boolean;
+  decoding?: "async" | "auto" | "sync";
+  loading?: "eager" | "lazy" | "auto" | null;
+  fetchpriority?: "high" | "low" | "auto" | null;
+}
+
+const props = Astro.props as Props;
+const isRemote = typeof props.src === "string" && /^https?:\/\//i.test(props.src);
+---
+
+{
+  isRemote ? (
+    <img
+      src={props.src}
+      alt={props.alt}
+      width={props.width}
+      height={props.height}
+      class={props.class}
+      loading={props.loading ?? (props.priority ? "eager" : "lazy")}
+      fetchpriority={props.fetchpriority ?? (props.priority ? "high" : "low")}
+      decoding={props.decoding ?? "async"}
+    />
+  ) : (
+    <BlogImage {...props} src={props.src as ImageMetadata} />
+  )
+}

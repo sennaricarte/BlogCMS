@@ -1,5 +1,5 @@
 ---
-import BlogImage from "../../../components/blog/BlogImage.astro";
+import HeroCover from "../../../components/blog/HeroCover.astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import { BLOG_PER_PAGE, getPublicBlogPosts, pageCount, paginate } from "../../../lib/blog";
 
@@ -42,7 +42,7 @@ const pageTitle = pageNum > 1 ? `Blog (p. ${pageNum})` : "Blog";
         <li>
           <article class="group flex flex-col gap-4 sm:flex-row sm:items-start">
             <a href={`/blog/${post.id}/`} class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200" aria-hidden="true" tabindex={-1}>
-              <BlogImage
+              <HeroCover
                 src={post.data.heroImage}
                 alt=""
                 width={400}

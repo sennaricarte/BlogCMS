@@ -5,6 +5,10 @@ function newId() {
   return `blk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+export function newBlockId(): string {
+  return newId();
+}
+
 export function createDefaultBlock(type: PageBlock["type"]): PageBlock {
   switch (type) {
     case "hero":

@@ -11,7 +11,7 @@ const headerLogoSrc = (config.headerLogoUrl ?? "").trim();
   <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
     <a
       href="/"
-      class="inline-flex min-h-10 min-w-0 max-w-full items-center gap-2 text-lg font-semibold text-[var(--client-color-primary)]"
+      class="inline-flex min-h-10 min-w-0 max-w-full items-center gap-2 text-lg font-semibold text-[var(--primary-color)]"
       aria-label={headerLogoSrc ? undefined : config.nomeMarca + " — página inicial"}
     >
       {
@@ -36,7 +36,7 @@ const headerLogoSrc = (config.headerLogoUrl ?? "").trim();
           <li>
             <a
               href={item.href}
-              class="rounded-md px-2 py-1 text-slate-700 underline-offset-4 hover:underline focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--client-color-primary)]"
+              class="rounded-md px-2 py-1 text-slate-700 underline-offset-4 hover:underline focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--primary-color)]"
             >
               {item.label}
             </a>

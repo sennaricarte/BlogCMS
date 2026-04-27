@@ -1,7 +1,7 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import BlogImage from "../../components/blog/BlogImage.astro";
+import HeroCover from "../../components/blog/HeroCover.astro";
 import ArticleBreadcrumbs from "../../components/seo/ArticleBreadcrumbs.astro";
 import siteConfig from "../../data/site-config.json";
 import { getPublicBlogPosts } from "../../lib/blog";
@@ -90,7 +90,7 @@ const breadcrumbs = [
                 aria-hidden="true"
                 tabindex={-1}
               >
-                <BlogImage
+                <HeroCover
                   src={post.data.heroImage}
                   alt={post.data.title}
                   width={320}

@@ -7,7 +7,7 @@ const { title, subtitle, class: className = "" } = Astro.props as P;
 ---
 
 <section
-  class={`rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white px-6 py-10 shadow-sm ${className}`}
+  class={`rounded-2xl border border-slate-200 border-t-4 border-t-[var(--primary-color)] bg-gradient-to-br from-slate-50 to-white px-6 py-10 shadow-sm ${className}`}
   aria-label="Cabeçalho de página"
 >
   <h2 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{title}</h2>

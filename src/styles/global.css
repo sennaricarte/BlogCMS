@@ -1,9 +1,18 @@
 @import "tailwindcss";
 
-/* Cores de marca: valores padrão até o <html> injetar --client-color-* (BaseLayout). */
+/*
+ * Cores de marca: `site-config.json` → BaseLayout injeta no <html> (build):
+ * --client-color-*, --primary-color e --secondary-color.
+ * Aqui ficam os fallbacks e o mapeamento para Tailwind @theme.
+ */
+:root {
+  --primary-color: var(--client-color-primary, #0ea5e9);
+  --secondary-color: var(--client-color-secondary, #64748b);
+}
+
 @theme {
-  --color-brand-primary: var(--client-color-primary, #0ea5e9);
-  --color-brand-secondary: var(--client-color-secondary, #64748b);
+  --color-brand-primary: var(--primary-color, #0ea5e9);
+  --color-brand-secondary: var(--secondary-color, #64748b);
 }
 
 @layer components {
@@ -26,7 +35,7 @@
     @apply my-4 border-l-4 border-slate-200 pl-4 text-slate-600 italic;
   }
   .post-body a {
-    @apply font-medium text-[var(--client-color-primary)] underline-offset-2 hover:underline;
+    @apply font-medium text-[var(--primary-color)] underline-offset-2 hover:underline;
   }
   .post-body :where(strong) {
     @apply font-semibold text-slate-900;

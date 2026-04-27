@@ -7,6 +7,8 @@ const STORAGE_KEY = "blogcms-page-editor-split";
 
 type Props = {
   hiddenInputId?: string;
+  /** Ecrã criar página: mostra o botão de template de contacto. */
+  showContactPageTemplate?: boolean;
 };
 
 function buildPageUrlFromForm(): string {
@@ -17,7 +19,10 @@ function buildPageUrlFromForm(): string {
   return `${origin}/p/${slug}/`;
 }
 
-export function PageEditorSplitView({ hiddenInputId = "p-page-blocks" }: Props) {
+export function PageEditorSplitView({
+  hiddenInputId = "p-page-blocks",
+  showContactPageTemplate = false,
+}: Props) {
   const [split, setSplit] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -150,7 +155,11 @@ export function PageEditorSplitView({ hiddenInputId = "p-page-blocks" }: Props) 
         }
       >
         <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <PageBlocksEditor hiddenInputId={hiddenInputId} onBlocksChange={onBlocksChange} />
+          <PageBlocksEditor
+            hiddenInputId={hiddenInputId}
+            onBlocksChange={onBlocksChange}
+            showContactTemplateButton={showContactPageTemplate}
+          />
         </div>
 
         {split && (

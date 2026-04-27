@@ -16,7 +16,8 @@ const blog = defineCollection({
       pubDate: z.coerce.date(),
       updatedDate: z.coerce.date().optional(),
       author: z.string(),
-      heroImage: image(),
+      /** Asset local (coleção) ou URL absoluta (ex.: hero no Supabase após importação). */
+      heroImage: z.union([image(), z.string().url()]),
       tags: z.array(z.string()).default([]),
       category: z.string().optional(),
       draft: z.boolean().default(false),

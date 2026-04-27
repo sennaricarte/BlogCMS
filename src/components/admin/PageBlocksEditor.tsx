@@ -16,8 +16,9 @@ import {
   QrCode,
   Trash2,
   Video,
+  LayoutTemplate,
 } from "lucide-react";
-import { createDefaultBlock } from "../../lib/page-blocks.factories";
+import { buildDefaultContactPageTemplate } from "../../lib/page-templates";
 import type { PageBlock } from "../../lib/page-blocks.zod";
 
 const BTNS: Array<{
@@ -43,7 +44,12 @@ function blockSummary(b: PageBlock): string {
   if (b.type === "hero") return b.title.slice(0, 48) + (b.title.length > 48 ? "…" : "");
   if (b.type === "contactForm") return (b.title || "Formulário").slice(0, 48);
   if (b.type === "linksList") return `${b.links.length} botão(ões)` + (b.title ? ` · ${b.title}` : "");
-  if (b.type === "faq") return `${b.items.length} pergunta(s)` + (b.title ? ` · ${b.title}` : "");
+  if (b.type === "faq")
+    return (
+      `${b.items.length} pergunta(s)` +
+      (b.horarioFuncionamento ? " · horário" : "") +
+      (b.title ? ` · ${b.title}` : "")
+    );
   if (b.type === "qrCode") {
     const u = b.targetUrl?.trim();
     if (!u) return "URL desta página";
@@ -250,6 +256,26 @@ function BlockFields({ block, onChange }: { block: PageBlock; onChange: (b: Page
           value={block.title || ""}
           onChange={(title) => onChange({ ...block, title: title || undefined })}
         />
+        <div>
+          <label htmlFor={`${id}-horario`} className="block text-xs font-medium text-slate-600">
+            Horário de funcionamento (opcional)
+          </label>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Exibido em destaque no site acima das perguntas. As entradas do acordeão abaixo é que alimentam o FAQ no
+            Google.
+          </p>
+          <textarea
+            id={`${id}-horario`}
+            value={block.horarioFuncionamento || ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              onChange({ ...block, horarioFuncionamento: v.trim() === "" ? undefined : v });
+            }}
+            rows={2}
+            placeholder="Ex.: Segunda a sexta, 9h–18h. Sábado com agendamento."
+            className="mt-1 w-full rounded border border-slate-200 px-2 py-1.5 text-sm"
+          />
+        </div>
         {block.items.map((item, idx) => (
           <div key={idx} className="rounded border border-slate-100 p-2">
             <p className="text-xs text-slate-500">Pergunta {idx + 1}</p>
@@ -555,9 +581,15 @@ type Props = {
   hiddenInputId?: string;
   /** Chamado em cada alteração da lista (útil para pré-visualização em tempo real). */
   onBlocksChange?: (blocks: PageBlock[]) => void;
+  /** Só ecrã "Nova página": botão de template de contacto. */
+  showContactTemplateButton?: boolean;
 };
 
-export function PageBlocksEditor({ hiddenInputId = "p-page-blocks", onBlocksChange }: Props) {
+export function PageBlocksEditor({
+  hiddenInputId = "p-page-blocks",
+  onBlocksChange,
+  showContactTemplateButton = false,
+}: Props) {
   const onChangeRef = useRef(onBlocksChange);
   onChangeRef.current = onBlocksChange;
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
@@ -618,6 +650,20 @@ export function PageBlocksEditor({ hiddenInputId = "p-page-blocks", onBlocksChan
     setOpenId(null);
   };
 
+  const applyContactTemplate = useCallback(() => {
+    setBlocks((prev) => {
+      if (prev.length > 0) {
+        const ok = window.confirm(
+          "Substituir os blocos actuais pelo template de contacto? Podes voltar atrás recarregando a página se ainda não guardaste.",
+        );
+        if (!ok) return prev;
+      }
+      const next = buildDefaultContactPageTemplate();
+      queueMicrotask(() => setOpenId(next[0]?.id ?? null));
+      return next;
+    });
+  }, []);
+
   const move = (from: number, to: number) => {
     if (to < 0 || to >= blocks.length) return;
     setBlocks((prev) => {
@@ -643,6 +689,34 @@ export function PageBlocksEditor({ hiddenInputId = "p-page-blocks", onBlocksChan
 
   return (
     <div className="min-w-0 space-y-6">
+      {showContactTemplateButton && (
+        <div
+          className="relative overflow-hidden rounded-2xl border-2 border-[var(--primary-color)]/35 bg-gradient-to-br from-[var(--primary-color)]/[0.07] via-white to-white p-4 shadow-sm sm:p-5"
+          role="region"
+          aria-label="Template de página de contacto"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-slate-900">Página de contacto em um clique</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Insere um hero, o formulário com campos padrão, botões (WhatsApp e Instagram de exemplo), mapa e FAQ.
+                Os blocos aparecem de seguida na lista; edita textos, URL e coordenadas como quiseres. As cores seguem a
+                <span className="whitespace-nowrap"> cor primária em </span>
+                Aparência.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={applyContactTemplate}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--primary-color)] px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:opacity-95 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-slate-900 sm:min-w-[15rem]"
+            >
+              <LayoutTemplate className="h-5 w-5 shrink-0" aria-hidden />
+              Usar Template de Contato
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <h2 className="text-sm font-medium text-slate-800">Adicionar Elemento</h2>
         <p className="text-xs text-slate-500">Clica num componente para o adicionar ao fim da página. Podes reordenar pelo ícone à esquerda.</p>

@@ -1,5 +1,5 @@
 ---
-import BlogImage from "../components/blog/BlogImage.astro";
+import HeroCover from "../components/blog/HeroCover.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { getPublicBlogPosts } from "../lib/blog";
 import { getCategoryDisplayName, getTagDisplayName, tagToSlug } from "../lib/taxonomies";
@@ -28,7 +28,7 @@ const latest = sorted.slice(0, 5);
             <li>
               <article class="group flex flex-col gap-4 border-b border-slate-200 pb-8 last:border-0 sm:flex-row sm:items-stretch">
                 <a href={`/blog/${post.id}/`} class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200" aria-hidden="true" tabindex={-1}>
-                  <BlogImage
+                  <HeroCover
                     src={post.data.heroImage}
                     alt=""
                     width={480}

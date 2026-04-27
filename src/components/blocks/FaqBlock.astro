@@ -3,7 +3,7 @@ import type { PageBlock } from "../../lib/page-blocks.zod";
 
 type P = Extract<PageBlock, { type: "faq" }> & { class?: string };
 
-const { title, items, class: className = "" } = Astro.props as P;
+const { title, items, horarioFuncionamento, class: className = "" } = Astro.props as P;
 const groupName = `faq-g-${Astro.props.id}`.replace(/[^a-zA-Z0-9_-]/g, "");
 ---
 
@@ -12,27 +12,49 @@ const groupName = `faq-g-${Astro.props.id}`.replace(/[^a-zA-Z0-9_-]/g, "");
   aria-label="Perguntas frequentes"
 >
   {
-    title && (
+    (title || horarioFuncionamento) && (
       <div class="border-b border-slate-100 pb-4">
-        <h2 class="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">{title}</h2>
-        <p class="mt-1 text-xs text-slate-500">Expande cada pergunta para ver a resposta.</p>
+        {title && <h2 class="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">{title}</h2>}
+        {horarioFuncionamento && (
+          <div
+            class:list={[
+              "rounded-lg border border-[var(--primary-color)]/25 bg-[var(--primary-color)]/[0.06] px-4 py-3 sm:px-5",
+              title ? "mt-3" : "",
+            ]}
+          >
+            <p class="text-xs font-semibold uppercase tracking-wide text-[var(--primary-color)]">
+              Horário de funcionamento
+            </p>
+            <p class="mt-1.5 text-sm font-medium leading-relaxed text-slate-800 whitespace-pre-line">
+              {horarioFuncionamento}
+            </p>
+          </div>
+        )}
+        {items.length > 0 && (title || horarioFuncionamento) && (
+          <p class="mt-2 text-xs text-slate-500">Expande cada pergunta para ver a resposta.</p>
+        )}
       </div>
     )
   }
-  <div class={`flex flex-col gap-2 ${title ? "mt-5" : ""}`}>
+  {
+    !title && !horarioFuncionamento && (
+      <p class="sr-only">Perguntas frequentes</p>
+    )
+  }
+  <div class:list={["flex flex-col gap-2", title || horarioFuncionamento ? "mt-5" : ""]}>
     {
       items.map((item, i) => (
         <details
-          class="group rounded-lg border border-slate-200 bg-slate-50/60 transition-all duration-200 hover:border-slate-300 hover:bg-white hover:shadow-sm open:border-slate-200 open:bg-white open:shadow-md open:ring-2 open:ring-[var(--client-color-primary)]/20 [&_summary::-webkit-details-marker]:hidden"
+          class="group rounded-lg border border-slate-200 bg-slate-50/60 transition-all duration-200 hover:border-slate-300 hover:bg-white hover:shadow-sm open:border-slate-200 open:bg-white open:shadow-md open:ring-2 open:ring-[var(--primary-color)]/20 [&_summary::-webkit-details-marker]:hidden"
           name={groupName}
         >
           <summary
-            class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-3.5 text-left text-sm font-semibold text-slate-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--client-color-primary)] focus-visible:ring-offset-2 sm:px-5 sm:py-4"
+            class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-3.5 text-left text-sm font-semibold text-slate-900 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--primary-color)] focus-visible:ring-offset-2 sm:px-5 sm:py-4"
             aria-label={`Pergunta ${i + 1}`}
           >
             <span class="min-w-0 flex-1 pr-2 leading-snug">{item.question}</span>
             <span
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition duration-200 group-open:rotate-180 group-open:border-[var(--client-color-primary)] group-open:bg-[var(--client-color-primary)]/10 group-open:text-[var(--client-color-primary)]"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition duration-200 group-open:rotate-180 group-open:border-[var(--primary-color)] group-open:bg-[var(--primary-color)]/10 group-open:text-[var(--primary-color)]"
               aria-hidden="true"
             >
               <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">

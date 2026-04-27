@@ -1,0 +1,21 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { ContentImportPanel } from "../../components/admin/ContentImportPanel";
+
+const pageTitle = "Importar conteúdo";
+const pageDescription =
+  "Traga artigos de um WordPress (REST) ou de uma página HTML (URL), converta para Markdown e grave no repositório com imagens de destaque no armazenamento.";
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="import"
+  canonicalPath="/admin/import/"
+>
+  <div class="rounded-xl border border-zinc-200/80 bg-white p-5 shadow-sm sm:p-8">
+    <ContentImportPanel client:load />
+  </div>
+</AdminLayout>

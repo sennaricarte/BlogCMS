@@ -82,7 +82,7 @@ function faviconMimeType(href: string): string {
 <!DOCTYPE html>
 <html
   lang={lang}
-  style={`--client-color-primary: ${config.cores.primaria}; --client-color-secondary: ${config.cores.secundaria}`}
+  style={`--client-color-primary: ${config.cores.primaria}; --client-color-secondary: ${config.cores.secundaria}; --primary-color: ${config.cores.primaria}; --secondary-color: ${config.cores.secundaria}`}
   data-theme="client"
 >
   <head>
@@ -133,7 +133,7 @@ function faviconMimeType(href: string): string {
   <body class="flex min-h-svh flex-col bg-white text-slate-900">
     <a
       href="#conteudo-principal"
-      class="focus:not-sr-only sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:shadow focus:ring-2 focus:ring-[var(--client-color-primary)]"
+      class="focus:not-sr-only sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:shadow focus:ring-2 focus:ring-[var(--primary-color)]"
     >
       {isPt ? "Ir para o conteúdo principal" : "Skip to main content"}
     </a>

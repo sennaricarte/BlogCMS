@@ -24,7 +24,7 @@ function isExternal(href: string): boolean {
               <li>
                 <a
                   href={item.href}
-                  class="text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-[var(--client-color-primary)] hover:underline"
+                  class="text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-[var(--primary-color)] hover:underline"
                 >
                   {item.label}
                 </a>
@@ -45,7 +45,7 @@ function isExternal(href: string): boolean {
               <li>
                 <a
                   href={item.href}
-                  class="text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-[var(--client-color-primary)] hover:underline"
+                  class="text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-[var(--primary-color)] hover:underline"
                   rel={isExternal(item.href) ? "me noopener noreferrer" : undefined}
                   target={isExternal(item.href) ? "_blank" : undefined}
                 >

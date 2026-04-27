@@ -1,8 +1,8 @@
 ---
-import { getImage } from "astro:assets";
+import { getImage, type ImageMetadata } from "astro:assets";
 import { render } from "astro:content";
 import type { CollectionEntry } from "astro:content";
-import BlogImage from "../components/blog/BlogImage.astro";
+import HeroCover from "../components/blog/HeroCover.astro";
 import ArticleBreadcrumbs from "../components/seo/ArticleBreadcrumbs.astro";
 import siteConfig from "../data/site-config.json";
 import { getCategoryDisplayName, getTagDisplayName, tagToSlug } from "../lib/taxonomies";
@@ -25,12 +25,19 @@ const siteBase =
   Astro.url.origin;
 const baseForUrl = siteBase.endsWith("/") ? siteBase : siteBase + "/";
 
-const og = await getImage({
-  src: d.heroImage,
-  width: 1200,
-  height: 630,
-});
-const openGraphImageUrl = new URL(og.src, baseForUrl).toString();
+const heroIsRemoteUrl = typeof d.heroImage === "string" && /^https?:\/\//i.test(d.heroImage);
+const openGraphImageUrl = heroIsRemoteUrl
+  ? d.heroImage
+  : new URL(
+      (
+        await getImage({
+          src: d.heroImage as ImageMetadata,
+          width: 1200,
+          height: 630,
+        })
+      ).src,
+      baseForUrl,
+    ).toString();
 
 const datePublished = d.pubDate.toISOString();
 const dateModified = (d.updatedDate ?? d.pubDate).toISOString();
@@ -106,7 +113,7 @@ const breadcrumbItems = getBreadcrumbItems(seoCtx);
       )}
     </header>
     <figure class="-mx-4 my-8 sm:mx-0">
-      <BlogImage
+      <HeroCover
         src={d.heroImage}
         alt={`Imagem de destaque: ${d.title}`}
         width={1200}

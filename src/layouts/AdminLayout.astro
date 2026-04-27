@@ -8,7 +8,7 @@ import Icon from "../components/admin/Icon.astro";
 export interface Props {
   title: string;
   description: string;
-  section?: "dashboard" | "posts" | "pages" | "media" | "categories" | "tags" | "appearance" | "settings" | "deploy" | "project";
+  section?: "dashboard" | "posts" | "import" | "pages" | "media" | "categories" | "tags" | "appearance" | "settings" | "deploy" | "project";
   canonicalPath: string;
 }
 
@@ -21,10 +21,20 @@ const navMain: Array<{
   href: string;
   label: string;
   id: NonNullable<Props["section"]>;
-  icon: "layout-dashboard" | "file-text" | "document" | "image" | "folder" | "tag" | "palette" | "adjustments";
+  icon:
+    | "layout-dashboard"
+    | "file-text"
+    | "document"
+    | "image"
+    | "folder"
+    | "tag"
+    | "palette"
+    | "adjustments"
+    | "arrow-down-tray";
 }> = [
   { href: "/admin/dashboard/", label: "Painel", id: "dashboard", icon: "layout-dashboard" },
   { href: "/admin/posts/", label: "Artigos", id: "posts", icon: "file-text" },
+  { href: "/admin/import/", label: "Importar", id: "import", icon: "arrow-down-tray" },
   { href: "/admin/pages/", label: "Páginas", id: "pages", icon: "document" },
   { href: "/admin/media/", label: "Mídia", id: "media", icon: "image" },
   { href: "/admin/taxonomies/", label: "Categorias", id: "categories", icon: "folder" },
