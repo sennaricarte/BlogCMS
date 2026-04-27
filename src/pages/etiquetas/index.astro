@@ -1,6 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import clientConfig from "../../data/client-config.json";
+import siteConfig from "../../data/site-config.json";
 import { getPublicBlogPosts } from "../../lib/blog";
 import { getTagBySlug, getTagSlugsWithPosts, getPostsForTagSlug } from "../../lib/taxonomies";
 
@@ -13,8 +13,8 @@ const items = slugs.map((slug) => {
   return { slug, name, count, desc: t?.description ?? "" };
 });
 
-const pageTitle = `Etiquetas | ${(clientConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
-const description = `Navega pelas etiquetas do blog — ${(clientConfig as { descricaoSeo?: string }).descricaoSeo ?? "artigos e recursos"}.`;
+const pageTitle = `Etiquetas | ${(siteConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
+const description = `Navega pelas etiquetas do blog — ${(siteConfig as { descricaoSeo?: string }).descricaoSeo ?? "artigos e recursos"}.`;
 ---
 
 <BaseLayout title={pageTitle} description={description} canonicalPath="/etiquetas/">

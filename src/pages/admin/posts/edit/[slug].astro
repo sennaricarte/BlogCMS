@@ -8,7 +8,7 @@ import { getEntry } from "astro:content";
 import AdminLayout from "../../../../layouts/AdminLayout.astro";
 import { EditPostBodyField } from "../../../../components/admin/EditPostBodyField";
 import taxonomies from "../../../../data/taxonomies.json";
-import clientConfig from "../../../../data/client-config.json";
+import siteConfig from "../../../../data/site-config.json";
 
 const slug = Astro.params.slug;
 if (!slug) {
@@ -40,7 +40,7 @@ if (!rawHero) {
 }
 
 const d = entry.data;
-const publicSiteBase = (clientConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ?? "";
+const publicSiteBase = (siteConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ?? "";
 const initialPayload = {
   slug,
   title: d.title,

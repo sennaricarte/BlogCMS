@@ -9,7 +9,8 @@ type IconKind =
   | "tag"
   | "adjustments"
   | "alert-triangle"
-  | "layout-rows";
+  | "layout-rows"
+  | "palette";
 
 const { kind, class: className = "" } = Astro.props as {
   kind: IconKind;
@@ -104,6 +105,17 @@ const base = "inline-block h-4 w-4 shrink-0 " + (className || "").trim();
         stroke-linecap="round"
         stroke-linejoin="round"
         d="M3.75 5.25h16.5M3.75 9.75h16.5M3.75 15h10.5M3.75 19.5h16.5"
+      />
+    </svg>
+  )
+}
+{
+  kind === "palette" && (
+    <svg class={base} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d="M7.5 8.25a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM12 8.25a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM16.5 8.25a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM7.5 15.75a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM12 15.75a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM16.5 15.75a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"
       />
     </svg>
   )

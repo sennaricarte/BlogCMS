@@ -4,7 +4,7 @@ export const prerender = false;
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { ADMIN_CMS_TARGET_KEY } from "../../lib/admin-cms-target";
 import { ADMIN_INTEGRATION_STORAGE_KEY } from "../../lib/admin-storage";
-import defaultClientConfig from "../../data/client-config.json";
+import defaultSiteConfig from "../../data/site-config.json";
 
 const pageTitle = "Configurações de integração";
 const pageDescription =
@@ -217,7 +217,7 @@ const pageDescription =
   define:vars={{
     ADMIN_INTEGRATION_STORAGE_KEY,
     ADMIN_CMS_TARGET_KEY,
-    defaultClientConfig,
+    defaultSiteConfig,
   }}
 >
   (function () {
@@ -418,7 +418,7 @@ const pageDescription =
             vercelToken: payload.VERCEL_TOKEN,
             vercelTeamId: payload.VERCEL_TEAM_ID,
             repositoryName: elRepo.value.trim(),
-            config: defaultClientConfig,
+            config: defaultSiteConfig,
             github: {
               private: true,
               description: "Site gerado a partir do template BlogCMS",

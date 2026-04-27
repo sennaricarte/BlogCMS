@@ -1,6 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import clientConfig from "../../data/client-config.json";
+import siteConfig from "../../data/site-config.json";
 import { getPublicBlogPosts } from "../../lib/blog";
 import {
   getCategoryBySlug,
@@ -16,8 +16,8 @@ const items = slugs.map((slug) => {
   return { slug, name, count, desc: t?.description ?? "" };
 });
 
-const pageTitle = `Categorias | ${(clientConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
-const description = `Explora os artigos por categoria — ${(clientConfig as { descricaoSeo?: string }).descricaoSeo ?? "conteúdo do blog"}.`;
+const pageTitle = `Categorias | ${(siteConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
+const description = `Explora os artigos por categoria — ${(siteConfig as { descricaoSeo?: string }).descricaoSeo ?? "conteúdo do blog"}.`;
 ---
 
 <BaseLayout title={pageTitle} description={description} canonicalPath="/categorias/">

@@ -1,0 +1,48 @@
+---
+import siteConfig from "../data/site-config.json";
+import type { SiteConfig } from "../lib/publisher";
+
+const { isPt = true } = Astro.props as { isPt?: boolean };
+const config = siteConfig as SiteConfig;
+const headerLogoSrc = (config.headerLogoUrl ?? "").trim();
+---
+
+<header class="border-b border-slate-200 bg-white">
+  <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
+    <a
+      href="/"
+      class="inline-flex min-h-10 min-w-0 max-w-full items-center gap-2 text-lg font-semibold text-[var(--client-color-primary)]"
+      aria-label={headerLogoSrc ? undefined : config.nomeMarca + " — página inicial"}
+    >
+      {
+        headerLogoSrc ? (
+          <img
+            src={headerLogoSrc}
+            alt={config.nomeMarca}
+            class="h-8 w-auto max-h-10 max-w-[min(200px,40vw)] object-contain object-left"
+            width="200"
+            height="40"
+            loading="eager"
+            decoding="async"
+          />
+        ) : (
+          <span class="text-lg font-semibold">{config.nomeMarca}</span>
+        )
+      }
+    </a>
+    <nav aria-label={isPt ? "Menu principal" : "Main navigation"}>
+      <ul class="flex flex-wrap gap-1 sm:gap-4">
+        {config.menuLinks.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              class="rounded-md px-2 py-1 text-slate-700 underline-offset-4 hover:underline focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--client-color-primary)]"
+            >
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+</header>

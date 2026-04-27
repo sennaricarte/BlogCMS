@@ -8,7 +8,7 @@ import Icon from "../components/admin/Icon.astro";
 export interface Props {
   title: string;
   description: string;
-  section?: "dashboard" | "posts" | "pages" | "media" | "categories" | "tags" | "layout" | "settings" | "deploy" | "project";
+  section?: "dashboard" | "posts" | "pages" | "media" | "categories" | "tags" | "appearance" | "settings" | "deploy" | "project";
   canonicalPath: string;
 }
 
@@ -21,7 +21,7 @@ const navMain: Array<{
   href: string;
   label: string;
   id: NonNullable<Props["section"]>;
-  icon: "layout-dashboard" | "file-text" | "document" | "image" | "folder" | "tag" | "layout-rows" | "adjustments";
+  icon: "layout-dashboard" | "file-text" | "document" | "image" | "folder" | "tag" | "palette" | "adjustments";
 }> = [
   { href: "/admin/dashboard/", label: "Painel", id: "dashboard", icon: "layout-dashboard" },
   { href: "/admin/posts/", label: "Artigos", id: "posts", icon: "file-text" },
@@ -29,7 +29,7 @@ const navMain: Array<{
   { href: "/admin/media/", label: "Mídia", id: "media", icon: "image" },
   { href: "/admin/taxonomies/", label: "Categorias", id: "categories", icon: "folder" },
   { href: "/admin/tags/", label: "Etiquetas", id: "tags", icon: "tag" },
-  { href: "/admin/layout/", label: "Layout", id: "layout", icon: "layout-rows" },
+  { href: "/admin/appearance/", label: "Aparência", id: "appearance", icon: "palette" },
   { href: "/admin/settings/", label: "Configurações", id: "settings", icon: "adjustments" },
 ];
 ---

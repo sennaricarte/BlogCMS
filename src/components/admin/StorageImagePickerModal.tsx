@@ -1,4 +1,3 @@
-import type { Editor } from "@tiptap/core";
 import { Images, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { isImageFileName } from "../../lib/media-filename";
@@ -8,44 +7,35 @@ type Item = { name: string; path: string; url: string };
 type Props = {
   open: boolean;
   onClose: () => void;
-  editor: Editor;
+  /** Invocado com a URL pública da imagem na biblioteca. */
+  onSelect: (publicUrl: string) => void;
+  title: string;
 };
 
 /**
- * Galeria: lista o bucket Supabase Storage (Central de Mídia) e insere a imagem com alt (SEO).
+ * Escolhe uma imagem já existente no bucket (mesma origem que a Central de mídia).
  */
-export function MediaGalleryModal({ open, onClose, editor }: Props) {
+export function StorageImagePickerModal({ open, onClose, onSelect, title }: Props) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<Item | null>(null);
-  const [altText, setAltText] = useState("");
 
   const load = useCallback(async () => {
     setErr(null);
     setLoading(true);
     try {
       const res = await fetch("/api/admin/media/list", { credentials: "same-origin" });
-      const j = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        items?: Item[];
-      };
+      const j = (await res.json()) as { ok?: boolean; error?: string; items?: Item[] };
       if (!j.ok) {
-        setErr(j.error || "Não foi possível carregar a galeria.");
+        setErr(j.error || "Não foi possível carregar a biblioteca de imagens.");
         setItems([]);
         return;
       }
       const out: Item[] = [];
       for (const it of j.items || []) {
-        if (!it.name || !isImageFileName(it.name)) {
-          continue;
-        }
-        out.push({
-          name: it.name,
-          path: it.path,
-          url: it.url,
-        });
+        if (!it.name || !isImageFileName(it.name)) continue;
+        out.push({ name: it.name, path: it.path, url: it.url });
       }
       setItems(out);
     } catch (e) {
@@ -59,7 +49,6 @@ export function MediaGalleryModal({ open, onClose, editor }: Props) {
   useEffect(() => {
     if (open) {
       setSelected(null);
-      setAltText("");
       void load();
     }
   }, [open, load]);
@@ -73,19 +62,9 @@ export function MediaGalleryModal({ open, onClose, editor }: Props) {
     return () => document.removeEventListener("keydown", h);
   }, [open, onClose]);
 
-  useEffect(() => {
-    if (!selected) {
-      setAltText("");
-      return;
-    }
-    const base = selected.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
-    setAltText(base.slice(0, 120) || "Imagem");
-  }, [selected]);
-
-  function insert() {
+  function confirm() {
     if (!selected) return;
-    const alt = altText.trim() || "Imagem";
-    editor.chain().focus().setImage({ src: selected.url, alt }).run();
+    onSelect(selected.url);
     onClose();
   }
 
@@ -96,19 +75,19 @@ export function MediaGalleryModal({ open, onClose, editor }: Props) {
       className="fixed inset-0 z-[200] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="media-gallery-title"
+      aria-labelledby="storage-picker-title"
     >
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-        aria-label="Fechar galeria"
+        aria-label="Fechar"
         onClick={onClose}
       />
       <div className="relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 id="media-gallery-title" className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+          <h2 id="storage-picker-title" className="flex items-center gap-2 text-sm font-semibold text-slate-900">
             <Images className="h-4 w-4" aria-hidden />
-            Galeria de imagens
+            {title}
           </h2>
           <button
             type="button"
@@ -132,11 +111,11 @@ export function MediaGalleryModal({ open, onClose, editor }: Props) {
             </p>
           ) : items.length === 0 && !err ? (
             <p className="text-sm text-slate-500">
-              Ainda sem imagens. Adiciona ficheiros na{" "}
+              Ainda não há imagens. Envia ficheiros em{" "}
               <a className="font-medium text-slate-800 underline" href="/admin/media/">
-                biblioteca
-              </a>
-              .
+                Central de mídia
+              </a>{" "}
+              e volta aqui.
             </p>
           ) : (
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
@@ -168,42 +147,23 @@ export function MediaGalleryModal({ open, onClose, editor }: Props) {
           )}
         </div>
 
-        {selected && (
-          <div className="border-t border-slate-200 bg-slate-50/90 px-4 py-3">
-            <label htmlFor="media-modal-alt" className="text-xs font-medium text-slate-700">
-              Texto alternativo (alt) — SEO e acessibilidade
-            </label>
-            <input
-              id="media-modal-alt"
-              value={altText}
-              onChange={(e) => setAltText(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-              placeholder="Descreva a imagem em poucas palavras"
-              autoComplete="off"
-            />
-            <p className="mt-1 text-[11px] text-slate-500">
-              A imagem passa a fazer parte do conteúdo com o endereço público abaixo.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={insert}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                Inserir no artigo
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelected(null);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-              >
-                Outra imagem
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50/90 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={!selected}
+            onClick={confirm}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Usar esta imagem
+          </button>
+        </div>
       </div>
     </div>
   );

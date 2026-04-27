@@ -9,6 +9,7 @@ import {
 import {
   deployToClientRepo,
   type ClientConfig,
+  type SiteConfig,
   type DeployToClientRepoOptions,
   type DeployToClientRepoResult,
 } from "./publisher";
@@ -20,7 +21,7 @@ export { RepositoryAlreadyExistsError };
 
 /**
  * Orquestra a criação de repositórios e o envio do template, com
- * `src/data/client-config.json` injetado a partir de `ClientConfig`.
+ * `src/data/site-config.json` injetado a partir de `ClientConfig` / `SiteConfig`.
  */
 export class GithubPublisher {
   private readonly token: string;
@@ -51,7 +52,7 @@ export class GithubPublisher {
   /**
    * Cria o repositório (público ou privado), gera o primeiro commit com o template
    * atual a partir da raiz do projeto (pastas como `node_modules` são ignoradas) e
-   * escreve `clientConfig` em `src/data/client-config.json`.
+   * escreve `clientConfig` em `src/data/site-config.json`.
    *
    * @throws {RepositoryAlreadyExistsError} Resposta 422 de nome duplicado no GitHub.
    */

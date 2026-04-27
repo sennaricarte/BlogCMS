@@ -1,6 +1,8 @@
 ---
-import clientConfig from "../data/client-config.json";
+import siteConfig from "../data/site-config.json";
 import "../styles/global.css";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
 
 export interface Props {
   title: string;
@@ -38,14 +40,7 @@ const {
   jsonLdData: jsonLdOverride,
 } = Astro.props as Props;
 
-const config = clientConfig as typeof clientConfig & {
-  footerLinks?: Array<{ label: string; href: string }>;
-  footerText?: string;
-};
-const footerLinks = config.footerLinks?.length ? config.footerLinks : [];
-const year = new Date().getFullYear();
-const footerTextDefault = `© ${year} ${config.nomeMarca}. Todos os direitos reservados.`;
-const footerText = (config.footerText && config.footerText.trim()) || footerTextDefault;
+const config = siteConfig as typeof siteConfig;
 const pageDescription = descriptionOverride?.trim() || config.descricaoSeo;
 const siteBase =
   (import.meta.env.SITE as string | undefined)?.replace(/\/$/, "") ||
@@ -71,6 +66,17 @@ const defaultJsonLd = {
 const jsonLd = jsonLdOverride ?? defaultJsonLd;
 
 const isPt = lang.toLowerCase().startsWith("pt");
+
+const extConfig = config as typeof config & { headerLogoUrl?: string; faviconUrl?: string };
+const faviconHref = extConfig.faviconUrl?.trim() || "/favicon.svg";
+function faviconMimeType(href: string): string {
+  const h = href.toLowerCase();
+  if (h.endsWith(".svg")) return "image/svg+xml";
+  if (h.endsWith(".ico")) return "image/x-icon";
+  if (h.endsWith(".png")) return "image/png";
+  if (h.endsWith(".jpg") || h.endsWith(".jpeg")) return "image/jpeg";
+  return "image/png";
+}
 ---
 
 <!DOCTYPE html>
@@ -82,8 +88,7 @@ const isPt = lang.toLowerCase().startsWith("pt");
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" type={faviconMimeType(faviconHref)} href={faviconHref} />
     <meta name="generator" content={Astro.generator} />
     <title>{fullTitle}</title>
     <meta name="description" content={pageDescription} />
@@ -132,52 +137,10 @@ const isPt = lang.toLowerCase().startsWith("pt");
     >
       {isPt ? "Ir para o conteúdo principal" : "Skip to main content"}
     </a>
-    <header class="border-b border-slate-200 bg-white">
-      <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <a href="/" class="text-lg font-semibold text-[var(--client-color-primary)]" aria-label={config.nomeMarca + " — página inicial"}>
-          {config.nomeMarca}
-        </a>
-        <nav aria-label={isPt ? "Menu principal" : "Main navigation"}>
-          <ul class="flex flex-wrap gap-1 sm:gap-4">
-            {config.menuLinks.map((item) => (
-              <li>
-                <a
-                  href={item.href}
-                  class="rounded-md px-2 py-1 text-slate-700 underline-offset-4 hover:underline focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--client-color-primary)]"
-                >
-                  {item.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </div>
-    </header>
+    <Header isPt={isPt} />
     <main id="conteudo-principal" class="flex-1">
       <slot />
     </main>
-    <footer class="mt-auto border-t border-slate-200 bg-slate-50" role="contentinfo">
-      <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        {
-          footerLinks.length > 0 && (
-            <nav aria-label="Rodapé do site" class="mb-4">
-              <ul class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-start">
-                {footerLinks.map((item) => (
-                  <li>
-                    <a
-                      href={item.href}
-                      class="text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-[var(--client-color-primary)] hover:underline"
-                    >
-                      {item.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          )
-        }
-        <p class="text-center text-sm text-slate-500 sm:text-left">{footerText}</p>
-      </div>
-    </footer>
+    <Footer isPt={isPt} />
   </body>
 </html>

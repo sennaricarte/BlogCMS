@@ -1,38 +1,5 @@
 ---
 export const prerender = false;
 
-import AdminLayout from "../../layouts/AdminLayout.astro";
-import { LayoutSettingsForm } from "../../components/admin/LayoutSettingsForm";
-import type { ClientConfig } from "../../lib/publisher";
-import defaultClientConfig from "../../data/client-config.json";
-
-const pageTitle = "Configurações de layout";
-const pageDescription =
-  "Menu superior e rodapé global (client-config.json). As alterações são gravadas no repositório GitHub do site.";
-const initial = defaultClientConfig as ClientConfig;
+return Astro.redirect("/admin/appearance/", 302);
 ---
-
-<AdminLayout
-  title={pageTitle}
-  description={pageDescription}
-  section="layout"
-  canonicalPath="/admin/layout/"
->
-  <p class="mb-6 text-sm text-zinc-600">
-    <a href="/admin/dashboard/" class="text-[var(--client-color-primary)] hover:underline">← Painel</a>
-  </p>
-
-  <header class="mb-8 max-w-3xl">
-    <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Configurações de layout</p>
-    <h1 class="mt-1 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Menu e rodapé</h1>
-    <p class="mt-2 text-sm text-zinc-600">
-      Define o menu do cabeçalho e as ligações do rodapé que aparecem em todas as páginas públicas. O ficheiro
-      <code class="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs">src/data/client-config.json</code> é
-      actualizado com um commit no teu repositório.
-    </p>
-  </header>
-
-  <div class="max-w-3xl">
-    <LayoutSettingsForm client:load initialConfig={initial} />
-  </div>
-</AdminLayout>

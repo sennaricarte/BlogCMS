@@ -3,7 +3,7 @@ import type { CollectionEntry } from "astro:content";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import BlogImage from "../../components/blog/BlogImage.astro";
 import ArticleBreadcrumbs from "../../components/seo/ArticleBreadcrumbs.astro";
-import clientConfig from "../../data/client-config.json";
+import siteConfig from "../../data/site-config.json";
 import { getPublicBlogPosts } from "../../lib/blog";
 import {
   getTagBySlug,
@@ -36,13 +36,13 @@ const { posts, name, description, slug } = Astro.props as {
   slug: string;
 };
 
-const pageTitle = `Artigos: ${name} (etiqueta) | ${(clientConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
+const pageTitle = `Artigos: ${name} (etiqueta) | ${(siteConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
 const canonicalPath = `/tag/${slug}/`;
 const h1 = `Artigos com a etiqueta «${name}»`;
 
 const siteBase =
   (import.meta.env.SITE as string | undefined)?.replace(/\/$/, "") ||
-  (clientConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
+  (siteConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
   "";
 
 const listJsonLd = {

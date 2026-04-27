@@ -4,7 +4,7 @@ import { render } from "astro:content";
 import type { CollectionEntry } from "astro:content";
 import BlogImage from "../components/blog/BlogImage.astro";
 import ArticleBreadcrumbs from "../components/seo/ArticleBreadcrumbs.astro";
-import clientConfig from "../data/client-config.json";
+import siteConfig from "../data/site-config.json";
 import { getCategoryDisplayName, getTagDisplayName, tagToSlug } from "../lib/taxonomies";
 import type { ClientConfig } from "../lib/publisher";
 import { buildBlogPostJsonLdGraph, getBreadcrumbItems } from "../lib/seo/blog-post-json-ld";
@@ -21,7 +21,7 @@ const { Content } = await render(post);
 
 const siteBase =
   (import.meta.env.SITE as string | undefined)?.replace(/\/$/, "") ||
-  (clientConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
+  (siteConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
   Astro.url.origin;
 const baseForUrl = siteBase.endsWith("/") ? siteBase : siteBase + "/";
 
@@ -35,7 +35,7 @@ const openGraphImageUrl = new URL(og.src, baseForUrl).toString();
 const datePublished = d.pubDate.toISOString();
 const dateModified = (d.updatedDate ?? d.pubDate).toISOString();
 
-const cfg = clientConfig as ClientConfig;
+const cfg = siteConfig as ClientConfig;
 const seoCtx = {
   post,
   siteBase,

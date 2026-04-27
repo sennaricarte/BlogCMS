@@ -3,8 +3,8 @@ import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGitHubClient, createRepository, type CreateRepositoryResult } from "./github";
 
-/** Alinhado a `src/data/client-config.json`. */
-export interface ClientConfig {
+/** Alinhado a `src/data/site-config.json` (identidade, menu, rodapé, SEO). */
+export interface SiteConfig {
   nomeMarca: string;
   cores: {
     primaria: string;
@@ -16,12 +16,27 @@ export interface ClientConfig {
   footerLinks?: Array<{ label: string; href: string }>;
   /** Texto legal / copyright (HTML não permitido; texto simples). */
   footerText?: string;
+  /** Redes sociais (rótulo + URL). */
+  socialLinks?: Array<{ label: string; href: string }>;
   siteUrl: string;
   imagemCompartilhamento: string;
+  /**
+   * Caminho público da logótipo no cabeçalho (ex. `/media/logo.png`).
+   * Vazio = mostrar só o nome da marca em texto.
+   */
+  headerLogoUrl?: string;
+  /**
+   * Caminho público do favicon (ex. `/favicon.svg`, `/media/favicon.ico`).
+   * Em falta, usa-se `/favicon.svg`.
+   */
+  faviconUrl?: string;
 }
 
+/** @deprecated Use `SiteConfig`; mantido para compatibilidade. */
+export type ClientConfig = SiteConfig;
+
 /** Sempre POSIX para comparar com `r` na árvore de ficheiros. */
-const CONFIG_FILE_IN_TEMPLATE = "src/data/client-config.json";
+const CONFIG_FILE_IN_TEMPLATE = "src/data/site-config.json";
 
 const IGNORED_DIR_NAMES = new Set([
   ".git",
@@ -143,7 +158,7 @@ function isBinaryFile(path: string, buffer: Buffer): boolean {
 /** Percorre o template e devolve pares (caminho POSIX no repo, conteúdo). */
 async function loadTemplateFiles(
   templateRoot: string,
-  clientConfig: ClientConfig,
+  clientConfig: SiteConfig,
 ): Promise<Array<{ path: string; buffer: Buffer; encoding: "utf-8" | "base64" }>> {
   const rootAbs = join(templateRoot);
   if (!(await pathExists(rootAbs))) {
@@ -217,12 +232,12 @@ async function mapPool<T, R>(
 
 /**
  * Cria um repositório no GitHub do usuário autenticado e envia o conteúdo do template
- * com `src/data/client-config.json` substituído por `clientConfig`.
+ * com `src/data/site-config.json` substituído por `clientConfig`.
  *
  * O `options.token` é obrigatório (não lido de `process.env` nesta função).
  */
 export async function deployToClientRepo(
-  clientConfig: ClientConfig,
+  clientConfig: SiteConfig,
   options: DeployToClientRepoOptions,
 ): Promise<DeployToClientRepoResult> {
   const token = requireGithubToken(

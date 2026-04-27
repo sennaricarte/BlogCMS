@@ -17,7 +17,7 @@ const DEFAULT_LANG = "pt-BR";
 
 /**
  * Gera a lista de migalhas (mesma ordem do JSON-LD BreadcrumbList).
- * Procura em `client-config` a entrada cujo `href` contém "blog" como secção; caso contrário, usa "Blog" e "/blog/".
+ * Procura em `site-config` a entrada cujo `href` contém "blog" como secção; caso contrário, usa "Blog" e "/blog/".
  */
 export function getBreadcrumbItems(ctx: BlogSeoContext): Array<{ name: string; href: string }> {
   const { siteBase, canonicalPath, post } = ctx;
@@ -41,7 +41,7 @@ function absoluteUrl(siteBase: string, path: string): string {
 }
 
 /**
- * @graph: BlogPosting (publisher=Organization do client-config) + BreadcrumbList.
+ * @graph: BlogPosting (publisher=Organization do site-config) + BreadcrumbList.
  */
 export function buildBlogPostJsonLdGraph(ctx: BlogSeoContext): Record<string, unknown> {
   const d = ctx.post.data;
@@ -51,7 +51,11 @@ export function buildBlogPostJsonLdGraph(ctx: BlogSeoContext): Record<string, un
     ? ctx.clientConfig.siteUrl.replace(/\/$/, "") + "/"
     : ctx.siteBase;
   const orgBase = orgUrl.replace(/\/?$/, "/");
-  const logoPath = ctx.clientConfig.imagemCompartilhamento || "/favicon.svg";
+  const logoPath =
+    ctx.clientConfig.headerLogoUrl?.trim() ||
+    ctx.clientConfig.imagemCompartilhamento ||
+    ctx.clientConfig.faviconUrl ||
+    "/favicon.svg";
   const logoUrl = absoluteUrl(ctx.siteBase, logoPath);
 
   const datePublished = d.pubDate.toISOString();

@@ -1,7 +1,7 @@
 ---
 export const prerender = false;
 import "../../../styles/global.css";
-import clientConfig from "../../../data/client-config.json";
+import siteConfig from "../../../data/site-config.json";
 import { getPreviewBlockSession } from "../../../lib/preview-session-store";
 import PageBlocksRenderer from "../../../components/blocks/PageBlocksRenderer.astro";
 
@@ -10,8 +10,8 @@ const session = sid ? getPreviewBlockSession(sid) : null;
 const blocks = session?.blocks ?? [];
 const origin = new URL(Astro.request.url).origin;
 const pageUrlFallback = session?.pageUrl?.trim() || `${origin}/p/`;
-const prim = (clientConfig as { cores?: { primaria?: string } }).cores?.primaria ?? "#0ea5e9";
-const sec = (clientConfig as { cores?: { secundaria?: string } }).cores?.secundaria ?? "#64748b";
+const prim = (siteConfig as { cores?: { primaria?: string } }).cores?.primaria ?? "#0ea5e9";
+const sec = (siteConfig as { cores?: { secundaria?: string } }).cores?.secundaria ?? "#64748b";
 ---
 
 <!doctype html>

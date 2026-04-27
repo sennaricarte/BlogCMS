@@ -13,7 +13,7 @@ Este é o corpo do primeiro artigo. Podes usar **Markdown** e listas:
 
 - Leve e rápido
 - Boa acessibilidade
-- Cores de marca a partir de `client-config.json`
+- Cores de marca a partir de `site-config.json`
 
 > Um *blockquote* para variar a ritmo de leitura.
 

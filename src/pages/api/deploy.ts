@@ -79,7 +79,7 @@ export const POST: APIRoute = async ({ request }) => {
     return jsonError("Indica o nome do repositório (clientData.repositoryName ou repositoryName).", 400);
   }
   if (!config || typeof config !== "object") {
-    return jsonError("O objeto «config» (client-config / SEO) é obrigatório (em clientData ou no topo).", 400);
+    return jsonError("O objeto «config» (site-config / SEO) é obrigatório (em clientData ou no topo).", 400);
   }
 
   try {

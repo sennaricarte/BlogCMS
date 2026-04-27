@@ -4,6 +4,8 @@ export const CMS_PATHS = {
   pages: "src/content/pages",
   /** Catálogo global (categorias e etiquetas) — fonte do editor. */
   taxonomiesJson: "src/data/taxonomies.json",
-  /** Marca, menu, rodapé e SEO de partilhamento. */
-  clientConfigJson: "src/data/client-config.json",
+  /** Aparência global: identidade, menu, rodapé (repositório do site / Astro). */
+  siteConfigJson: "src/data/site-config.json",
+  /** Repositórios antigos: leitura ao migrar para `siteConfigJson`. */
+  legacyClientConfigJson: "src/data/client-config.json",
 } as const;

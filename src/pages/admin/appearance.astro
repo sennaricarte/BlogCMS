@@ -1,0 +1,38 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { LayoutSettingsForm } from "../../components/admin/LayoutSettingsForm";
+import type { ClientConfig } from "../../lib/publisher";
+import defaultSiteConfig from "../../data/site-config.json";
+
+const pageTitle = "Aparência";
+const pageDescription =
+  "Identidade visual, menu, rodapé, logótipo e favicon (ficheiro site-config.json no repositório do site).";
+const initial = defaultSiteConfig as ClientConfig;
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="appearance"
+  canonicalPath="/admin/appearance/"
+>
+  <p class="mb-6 text-sm text-zinc-600">
+    <a href="/admin/dashboard/" class="text-[var(--client-color-primary)] hover:underline">← Painel</a>
+  </p>
+
+  <header class="mb-8 max-w-3xl">
+    <p class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Layout do site</p>
+    <h1 class="mt-1 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Aparência e navegação</h1>
+    <p class="mt-2 text-sm text-zinc-600">
+      Cores da marca, logótipo, favicon, menu do cabeçalho, rodapé e redes sociais. As alterações são guardadas em
+      <code class="rounded bg-zinc-100 px-1 text-xs">site-config.json</code> no repositório ligado ao projeto; o Astro
+      aplica tudo no próximo build.
+    </p>
+  </header>
+
+  <div class="max-w-3xl">
+    <LayoutSettingsForm client:load initialConfig={initial} />
+  </div>
+</AdminLayout>

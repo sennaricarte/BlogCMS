@@ -37,6 +37,9 @@ const fakeConfig: ClientConfig = {
   ],
   siteUrl: "https://blog-do-senna.example.com",
   imagemCompartilhamento: "/favicon.svg",
+  headerLogoUrl: "",
+  faviconUrl: "/favicon.svg",
+  socialLinks: [],
 };
 
 async function main(): Promise<void> {

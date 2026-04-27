@@ -31,7 +31,7 @@ export function MediaCenter() {
         items?: ListItem[];
       };
       if (!j.ok) {
-        setErr(j.error || "Não foi possível listar a mídia no Supabase.");
+        setErr(j.error || "Não foi possível carregar a biblioteca de imagens.");
         setList([]);
         return;
       }
@@ -90,9 +90,7 @@ export function MediaCenter() {
       setLastUpload({ name: data.fileName, url: data.previewUrl, relativeMd: data.relativeMarkdown });
       const base = data.fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
       setPostAlt(base.slice(0, 120) || "Imagem");
-      setUpMsg(
-        "Ficheiro processado (WebP) e enviado para o Supabase Storage. Preencha o texto alternativo (SEO) abaixo.",
-      );
+      setUpMsg("Imagem enviada. Preenche o texto alternativo (recomendado para acessibilidade e SEO) abaixo.");
       await refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Falha no upload.");
@@ -121,11 +119,8 @@ export function MediaCenter() {
         </p>
       )}
       <p className="text-sm text-zinc-600">
-        As imagens são otimizadas no servidor (WebP, largura máx. 1920px, qualidade 80) e enviadas para o{" "}
-        <strong>Supabase Storage</strong> (necessitas de sessão no admin e de{" "}
-        <code className="rounded bg-zinc-100 px-1 font-mono text-xs">SUPABASE_SERVICE_ROLE_KEY</code> no ambiente
-        do servidor). O bucket predefinido é <code className="font-mono text-xs">cms-media</code> (público para
-        leitura).
+        As imagens são otimizadas automaticamente (tamanho e formato adequados à web) e ficam guardadas na biblioteca
+        do site, para reutilizares em artigos e noutros sítios do painel.
       </p>
 
       <div

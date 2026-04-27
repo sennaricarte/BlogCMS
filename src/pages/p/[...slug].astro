@@ -1,7 +1,7 @@
 ---
 import { getCollection, render } from "astro:content";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import clientConfig from "../../data/client-config.json";
+import siteConfig from "../../data/site-config.json";
 import type { PageBlock } from "../../lib/page-blocks.zod";
 import { buildPageJsonLdGraph } from "../../lib/page-seo-jsonld";
 import PageBlocksRenderer from "../../components/blocks/PageBlocksRenderer.astro";
@@ -30,7 +30,7 @@ const hasMarkdown = typeof rawMd === "string" && rawMd.replace(/\r?\n/g, "").tri
 const canonicalPath = new URL(Astro.url.pathname, Astro.url).pathname;
 const siteBase =
   (import.meta.env.SITE as string | undefined)?.replace(/\/$/, "") ||
-  (clientConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
+  (siteConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
   Astro.url.origin;
 const pageUrl = new URL(canonicalPath, siteBase + "/").toString();
 const faqForSchema = blocks

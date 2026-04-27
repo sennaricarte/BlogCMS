@@ -87,7 +87,7 @@ function isRetryableVercelProjectError(e: unknown): boolean {
 export interface DeployNewSiteClientData {
   /** Nome do novo repositório GitHub (slug). */
   repositoryName: string;
-  /** Conteúdo escrito em `src/data/client-config.json` no template. */
+  /** Conteúdo escrito em `src/data/site-config.json` no template. */
   config: ClientConfig;
   /** Opções extra do `GithubPublisher.createClientSite` (privacidade, template, etc.). */
   github?: CreateClientSiteOptions;
@@ -195,7 +195,7 @@ export async function deployNewSite(
     vercel = new VercelService({ token: tt.vercelToken, teamId: tt.vercelTeamId });
   }
 
-  log("1/3 Iniciando: criar repositório no GitHub e enviar o template Astro com client-config.json personalizado…");
+  log("1/3 Iniciando: criar repositório no GitHub e enviar o template Astro com site-config.json personalizado…");
 
   const ghResult = await github.createClientSite(repoName, clientData.config, {
     ...clientData.github,
