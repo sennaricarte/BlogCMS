@@ -1,0 +1,102 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { EditPageBodyField } from "../../../components/admin/EditPageBodyField";
+import { PageEditorSplitView } from "../../../components/admin/PageEditorSplitView";
+
+const defaultPageMd = `# Página
+
+Conteúdo em **Markdown**.`;
+---
+
+<AdminLayout
+  title="Nova página"
+  description="Criar arquivo em src/content/pages e publicar em /p/slug/"
+  section="pages"
+  canonicalPath="/admin/pages/novo/"
+>
+  <p class="mb-4 text-sm text-slate-600">
+    <a href="/admin/pages/" class="text-[var(--client-color-primary)] hover:underline">← Páginas</a>
+  </p>
+
+  <div
+    id="page-form-root"
+    class="space-y-6"
+    data-mode="create"
+    data-initial-slug="nova"
+  >
+    <div
+      class="hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+      id="p-msg"
+      role="status"
+    >
+    </div>
+    <div class="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 sm:p-6">
+      <div class="sm:col-span-2">
+        <label for="p-title" class="block text-sm font-medium text-slate-800">Título</label>
+        <input id="p-title" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" required />
+      </div>
+      <div>
+        <div class="flex items-center justify-between">
+          <label for="p-slug" class="text-sm font-medium">Slug (URL /p/…/)</label>
+          <label class="inline-flex items-center gap-1.5 text-xs text-slate-600">
+            <input type="checkbox" id="p-auto-slug" checked class="rounded border-slate-300" />
+            Gerar do título
+          </label>
+        </div>
+        <input id="p-slug" class="mt-1.5 w-full rounded-lg border border-slate-200 font-mono text-sm" />
+      </div>
+      <div>
+        <label for="p-pub" class="block text-sm font-medium">Data</label>
+        <input id="p-pub" type="date" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+      </div>
+      <div>
+        <label for="p-upd" class="block text-sm font-medium">Atualizado (opt.)</label>
+        <input id="p-upd" type="date" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+      </div>
+      <div class="sm:col-span-2">
+        <label for="p-desc" class="block text-sm font-medium">Meta descrição (SEO)</label>
+        <textarea id="p-desc" required rows="2" maxlength="160" class="mt-1.5 w-full rounded-lg border border-slate-200 p-2 text-sm"
+        ></textarea>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" id="p-draft" class="rounded border-slate-300" />
+          Rascunho
+        </label>
+      </div>
+    </div>
+    <input type="hidden" id="p-page-blocks" value="[]" />
+    <PageEditorSplitView client:load />
+    <div class="min-w-0">
+      <p class="text-sm font-medium text-slate-800">Conteúdo adicional (Markdown, opcional)</p>
+      <p class="mt-0.5 text-xs text-slate-500">Editor rico (TipTap). Podes usar só blocos, só texto ou combinar os dois.</p>
+      <input type="hidden" id="p-body" value="" />
+      <div class="mt-2 w-full min-w-0">
+        <EditPageBodyField client:load initialMarkdown={defaultPageMd}>
+          <p slot="fallback" class="min-h-40 rounded-lg border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
+            A carregar editor…
+          </p>
+        </EditPageBodyField>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button
+        type="button"
+        id="p-save"
+        class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Criar no GitHub</button
+      >
+      <span class="text-sm text-slate-500" id="p-saving" aria-live="polite"></span>
+      <button
+        type="button"
+        id="p-del"
+        class="ml-auto hidden rounded border border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-800">Excluir</button
+      >
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  import "../../../scripts/page-editor.ts";
+</script>

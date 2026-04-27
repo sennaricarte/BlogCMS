@@ -1,0 +1,44 @@
+---
+import type { PageBlock } from "../../lib/page-blocks.zod";
+
+type P = Extract<PageBlock, { type: "cta" }> & { class?: string };
+
+const {
+  title,
+  text,
+  primaryLabel,
+  primaryUrl,
+  secondaryLabel,
+  secondaryUrl,
+  class: className = "",
+} = Astro.props as P;
+const hasSecondary = Boolean(secondaryLabel?.trim() && secondaryUrl?.trim());
+---
+
+<section
+  class={`rounded-2xl border border-slate-200 bg-gradient-to-br from-[var(--client-color-primary)]/10 via-white to-slate-50 px-6 py-8 shadow-sm ring-1 ring-slate-900/5 sm:px-8 sm:py-10 ${className}`}
+  aria-labelledby={`cta-h-${Astro.props.id}`}
+>
+  <h2 id={`cta-h-${Astro.props.id}`} class="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+    {title}
+  </h2>
+  {text && <p class="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">{text}</p>}
+  <div class={`mt-6 flex flex-wrap items-center gap-3 ${text ? "" : "mt-5"}`}>
+    <a
+      href={primaryUrl}
+      class="inline-flex items-center justify-center rounded-lg bg-[var(--client-color-primary)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--client-color-primary)]"
+    >
+      {primaryLabel}
+    </a>
+    {
+      hasSecondary && (
+        <a
+          href={secondaryUrl!}
+          class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+        >
+          {secondaryLabel}
+        </a>
+      )
+    }
+  </div>
+</section>

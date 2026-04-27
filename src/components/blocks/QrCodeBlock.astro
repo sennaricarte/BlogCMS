@@ -1,0 +1,33 @@
+---
+import QRCode from "qrcode";
+import type { PageBlock } from "../../lib/page-blocks.zod";
+
+type P = Extract<PageBlock, { type: "qrCode" }> & {
+  class?: string;
+  /** URL canónica da página, usada se `targetUrl` estiver vazio */
+  pageUrlFallback: string;
+};
+
+const p = Astro.props as P;
+const { targetUrl, caption, pageUrlFallback, class: className = "" } = p;
+const finalUrl = (targetUrl && targetUrl.trim()) || pageUrlFallback;
+const dataUrl = await QRCode.toDataURL(finalUrl, { width: 256, margin: 2, errorCorrectionLevel: "M" });
+---
+
+<section
+  class={`flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm ${className}`}
+  aria-label="Código QR"
+>
+  <figure>
+    <img
+      src={dataUrl}
+      width="256"
+      height="256"
+      class="h-48 w-48 sm:h-64 sm:w-64"
+      alt={`Código QR que aponta para ${finalUrl}`}
+      loading="lazy"
+    />
+    <figcaption class="mt-3 max-w-sm text-xs break-all text-slate-500">{finalUrl}</figcaption>
+  </figure>
+  {caption && <p class="mt-2 text-sm text-slate-600">{caption}</p>}
+</section>

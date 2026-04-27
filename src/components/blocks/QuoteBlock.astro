@@ -1,0 +1,25 @@
+---
+import type { PageBlock } from "../../lib/page-blocks.zod";
+
+type P = Extract<PageBlock, { type: "quote" }> & { class?: string };
+
+const { text, author, authorRole, class: className = "" } = Astro.props as P;
+const hasAttribution = Boolean(author?.trim() || authorRole?.trim());
+---
+
+<figure
+  class={`relative rounded-2xl border border-slate-200 bg-slate-50/80 px-6 py-8 shadow-sm sm:px-8 ${className}`}
+>
+  <blockquote class="border-l-4 border-[var(--client-color-primary)] pl-5 text-lg leading-relaxed text-slate-800 sm:text-xl">
+    <p class="font-medium">“{text}”</p>
+  </blockquote>
+  {
+    hasAttribution && (
+      <figcaption class="mt-5 pl-5 text-sm text-slate-600">
+        {author?.trim() && <span class="font-semibold text-slate-800">{author}</span>}
+        {author?.trim() && authorRole?.trim() && <span class="text-slate-400"> · </span>}
+        {authorRole?.trim() && <span class="text-slate-600">{authorRole}</span>}
+      </figcaption>
+    )
+  }
+</figure>

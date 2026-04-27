@@ -1,0 +1,324 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import { ADMIN_CMS_TARGET_KEY } from "../lib/admin-cms-target";
+import { ADMIN_INTEGRATION_STORAGE_KEY } from "../lib/admin-storage";
+import LogoutButton from "../components/admin/LogoutButton";
+import Icon from "../components/admin/Icon.astro";
+
+export interface Props {
+  title: string;
+  description: string;
+  section?: "dashboard" | "posts" | "pages" | "media" | "categories" | "tags" | "layout" | "settings" | "deploy" | "project";
+  canonicalPath: string;
+}
+
+const { title, description, section, canonicalPath } = Astro.props;
+
+/** Lista de sites: ecrã focado; o menu de secções (Posts, Páginas, …) abre a partir de “Gerenciar site”. */
+const showCmsNav = section !== "dashboard";
+
+const navMain: Array<{
+  href: string;
+  label: string;
+  id: NonNullable<Props["section"]>;
+  icon: "layout-dashboard" | "file-text" | "document" | "image" | "folder" | "tag" | "layout-rows" | "adjustments";
+}> = [
+  { href: "/admin/dashboard/", label: "Painel", id: "dashboard", icon: "layout-dashboard" },
+  { href: "/admin/posts/", label: "Artigos", id: "posts", icon: "file-text" },
+  { href: "/admin/pages/", label: "Páginas", id: "pages", icon: "document" },
+  { href: "/admin/media/", label: "Mídia", id: "media", icon: "image" },
+  { href: "/admin/taxonomies/", label: "Categorias", id: "categories", icon: "folder" },
+  { href: "/admin/tags/", label: "Etiquetas", id: "tags", icon: "tag" },
+  { href: "/admin/layout/", label: "Layout", id: "layout", icon: "layout-rows" },
+  { href: "/admin/settings/", label: "Configurações", id: "settings", icon: "adjustments" },
+];
+---
+
+<BaseLayout title={title} description={description} noindex canonicalPath={canonicalPath}>
+  <div
+    class="min-h-screen bg-zinc-50 font-sans text-zinc-900 antialiased selection:bg-zinc-900/10"
+  >
+    <a
+      href="#conteudo-admin"
+      class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:border focus:border-zinc-200 focus:bg-white focus:px-3 focus:py-2 focus:shadow-md focus:ring-1 focus:ring-zinc-200"
+      >Ir para o conteúdo</a
+    >
+
+    {
+      showCmsNav ? (
+        <div class="border-b border-zinc-200/80 bg-white/95 backdrop-blur-md lg:hidden">
+          <nav class="flex items-center gap-1 overflow-x-auto px-2 py-2.5" aria-label="Atalhos do painel">
+            {navMain.map((l) => (
+              <a
+                href={l.href}
+                class:list={[
+                  "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium",
+                  section === l.id
+                    ? "bg-zinc-900 text-white"
+                    : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+                ]}
+                aria-current={section === l.id ? "page" : undefined}
+              >
+                <Icon kind={l.icon} class="opacity-90" />
+                {l.label}
+              </a>
+            ))}
+          </nav>
+          <div class="px-2 pb-2.5">
+            <LogoutButton client:load />
+          </div>
+        </div>
+      ) : (
+        <div
+          class="flex items-center justify-between gap-3 border-b border-zinc-200/80 bg-white/95 px-3 py-2.5 backdrop-blur-md lg:hidden"
+          aria-label="Cabeçalho do painel"
+        >
+          <p class="text-sm font-semibold tracking-tight text-zinc-900">
+            <span class="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-zinc-400">BlogCMS</span>{" "}
+            <span class="text-zinc-600">Admin</span>
+          </p>
+          <LogoutButton client:load />
+        </div>
+      )
+    }
+
+    <div class="flex min-h-screen">
+      {
+        showCmsNav && (
+          <aside
+            class="hidden w-[16rem] flex-shrink-0 flex-col border-r border-zinc-200/80 bg-white shadow-[1px_0_0_0_rgba(0,0,0,0.03)] lg:fixed lg:inset-y-0 lg:left-0 lg:flex"
+            aria-label="Navegação do painel"
+          >
+            <div class="border-b border-zinc-200/80 px-5 py-5">
+              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-zinc-400">BlogCMS</p>
+              <p class="mt-1.5 text-base font-semibold tracking-tight text-zinc-900">Admin</p>
+            </div>
+            <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 py-3" aria-label="Secções">
+              {navMain.map((l) => (
+                <a
+                  href={l.href}
+                  class:list={[
+                    "group flex min-h-[2.5rem] items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                    section === l.id
+                      ? "bg-zinc-900 text-white shadow-sm"
+                      : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+                  ]}
+                  aria-current={section === l.id ? "page" : undefined}
+                >
+                  <span
+                    class:list={[
+                      "flex h-7 w-7 items-center justify-center rounded-md border",
+                      section === l.id
+                        ? "border-white/10 bg-white/10 text-white"
+                        : "border-zinc-200/80 bg-zinc-50/80 text-zinc-500 group-hover:border-zinc-200",
+                    ]}
+                  >
+                    <Icon kind={l.icon} />
+                  </span>
+                  {l.label}
+                </a>
+              ))}
+            </nav>
+            <div class="mt-auto space-y-2 border-t border-zinc-200/80 p-2.5">
+              <LogoutButton client:load />
+              <a
+                href="/admin/"
+                class:list={[
+                  "flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  section === "deploy"
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800",
+                ]}
+                aria-label="Infraestrutura: GitHub e Vercel"
+              >
+                Infra: GitHub &amp; Vercel
+              </a>
+            </div>
+          </aside>
+        )
+      }
+
+      <div
+        class:list={[
+          "flex min-h-screen min-w-0 flex-1 flex-col",
+          showCmsNav ? "lg:pl-64" : "lg:pl-0",
+        ]}
+      >
+        <header
+          class="sticky top-0 z-20 border-b border-zinc-200/80 bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/70"
+        >
+          <div
+            class="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-8"
+          >
+            <div class="min-w-0">
+              <h1 class="text-lg font-semibold tracking-tight text-zinc-900">{title}</h1>
+              <p class="mt-0.5 text-sm text-zinc-500">{description}</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              {
+                section === "dashboard" && (
+                  <a
+                    href="/admin/"
+                    class="order-first inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300/30 sm:order-first"
+                    aria-label="Criar novo site (GitHub e Vercel)"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.25"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="shrink-0"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="M12 5v14" />
+                    </svg>
+                    Novo site
+                  </a>
+                )
+              }
+              <label for="admin-busca-rapida" class="sr-only">Busca rápida</label>
+              <input
+                id="admin-busca-rapida"
+                type="search"
+                class="min-w-[10rem] flex-1 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/5 sm:max-w-xs"
+                placeholder="Buscar…"
+                autocomplete="off"
+                data-admin-quick-search
+                disabled
+              />
+              <button
+                type="button"
+                class:list={[
+                  "inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:opacity-50",
+                  section === "dashboard"
+                    ? "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
+                    : "border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50",
+                ]}
+                data-action="vercel-deploy"
+                disabled
+                aria-label="Publicar alterações (Vercel)"
+              >
+                Publicar
+              </button>
+              {
+                !showCmsNav && (
+                  <div class="mt-1 flex w-full items-center justify-end gap-2 sm:mt-0 sm:w-auto sm:shrink-0 lg:mt-0">
+                    <a
+                      href="/admin/"
+                      class="hidden min-h-10 items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 lg:inline-flex"
+                    >
+                      Infra: GitHub &amp; Vercel
+                    </a>
+                    <div class="hidden lg:block">
+                      <LogoutButton client:load />
+                    </div>
+                  </div>
+                )
+              }
+            </div>
+          </div>
+        </header>
+
+        <main id="conteudo-admin" class="flex-1 px-4 py-8 sm:px-8">
+          <div class="mx-auto max-w-6xl">
+            <slot />
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script
+  is:inline
+  define:vars={{ ADMIN_CMS_TARGET_KEY, ADMIN_INTEGRATION_STORAGE_KEY }}
+>
+  (function () {
+    var K_INTEGR = ADMIN_INTEGRATION_STORAGE_KEY;
+    var K_CMS = ADMIN_CMS_TARGET_KEY;
+
+    function readJson(key) {
+      try {
+        var raw = localStorage.getItem(key);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    var searchInput = document.querySelector("[data-admin-quick-search]");
+    if (searchInput) {
+      searchInput.removeAttribute("disabled");
+      var table = document.querySelector("[data-cms-table-wrap]");
+      if (table) {
+        searchInput.addEventListener("input", function () {
+          var q = searchInput && searchInput.value ? String(searchInput.value).toLowerCase().trim() : "";
+          var rows = table.querySelectorAll("[data-cms-table] tbody tr");
+          for (var i = 0; i < rows.length; i++) {
+            var row = /** @type {HTMLElement} */ (rows[i]);
+            var t = (row.getAttribute("data-search") || row.textContent || "").toLowerCase();
+            row.classList.toggle("hidden", q.length > 0 && t.indexOf(q) < 0);
+          }
+        });
+      } else {
+        searchInput.setAttribute("disabled", "true");
+        searchInput.setAttribute("title", "Nenhuma tabela nesta página");
+      }
+    }
+
+    var btn = document.querySelector("[data-action='vercel-deploy']");
+    if (btn) {
+      btn.removeAttribute("disabled");
+      btn.addEventListener("click", async function () {
+        var integ = readJson(K_INTEGR);
+        var target = readJson(K_CMS);
+        if (!integ || !integ.VERCEL_TOKEN) {
+          alert("Configure o token da Vercel em /admin/settings/ (integração).");
+          return;
+        }
+        if (!target || !target.githubRepoFullName || !target.vercelProjectId || !target.vercelProjectName) {
+          alert("Preencha o alvo do CMS (repositório e projeto Vercel) em /admin/settings/.");
+          return;
+        }
+        btn.setAttribute("disabled", "true");
+        var label = /** @type {HTMLButtonElement} */ (btn);
+        var old = label.textContent;
+        label.textContent = "A publicar…";
+        try {
+          var res = await fetch("/api/admin/cms/vercel-deploy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              VERCEL_TOKEN: integ.VERCEL_TOKEN,
+              VERCEL_TEAM_ID: integ.VERCEL_TEAM_ID,
+              vercelProjectId: target.vercelProjectId,
+              vercelProjectName: target.vercelProjectName,
+              githubRepoFullName: target.githubRepoFullName,
+              ref: target.branch || "main",
+            }),
+          });
+          var j = await res.json();
+          if (!res.ok || !j.ok) {
+            alert("Erro: " + (j.error || "HTTP " + res.status));
+            return;
+          }
+          label.textContent = "Enviado";
+          setTimeout(function () {
+            label.textContent = old;
+          }, 2000);
+        } catch (e) {
+          alert("Falha de rede: " + ((e && e.message) || ""));
+        } finally {
+          label.removeAttribute("disabled");
+        }
+      });
+    }
+  })();
+</script>

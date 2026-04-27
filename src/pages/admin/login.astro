@@ -1,0 +1,158 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { readSupabasePublicConfig } from "../../lib/supabase";
+
+export const prerender = false;
+
+const pageTitle = "Entrar no painel";
+const pageDescription = "Acesso seguro à área de administração (Supabase Auth).";
+
+const hasSupabaseEnv = readSupabasePublicConfig() != null;
+---
+
+<BaseLayout title={pageTitle} description={pageDescription} noindex canonicalPath="/admin/login/">
+  <div class="min-h-screen bg-gradient-to-b from-slate-100/90 to-slate-50">
+    <div class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12 sm:px-6">
+      <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-lg shadow-slate-900/5 sm:p-8">
+        <header class="mb-8 text-center">
+          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">BlogCMS</p>
+          <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">Bem-vindo de volta</h1>
+          <p class="mt-1.5 text-sm text-slate-600">Entra com a tua conta de administrador.</p>
+        </header>
+
+        {
+          hasSupabaseEnv ? (
+            <form id="form-admin-login" class="space-y-5" novalidate>
+              <div>
+                <label for="admin-login-email" class="block text-sm font-medium text-slate-800">
+                  E-mail
+                </label>
+                <input
+                  id="admin-login-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-[var(--client-color-primary)]/30"
+                  aria-describedby="admin-login-error"
+                />
+              </div>
+              <div>
+                <label for="admin-login-password" class="block text-sm font-medium text-slate-800">
+                  Senha
+                </label>
+                <input
+                  id="admin-login-password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-[var(--client-color-primary)]/30"
+                />
+              </div>
+              <p
+                id="admin-login-error"
+                class="hidden rounded-lg border border-red-200/90 bg-red-50 px-3 py-2 text-sm text-red-900"
+                role="alert"
+                hidden
+              />
+              <button
+                type="submit"
+                class="inline-flex w-full min-h-11 items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/20 disabled:cursor-not-allowed disabled:opacity-60"
+                id="admin-login-submit"
+                aria-busy="false"
+              >
+                Entrar
+              </button>
+            </form>
+          ) : (
+            <p
+              class="rounded-lg border border-amber-200/90 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+              role="status"
+            >
+              Define <code class="font-mono text-xs">PUBLIC_SUPABASE_URL</code> e
+              <code class="font-mono text-xs"> PUBLIC_SUPABASE_ANON_KEY</code> no
+              <code class="font-mono text-xs"> .env</code> e reinicia o servidor.
+            </p>
+          )
+        }
+        <p class="mt-6 text-center text-xs text-slate-500">
+          Problemas a entrar? Verifica o Supabase (Auth) e as variáveis
+          <code class="mx-0.5 rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.7rem]">PUBLIC_SUPABASE_*</code>
+          no
+          <code class="font-mono text-[0.7rem]">.env</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+  {
+    hasSupabaseEnv && (
+      <script>
+        import { createSupabaseBrowserClient } from "../../lib/supabase";
+
+        const DASHBOARD = "/admin/dashboard/";
+
+        const form = document.getElementById("form-admin-login");
+        const errEl = document.getElementById("admin-login-error");
+        const submitBtn = document.getElementById("admin-login-submit");
+        const emailIn = document.getElementById("admin-login-email");
+        const passIn = document.getElementById("admin-login-password");
+
+        if (
+          form instanceof HTMLFormElement &&
+          errEl &&
+          submitBtn instanceof HTMLButtonElement &&
+          emailIn instanceof HTMLInputElement &&
+          passIn instanceof HTMLInputElement
+        ) {
+          function setError(msg: string | null) {
+            if (!errEl) return;
+            if (msg) {
+              errEl.textContent = msg;
+              errEl.classList.remove("hidden");
+              errEl.removeAttribute("hidden");
+            } else {
+              errEl.textContent = "";
+              errEl.classList.add("hidden");
+              errEl.setAttribute("hidden", "");
+            }
+          }
+
+          function setLoading(loading: boolean) {
+            submitBtn!.disabled = loading;
+            submitBtn!.setAttribute("aria-busy", loading ? "true" : "false");
+            submitBtn!.textContent = loading ? "A entrar…" : "Entrar";
+            emailIn!.readOnly = loading;
+            passIn!.readOnly = loading;
+          }
+
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            setError(null);
+            setLoading(true);
+            const email = emailIn.value.trim();
+            const password = passIn.value;
+            if (!email || !password) {
+              setError("Indica o e-mail e a senha.");
+              setLoading(false);
+              return;
+            }
+            try {
+              const supabase = createSupabaseBrowserClient();
+              const { error } = await supabase.auth.signInWithPassword({ email, password });
+              if (error) {
+                setError(error.message);
+                return;
+              }
+              window.location.replace(DASHBOARD);
+            } catch (err: unknown) {
+              setError(err instanceof Error ? err.message : "Erro inesperado a iniciar sessão.");
+            } finally {
+              setLoading(false);
+            }
+          });
+        }
+      </script>
+    )
+  }
+</BaseLayout>

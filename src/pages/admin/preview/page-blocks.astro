@@ -1,0 +1,43 @@
+---
+export const prerender = false;
+import "../../../styles/global.css";
+import clientConfig from "../../../data/client-config.json";
+import { getPreviewBlockSession } from "../../../lib/preview-session-store";
+import PageBlocksRenderer from "../../../components/blocks/PageBlocksRenderer.astro";
+
+const sid = Astro.url.searchParams.get("sid") ?? "";
+const session = sid ? getPreviewBlockSession(sid) : null;
+const blocks = session?.blocks ?? [];
+const origin = new URL(Astro.request.url).origin;
+const pageUrlFallback = session?.pageUrl?.trim() || `${origin}/p/`;
+const prim = (clientConfig as { cores?: { primaria?: string } }).cores?.primaria ?? "#0ea5e9";
+const sec = (clientConfig as { cores?: { secundaria?: string } }).cores?.secundaria ?? "#64748b";
+---
+
+<!doctype html>
+<html
+  lang="pt-BR"
+  style={`--client-color-primary: ${prim}; --client-color-secondary: ${sec}`}
+  class="antialiased"
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Pré-visualização de blocos — BlogCMS</title>
+  </head>
+  <body class="min-h-svh bg-white text-slate-900">
+    <p class="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-xs font-medium text-amber-900">
+      Pré-visualização em tempo real (componentes Astro, mesmo markup que no site)
+    </p>
+    <div class="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      {
+        blocks.length === 0 ? (
+          <p class="text-center text-sm text-slate-500">Sem blocos. Adiciona blocos no editor à esquerda.</p>
+        ) : (
+          <PageBlocksRenderer blocks={blocks} pageUrlFallback={pageUrlFallback} />
+        )
+      }
+    </div>
+  </body>
+</html>

@@ -1,0 +1,28 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import taxonomies from "../../../data/taxonomies.json";
+import { NewPostForm } from "../../../components/admin/NewPostForm";
+
+const pageTitle = "Novo artigo";
+const pageDescription =
+  "Editor rico (TipTap), SEO e salvamento no repositório GitHub do cliente via /api/posts/save.";
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="posts"
+  canonicalPath="/admin/posts/new/"
+>
+  <p class="mb-4 text-sm text-zinc-600">
+    <a href="/admin/posts/" class="text-[var(--client-color-primary)] hover:underline">← Artigos</a>
+  </p>
+
+  <NewPostForm client:load taxonomies={taxonomies}>
+    <p slot="fallback" class="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-6 text-sm text-zinc-600">
+      A carregar formulário…
+    </p>
+  </NewPostForm>
+</AdminLayout>

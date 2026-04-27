@@ -1,0 +1,46 @@
+---
+type Variant = "primary" | "secondary" | "ghost" | "outline";
+type Size = "sm" | "md" | "lg";
+
+const props = Astro.props as {
+  href?: string;
+  variant?: Variant;
+  size?: Size;
+  class?: string;
+  type?: "button" | "submit";
+  [key: string]: unknown;
+};
+
+const { href, variant = "primary", size = "md", class: className = "", type = "button", ...rest } =
+  props;
+
+const base =
+  "inline-flex min-h-10 min-w-0 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-zinc-900/20 disabled:cursor-not-allowed disabled:opacity-50";
+
+const byVariant: Record<Variant, string> = {
+  primary: "border border-zinc-900/10 bg-zinc-900 text-white shadow-sm hover:bg-zinc-800",
+  secondary: "border border-zinc-200 bg-white text-zinc-900 shadow-sm hover:bg-zinc-50",
+  ghost: "border border-transparent text-zinc-800 hover:bg-zinc-100",
+  outline: "border border-zinc-200 bg-transparent text-zinc-800 hover:bg-zinc-50",
+};
+
+const bySize: Record<Size, string> = {
+  sm: "min-h-8 px-3 py-1.5 text-xs",
+  md: "px-4 py-2.5",
+  lg: "min-h-11 px-5 py-2.5 text-base",
+};
+
+const cls = [base, byVariant[variant], bySize[size], className].filter(Boolean).join(" ");
+---
+
+{
+  href ? (
+    <a href={href} class={cls} data-admin-button {...rest}>
+      <slot />
+    </a>
+  ) : (
+    <button type={type} class={cls} data-admin-button {...rest}>
+      <slot />
+    </button>
+  )
+}

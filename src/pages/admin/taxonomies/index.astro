@@ -1,0 +1,23 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import taxonomies from "../../../data/taxonomies.json";
+import { TaxonomyItemsManager } from "../../../components/admin/TaxonomyItemsManager";
+import type { TaxonomiesData } from "../../../lib/taxonomies";
+
+const data = taxonomies as TaxonomiesData;
+
+const pageTitle = "Categorias";
+const pageDescription =
+  "Criar, editar e remover categorias do site. As alterações guardam-se no repositório (ficheiro de dados partilhado com o editor de artigos).";
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="categories"
+  canonicalPath="/admin/taxonomies/"
+>
+  <TaxonomyItemsManager client:load initialData={data} field="categories" />
+</AdminLayout>

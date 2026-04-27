@@ -1,0 +1,250 @@
+---
+export const prerender = false;
+
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import matter from "gray-matter";
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { getCollection } from "astro:content";
+import { getCategoryDisplayName } from "../../../lib/taxonomies";
+import Badge from "../../../components/admin/Badge.astro";
+import Button from "../../../components/admin/Button.astro";
+import Icon from "../../../components/admin/Icon.astro";
+
+const pageTitle = "Artigos";
+const pageDescription =
+  "Lista de artigos a partir da coleção Astro (getCollection). Configure o GitHub em Configurações para alinhar com o repositório remoto.";
+
+const rows = await getCollection("blog");
+const sorted = [...rows].sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
+
+function seoNeedsAttentionFromFile(id: string): boolean {
+  const p = path.join(process.cwd(), "src/content/blog", `${id}.md`);
+  if (!existsSync(p)) return false;
+  try {
+    const { data: fm } = matter(readFileSync(p, "utf-8"));
+    const noDesc = !fm.description || !String(fm.description).trim();
+    const noHero = !fm.heroImage || !String(fm.heroImage).trim();
+    return Boolean(noDesc || noHero);
+  } catch {
+    return false;
+  }
+}
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="posts"
+  canonicalPath="/admin/posts/"
+>
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <Button href="/admin/posts/new/" variant="primary" size="md" aria-label="Criar novo artigo">
+      Novo artigo
+    </Button>
+    <p class="text-xs text-zinc-500" id="remote-hint" role="status" aria-live="polite"></p>
+  </div>
+
+  <div
+    class="overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-sm"
+    data-cms-table-wrap
+  >
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-zinc-200 text-left text-sm" data-cms-table>
+        <thead class="bg-zinc-50/90 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <tr>
+            <th scope="col" class="px-4 py-3">Título</th>
+            <th scope="col" class="hidden px-4 py-3 sm:table-cell">Autor</th>
+            <th scope="col" class="hidden px-4 py-3 md:table-cell">Categoria</th>
+            <th scope="col" class="hidden px-4 py-3 lg:table-cell">Data</th>
+            <th scope="col" class="hidden px-4 py-3 sm:table-cell">Estado</th>
+            <th scope="col" class="px-4 py-3 text-right">Ações</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-100 text-zinc-800" id="posts-tbody">
+          {
+            sorted.map((post) => {
+              const isDraft = post.data.draft;
+              const statusLabel = isDraft ? "Rascunho" : "Publicado";
+              const date = post.data.pubDate.toLocaleDateString("pt-BR", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              });
+              const catLabel = getCategoryDisplayName(post.data.category) || "—";
+              const author = post.data.author || "—";
+              const seoFlag = seoNeedsAttentionFromFile(post.id);
+              const search =
+                `${post.data.title} ${author} ${catLabel} ${statusLabel} ${date} ${post.id}`.toLowerCase();
+              return (
+                <tr data-search={search} data-slug={post.id}>
+                  <td class="max-w-xs px-4 py-3 font-medium">
+                    <div class="flex min-w-0 items-start gap-2">
+                      <a
+                        class="min-w-0 flex-1 text-[var(--client-color-primary)] hover:underline"
+                        href={`/admin/posts/edit/${post.id}/`}
+                      >
+                        {post.data.title}
+                      </a>
+                      {seoFlag && (
+                        <span
+                          class="inline-flex shrink-0"
+                          title="SEO: em falta description ou heroImage no frontmatter — requer atenção."
+                          role="img"
+                          aria-label="Aviso SEO: description ou imagem de destino em falta"
+                        >
+                          <Icon kind="alert-triangle" />
+                        </span>
+                      )}
+                    </div>
+                    <span class="mt-0.5 block text-xs text-zinc-500 sm:hidden">
+                      {author} · {catLabel} · {statusLabel} · {date}
+                    </span>
+                  </td>
+                  <td class="hidden px-4 py-3 text-zinc-600 sm:table-cell">{author}</td>
+                  <td class="hidden max-w-[10rem] truncate px-4 py-3 text-zinc-600 md:table-cell" title={catLabel}>
+                    {catLabel}
+                  </td>
+                  <td class="hidden px-4 py-3 text-zinc-600 lg:table-cell">
+                    <time datetime={post.data.pubDate.toISOString()}>{date}</time>
+                  </td>
+                  <td class="hidden px-4 py-3 sm:table-cell">
+                    {isDraft ? (
+                      <Badge variant="secondary">{statusLabel}</Badge>
+                    ) : (
+                      <Badge variant="success">{statusLabel}</Badge>
+                    )}
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <a
+                      href={`/admin/posts/edit/${post.id}/`}
+                      class="text-sm font-medium text-zinc-700 hover:text-zinc-900"
+                    >
+                      Editar
+                    </a>
+                  </td>
+                </tr>
+              );
+            })
+          }
+        </tbody>
+      </table>
+    </div>
+    <nav id="posts-list-nav" class="not-prose min-h-[3rem]" aria-live="polite"></nav>
+  </div>
+</AdminLayout>
+
+<script>
+  import { initAdminTablePagination } from "../../../scripts/admin-table-pagination";
+  initAdminTablePagination({ tbodyId: "posts-tbody", navId: "posts-list-nav", pageSize: 10 });
+</script>
+
+<script is:inline>
+  (function () {
+    var K_INTEGR = "blogcms-admin-integration";
+    var K_CMS = "blogcms-cms-target";
+    var el = document.getElementById("remote-hint");
+    var tbody = document.getElementById("posts-tbody");
+    if (!el || !tbody) return;
+    function readJson(key) {
+      try {
+        var raw = localStorage.getItem(key);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch (e) {
+        return null;
+      }
+    }
+    var integ = readJson(K_INTEGR);
+    var target = readJson(K_CMS);
+    if (!integ || !integ.GITHUB_PERSONAL_TOKEN || !target || !target.githubRepoFullName) {
+      el.textContent = "Dica: configure o token e o repositório alvo em Configurações para listar a partir do GitHub.";
+      return;
+    }
+    el.textContent = "A sincronizar com o GitHub…";
+    fetch("/api/admin/cms/github", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "listBlog",
+        GITHUB_PERSONAL_TOKEN: integ.GITHUB_PERSONAL_TOKEN,
+        githubRepoFullName: target.githubRepoFullName,
+        branch: target.branch || "main",
+      }),
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (j) {
+        if (!j || !j.ok || !j.items) {
+          el.textContent = (j && j.error) || "Não foi possível listar a partir do GitHub.";
+          return;
+        }
+        el.textContent = "Lista alinhada com o repositório remoto (" + j.items.length + " itens).";
+        tbody.textContent = "";
+        for (var i = 0; i < j.items.length; i++) {
+          var p = j.items[i];
+          var isDraft = p.draft;
+          var d = new Date(p.pubDate);
+          var dateStr = isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-BR", { year: "numeric", month: "short", day: "numeric" });
+          var stLabel = isDraft ? "Rascunho" : "Publicado";
+          var catStr = p.category && String(p.category).trim() ? String(p.category).trim() : "—";
+          var authorStr = p.author && p.author !== "—" ? p.author : "—";
+          var tr = document.createElement("tr");
+          tr.setAttribute("data-slug", p.slug);
+          tr.setAttribute(
+            "data-search",
+            (p.title + " " + authorStr + " " + catStr + " " + stLabel + " " + dateStr + " " + p.slug).toLowerCase(),
+          );
+          var esc = function (s) {
+            return String(s)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/"/g, "&quot;");
+          };
+          var statusHtml = isDraft
+            ? '<span class="inline-flex items-center justify-center rounded-full border border-zinc-200/80 bg-zinc-100 px-2.5 py-0.5 text-xs font-medium leading-none text-zinc-700">Rascunho</span>'
+            : '<span class="inline-flex items-center justify-center rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium leading-none text-emerald-800">Publicado</span>';
+          var warnHtml = p.seoAlert
+            ? '<span class="inline-flex shrink-0" title="SEO: em falta description ou heroImage no frontmatter" role="img" aria-label="Aviso SEO">'
+            + "<svg class=\"inline-block h-4 w-4 shrink-0 text-amber-500\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.031-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z\" /></svg></span>"
+            : "";
+          tr.innerHTML =
+            '<td class="max-w-xs px-4 py-3 font-medium"><div class="flex min-w-0 items-start gap-2">'
+            + '<a class="min-w-0 flex-1 text-[var(--client-color-primary)] hover:underline" href="/admin/posts/edit/' +
+            p.slug +
+            '/">' +
+            esc(p.title || p.slug) +
+            "</a>" +
+            warnHtml +
+            '</div><span class="mt-0.5 block text-xs text-zinc-500 sm:hidden">' +
+            esc(authorStr) +
+            " · " +
+            esc(catStr) +
+            " · " +
+            stLabel +
+            " · " +
+            dateStr +
+            '</span></td><td class="hidden px-4 py-3 text-zinc-600 sm:table-cell">' +
+            esc(authorStr) +
+            "</td><td class=\"hidden max-w-[10rem] truncate px-4 py-3 text-zinc-600 md:table-cell\" title=\"" +
+            esc(catStr) +
+            '">' +
+            esc(catStr) +
+            "</td><td class=\"hidden px-4 py-3 text-zinc-600 lg:table-cell\"><time datetime=\"" +
+            esc(!isNaN(d.getTime()) ? d.toISOString() : "") +
+            '">' +
+            esc(dateStr) +
+            "</td><td class=\"hidden px-4 py-3 sm:table-cell\">" +
+            statusHtml +
+            '</td><td class="px-4 py-3 text-right"><a href="/admin/posts/edit/' +
+            p.slug +
+            '/" class="text-sm font-medium text-zinc-700 hover:text-zinc-900">Editar</a></td>';
+          tbody.appendChild(tr);
+        }
+      })
+      .catch(function () {
+        el.textContent = "Falha de rede ao listar a partir do GitHub.";
+      });
+  })();
+</script>

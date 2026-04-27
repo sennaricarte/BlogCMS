@@ -1,0 +1,447 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import defaultConfig from "../../data/client-config.json";
+
+/** Admin e tokens: servido no servidor; não gera HTML estático com segredos. */
+export const prerender = false;
+
+const pageTitle = "Gerar site (GitHub + Vercel)";
+const pageDescription =
+  "Indique tokens, dados de marca e SEO. O processamento corre no servidor; os PATs não ficam no HTML.";
+---
+
+<BaseLayout title={pageTitle} description={pageDescription} noindex canonicalPath="/admin/">
+  <div class="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+    <header class="mb-8 border-b border-slate-200 pb-6">
+      <p class="text-sm font-medium uppercase tracking-wide text-[var(--client-color-primary)]">Opção B · Infra do cliente</p>
+      <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Painel de deploy</h1>
+      <p class="mt-2 text-sm text-slate-600">
+        Os tokens são enviados por HTTPS e só vivem no ambiente de servidor (API). Preenche os campos obrigatórios para
+        ativar o botão.
+      </p>
+      <p class="mt-2 text-xs text-slate-500">
+        <a href="/admin/settings/" class="text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+          >Definições (teste de ligação e localStorage)</a
+        >
+        ·
+        <a
+          href="/admin/posts/"
+          class="text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+          >CMS — artigos e conteúdo</a
+        >
+      </p>
+    </header>
+
+    <form id="form-deploy" class="space-y-6" novalidate>
+      <fieldset class="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+        <legend class="px-1 text-sm font-semibold text-slate-800">Acesso (servidor)</legend>
+        <div>
+          <label for="github-token" class="block text-sm font-medium text-slate-800">GitHub Personal Token</label>
+          <input
+            id="github-token"
+            type="password"
+            name="githubToken"
+            autocomplete="off"
+            required
+            aria-required="true"
+            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+          />
+        </div>
+        <div>
+          <label for="vercel-token" class="block text-sm font-medium text-slate-800">Vercel Token</label>
+          <input
+            id="vercel-token"
+            type="password"
+            name="vercelToken"
+            autocomplete="off"
+            required
+            aria-required="true"
+            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+          />
+        </div>
+        <div>
+          <label for="vercel-team" class="block text-sm font-medium text-slate-800">Vercel Team ID (opcional)</label>
+          <input
+            id="vercel-team"
+            type="text"
+            name="vercelTeamId"
+            autocomplete="off"
+            placeholder="team_…"
+            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+          />
+        </div>
+      </fieldset>
+
+      <fieldset class="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+        <legend class="px-1 text-sm font-semibold text-slate-800">Dados do site (SEO e marca)</legend>
+        <div>
+          <label for="repo-name" class="block text-sm font-medium text-slate-800">Slug do repositório (GitHub)</label>
+          <input
+            id="repo-name"
+            type="text"
+            name="repositoryName"
+            required
+            aria-required="true"
+            placeholder="ex.: meu-blog-pro"
+            class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+          />
+        </div>
+        <div>
+          <label for="nome-marca" class="block text-sm font-medium text-slate-800">Título / nome da marca</label>
+          <input
+            id="nome-marca"
+            type="text"
+            name="nomeMarca"
+            required
+            value={defaultConfig.nomeMarca}
+            class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+          />
+        </div>
+        <div>
+          <label for="desc-seo" class="block text-sm font-medium text-slate-800">Descrição (SEO)</label>
+          <textarea
+            id="desc-seo"
+            name="descricaoSeo"
+            required
+            rows="3"
+            class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+          >
+            {defaultConfig.descricaoSeo}
+          </textarea>
+        </div>
+        <div>
+          <label for="site-url" class="block text-sm font-medium text-slate-800">URL pública (site)</label>
+          <input
+            id="site-url"
+            type="url"
+            name="siteUrl"
+            required
+            value={defaultConfig.siteUrl}
+            placeholder="https://exemplo.com"
+            class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+          />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="cor-prim" class="block text-sm font-medium text-slate-800">Cor primária</label>
+            <div class="mt-1.5 flex gap-2">
+              <input
+                id="cor-prim"
+                type="color"
+                name="corPrim"
+                class="h-10 w-14 cursor-pointer rounded border border-slate-300"
+                value={defaultConfig.cores.primaria}
+                aria-label="Selecionar cor primária"
+              />
+            </div>
+          </div>
+          <div>
+            <label for="cor-sec" class="block text-sm font-medium text-slate-800">Cor secundária</label>
+            <div class="mt-1.5 flex gap-2">
+              <input
+                id="cor-sec"
+                type="color"
+                name="corSec"
+                class="h-10 w-14 cursor-pointer rounded border border-slate-300"
+                value={defaultConfig.cores.secundaria}
+                aria-label="Selecionar cor secundária"
+              />
+            </div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500" id="form-aguardar-tokens" aria-live="polite">
+          Preenche os tokens GitHub e Vercel para ativar o botão de geração.
+        </p>
+        <div class="pt-1">
+          <button
+            type="button"
+            id="btn-gerar"
+            disabled
+            class="inline-flex w-full items-center justify-center rounded-lg bg-[var(--client-color-primary)] px-4 py-3 text-sm font-semibold text-white shadow-md transition enabled:hover:opacity-95 enabled:focus:outline enabled:focus:outline-2 enabled:focus:outline-offset-2 enabled:focus:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            Gerar site
+          </button>
+        </div>
+      </fieldset>
+    </form>
+
+    <section class="mt-8 hidden" id="sec-progress" aria-label="Progresso do deploy">
+      <h2 class="text-sm font-semibold text-slate-800">Etapas</h2>
+      <ol class="mt-3 space-y-2" id="progress-list" role="list" aria-describedby="progress-help">
+        <li
+          data-pipeline="REPO_CREATED"
+          class="progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500"
+        >
+          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+          <span>Repositório GitHub</span>
+        </li>
+        <li
+          data-pipeline="FILES_PUSHED"
+          class="progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500"
+        >
+          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+          <span>Template e ficheiros (SEO no JSON)</span>
+        </li>
+        <li
+          data-pipeline="PROPAGATION_WAIT"
+          class="progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500"
+        >
+          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+          <span>Aguardar propagação (8s)</span>
+        </li>
+        <li
+          data-pipeline="VERCEL_CONNECTED"
+          class="progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500"
+        >
+          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+          <span>Projeto Vercel ligado</span>
+        </li>
+        <li
+          data-pipeline="DEPLOY_STARTED"
+          class="progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500"
+        >
+          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+          <span>Deploy de produção</span>
+        </li>
+      </ol>
+      <p id="progress-help" class="mt-2 text-xs text-slate-500">As etapas ficam a verde ao concluir; a cor de marca assinala a etapa ativa.</p>
+    </section>
+
+    <div
+      id="deploy-mensagem"
+      role="status"
+      aria-live="polite"
+      class="mt-6 hidden min-h-[2rem] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+    />
+  </div>
+</BaseLayout>
+
+<script
+  define:vars={{
+    defaultConfig,
+  }}
+>
+  (function () {
+    var ORDER = ["REPO_CREATED", "FILES_PUSHED", "PROPAGATION_WAIT", "VERCEL_CONNECTED", "DEPLOY_STARTED"];
+    var dotPending = "h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300";
+    var dotDone = "h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500";
+    var dotActive = "h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--client-color-primary)]";
+
+    function $(id) {
+      return document.getElementById(id);
+    }
+
+    var elGh = /** @type {HTMLInputElement | null} */ ($("github-token"));
+    var elV = /** @type {HTMLInputElement | null} */ ($("vercel-token"));
+    var elTeam = /** @type {HTMLInputElement | null} */ ($("vercel-team"));
+    var elRepo = /** @type {HTMLInputElement | null} */ ($("repo-name"));
+    var elNome = /** @type {HTMLInputElement | null} */ ($("nome-marca"));
+    var elDesc = /** @type {HTMLTextAreaElement | null} */ ($("desc-seo"));
+    var elSite = /** @type {HTMLInputElement | null} */ ($("site-url"));
+    var elCorPrim = /** @type {HTMLInputElement | null} */ ($("cor-prim"));
+    var elCorSec = /** @type {HTMLInputElement | null} */ ($("cor-sec"));
+    var btn = /** @type {HTMLButtonElement | null} */ ($("btn-gerar"));
+    var secProgress = $("sec-progress");
+    var elMsg = $("deploy-mensagem");
+
+    function setMsg(t, isErr) {
+      if (!elMsg) return;
+      if (!t) {
+        elMsg.classList.add("hidden");
+        return;
+      }
+      elMsg.classList.remove("hidden");
+      elMsg.textContent = t;
+      elMsg.className =
+        "mt-6 min-h-[2rem] rounded-lg border px-3 py-2 text-sm " +
+        (isErr
+          ? "border-red-200 bg-red-50 text-red-900"
+          : "border-slate-200 bg-slate-50 text-slate-800");
+    }
+
+    function resetProgress() {
+      ORDER.forEach(function (id) {
+        var li = document.querySelector('[data-pipeline="' + id + '"]');
+        if (!li) return;
+        li.className =
+          "progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500";
+        var dot = li.querySelector("span[aria-hidden]");
+        if (dot) dot.className = dotPending;
+      });
+    }
+
+    function markDone(id) {
+      var li = document.querySelector('[data-pipeline="' + id + '"]');
+      if (!li) return;
+      li.className =
+        "progress-step flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900";
+      var dot = li.querySelector("span[aria-hidden]");
+      if (dot) dot.className = dotDone;
+    }
+
+    function markActive(id) {
+      var li = document.querySelector('[data-pipeline="' + id + '"]');
+      if (!li) return;
+      li.className =
+        "progress-step flex items-center gap-2 rounded-lg border-2 border-[var(--client-color-primary)] bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm ring-2 ring-[var(--client-color-primary)]/20";
+      var dot = li.querySelector("span[aria-hidden]");
+      if (dot) dot.className = dotActive;
+    }
+
+    function onPipelineEvent(s) {
+      var idx = ORDER.indexOf(s);
+      if (idx < 0) return;
+      for (var i = 0; i <= idx; i++) {
+        markDone(ORDER[i]);
+      }
+      if (idx + 1 < ORDER.length) {
+        markActive(ORDER[idx + 1]);
+      }
+    }
+
+    function updateButton() {
+      var ok = !!(elGh && elV && elGh.value.trim() && elV.value.trim());
+      if (btn) {
+        btn.disabled = !ok;
+        btn.setAttribute("aria-disabled", ok ? "false" : "true");
+      }
+      var hint = $("form-aguardar-tokens");
+      if (hint) {
+        hint.textContent = ok
+          ? "Tokens preenchidos — podes iniciar o deploy."
+          : "Preenche os tokens GitHub e Vercel para ativar o botão de geração.";
+      }
+    }
+
+    if (elGh) elGh.addEventListener("input", updateButton);
+    if (elV) elV.addEventListener("input", updateButton);
+    updateButton();
+
+    if (btn) {
+      btn.addEventListener("click", async function () {
+        if (!elGh || !elV || !elRepo || !elNome || !elDesc || !elSite || !elCorPrim || !elCorSec) return;
+        if (!elGh.value.trim() || !elV.value.trim()) return;
+        setMsg("");
+        if (secProgress) secProgress.classList.remove("hidden");
+        resetProgress();
+        markActive("REPO_CREATED");
+        btn.disabled = true;
+        var orig = btn.textContent;
+        btn.textContent = "A processar…";
+
+        var config = {
+          nomeMarca: elNome.value.trim(),
+          descricaoSeo: elDesc.value.trim(),
+          cores: {
+            primaria: elCorPrim.value,
+            secundaria: elCorSec.value,
+          },
+          menuLinks: defaultConfig.menuLinks,
+          footerLinks: defaultConfig.footerLinks ?? [],
+          footerText: defaultConfig.footerText ?? "",
+          siteUrl: elSite.value.trim(),
+          imagemCompartilhamento: defaultConfig.imagemCompartilhamento || "/favicon.svg",
+        };
+
+        var body = {
+          githubToken: elGh.value.trim(),
+          vercelToken: elV.value.trim(),
+          vercelTeamId: elTeam && elTeam.value.trim() ? elTeam.value.trim() : undefined,
+          clientData: {
+            repositoryName: elRepo.value.trim(),
+            config: config,
+            github: {
+              private: true,
+              description: "Site · " + config.nomeMarca,
+            },
+            vercel: {
+              vercelProjectName: elRepo.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-"),
+              teamId: elTeam && elTeam.value.trim() ? elTeam.value.trim() : undefined,
+            },
+          },
+        };
+
+        try {
+          var res = await fetch("/api/deploy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (res.status === 401) {
+            var e401 = await res.json();
+            setMsg((e401 && e401.error) || "Credenciais inválidas (401). Revisa os tokens.", true);
+            resetProgress();
+            return;
+          }
+          if (res.status !== 200 || !res.body) {
+            var t = await res.text();
+            setMsg("Erro HTTP " + res.status + (t ? ": " + t.slice(0, 200) : ""), true);
+            resetProgress();
+            return;
+          }
+
+          var reader = res.body.getReader();
+          var dec = new TextDecoder();
+          var buf = "";
+          function handleLine(line) {
+            var lineTrim = line.trim();
+            if (!lineTrim) return false;
+            var o = JSON.parse(lineTrim);
+            if (o.type === "progress") {
+              if (o.pipelineStatus) {
+                onPipelineEvent(o.pipelineStatus);
+              }
+              return false;
+            }
+            if (o.type === "error") {
+              setMsg(
+                o.message + (o.httpStatus === 401 ? " (revisa o GitHub e a Vercel.)" : ""),
+                true
+              );
+              return true;
+            }
+            if (o.type === "complete" && o.result) {
+              ORDER.forEach(function (k) {
+                markDone(k);
+              });
+              var r0 = o.result;
+              setMsg("Feito. GitHub: " + (r0.githubRepositoryUrl || "—") + " | Vercel: " + (r0.vercelProjectName || "—"), false);
+              return true;
+            }
+            return false;
+          }
+          while (true) {
+            var r = await reader.read();
+            if (r.done) break;
+            buf += dec.decode(r.value, { stream: true });
+            var parts = buf.split("\n");
+            buf = parts.pop() || "";
+            for (var i = 0; i < parts.length; i++) {
+              if (handleLine(parts[i])) {
+                return;
+              }
+            }
+          }
+          if (buf.trim() && handleLine(buf)) {
+            return;
+          }
+        } catch (err) {
+          setMsg(
+            (err && /** @type {Error} */ (err).message) || "Falha de rede ou servidor.",
+            true
+          );
+          resetProgress();
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            if (!elGh || !elV || !elGh.value.trim() || !elV.value.trim()) {
+              btn.disabled = true;
+            }
+            updateButton();
+            btn.textContent = orig || "Gerar site";
+          }
+        }
+      });
+    }
+  })();
+</script>

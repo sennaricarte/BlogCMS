@@ -1,0 +1,125 @@
+---
+import type { CollectionEntry } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import BlogImage from "../../components/blog/BlogImage.astro";
+import ArticleBreadcrumbs from "../../components/seo/ArticleBreadcrumbs.astro";
+import clientConfig from "../../data/client-config.json";
+import { getPublicBlogPosts } from "../../lib/blog";
+import {
+  getTagBySlug,
+  getPostsForTagSlug,
+  getTagSlugsWithPosts,
+} from "../../lib/taxonomies";
+type BlogEntry = CollectionEntry<"blog">;
+
+export async function getStaticPaths() {
+  const posts = await getPublicBlogPosts(false);
+  const slugs = getTagSlugsWithPosts(posts);
+  return slugs.map((slug) => {
+    const inTax = getTagBySlug(slug);
+    const name = inTax?.name ?? slug;
+    const list = getPostsForTagSlug(posts, slug);
+    const description =
+      inTax?.description?.trim() ||
+      `Todos os artigos etiquetados com «${name}» — leitura curada do blog.`;
+    return {
+      params: { slug },
+      props: { posts: list, name, description, slug },
+    };
+  });
+}
+
+const { posts, name, description, slug } = Astro.props as {
+  posts: BlogEntry[];
+  name: string;
+  description: string;
+  slug: string;
+};
+
+const pageTitle = `Artigos: ${name} (etiqueta) | ${(clientConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
+const canonicalPath = `/tag/${slug}/`;
+const h1 = `Artigos com a etiqueta «${name}»`;
+
+const siteBase =
+  (import.meta.env.SITE as string | undefined)?.replace(/\/$/, "") ||
+  (clientConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
+  "";
+
+const listJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  name: h1,
+  numberOfItems: posts.length,
+  itemListElement: posts.map((p, i) => ({
+    "@type": "ListItem",
+    position: i + 1,
+    name: p.data.title,
+    url: new URL(`/blog/${p.id}/`, siteBase + "/").toString(),
+  })),
+} as const;
+
+const breadcrumbs = [
+  { name: "Início", href: "/" },
+  { name: "Etiquetas", href: "/etiquetas/" },
+  { name, href: canonicalPath },
+];
+---
+
+<BaseLayout
+  title={pageTitle}
+  description={description}
+  canonicalPath={canonicalPath}
+  jsonLdData={listJsonLd}
+>
+  <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <ArticleBreadcrumbs items={breadcrumbs} />
+    <header class="mb-10 border-b border-slate-200 pb-6">
+      <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">{h1}</h1>
+      <p class="mt-3 text-lg text-slate-600">
+        {description}
+      </p>
+    </header>
+    <ol class="grid gap-8 sm:grid-cols-1" aria-label={`Lista de artigos: ${name}`}>
+        {posts.map((post) => (
+          <li>
+            <article class="flex flex-col gap-4 border-b border-slate-200 pb-8 last:border-0 sm:flex-row sm:items-stretch">
+              <a
+                href={`/blog/${post.id}/`}
+                class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200"
+                aria-hidden="true"
+                tabindex={-1}
+              >
+                <BlogImage
+                  src={post.data.heroImage}
+                  alt={post.data.title}
+                  width={320}
+                  height={200}
+                />
+              </a>
+              <div class="min-w-0 flex-1">
+                <a href={`/blog/${post.id}/`} class="group">
+                  <h2 class="text-xl font-semibold text-slate-900 group-hover:text-[var(--client-color-primary)]">
+                    {post.data.title}
+                  </h2>
+                </a>
+                <p class="mt-2 line-clamp-2 text-sm text-slate-600">
+                  {post.data.description}
+                </p>
+                <p class="mt-2 text-xs text-slate-500">
+                  <time datetime={post.data.pubDate.toISOString()}>
+                    {post.data.pubDate.toLocaleDateString("pt-PT")}
+                  </time>
+                </p>
+                <a
+                  href={`/blog/${post.id}/`}
+                  class="mt-2 inline-block text-sm font-medium text-[var(--client-color-primary)] hover:underline"
+                >
+                  Ler artigo
+                </a>
+              </div>
+            </article>
+          </li>
+        ))}
+    </ol>
+  </div>
+</BaseLayout>

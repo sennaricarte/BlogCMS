@@ -1,0 +1,58 @@
+{
+  "name": "blogcms",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "dev:clean": "node scripts/clean-vite-cache.mjs && astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "test:deploy": "tsx scripts/test-deploy.ts"
+  },
+  "dependencies": {
+    "@astrojs/react": "^5.0.4",
+    "@astrojs/vercel": "^10.0.5",
+    "@octokit/rest": "^22.0.1",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.104.1",
+    "@tailwindcss/vite": "^4.2.4",
+    "@tiptap/extension-image": "^3.22.4",
+    "@tiptap/extension-link": "^3.22.4",
+    "@tiptap/extension-table": "^3.22.4",
+    "@tiptap/extension-table-cell": "^3.22.4",
+    "@tiptap/extension-table-header": "^3.22.4",
+    "@tiptap/extension-table-row": "^3.22.4",
+    "@tiptap/extension-text-style": "^3.22.4",
+    "@tiptap/extension-underline": "^3.22.4",
+    "@tiptap/extension-youtube": "^3.22.4",
+    "@tiptap/pm": "^3.22.4",
+    "@tiptap/react": "^3.22.4",
+    "@tiptap/starter-kit": "^3.22.4",
+    "astro": "^6.1.9",
+    "gray-matter": "^4.0.3",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.11.0",
+    "marked": "^18.0.2",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "recharts": "^3.8.1",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4.2.4",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.8",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/turndown": "^5.0.6",
+    "dotenv": "^16.4.7",
+    "tsx": "^4.19.2"
+  }
+}

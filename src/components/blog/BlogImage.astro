@@ -1,0 +1,42 @@
+---
+import { Image, type ImageMetadata } from "astro:assets";
+
+/**
+ * Imagens de capa/hero do blog. Com `priority` (LCP), usa `loading="eager"` e
+ * `fetchpriority="high"`; caso contrário, lazy + `fetchpriority="low"`.
+ */
+export interface Props {
+  src: ImageMetadata;
+  alt: string;
+  width: number;
+  height: number;
+  class?: string;
+  sizes: string;
+  quality?: number;
+  /** A primeira imagem visível (hero do post, ou 1.º card da lista) deve ser `true` para o LCP. */
+  priority?: boolean;
+  decoding?: "async" | "auto" | "sync";
+  loading?: "eager" | "lazy" | "auto" | null;
+  fetchpriority?: "high" | "low" | "auto" | null;
+}
+
+const {
+  priority = false,
+  decoding = "async",
+  loading: loadingOverride,
+  fetchpriority: fetchOverride,
+  class: className,
+  ...imageProps
+} = Astro.props;
+
+const loading = loadingOverride ?? (priority ? "eager" : "lazy");
+const fetchpriority = fetchOverride ?? (priority ? "high" : "low");
+---
+
+<Image
+  {...imageProps}
+  class={className}
+  loading={loading}
+  fetchpriority={fetchpriority}
+  decoding={decoding}
+/>

@@ -1,0 +1,124 @@
+---
+import { getImage } from "astro:assets";
+import { render } from "astro:content";
+import type { CollectionEntry } from "astro:content";
+import BlogImage from "../components/blog/BlogImage.astro";
+import ArticleBreadcrumbs from "../components/seo/ArticleBreadcrumbs.astro";
+import clientConfig from "../data/client-config.json";
+import { getCategoryDisplayName, getTagDisplayName, tagToSlug } from "../lib/taxonomies";
+import type { ClientConfig } from "../lib/publisher";
+import { buildBlogPostJsonLdGraph, getBreadcrumbItems } from "../lib/seo/blog-post-json-ld";
+import BaseLayout from "./BaseLayout.astro";
+
+export interface Props {
+  post: CollectionEntry<"blog">;
+  canonicalPath: string;
+}
+
+const { post, canonicalPath } = Astro.props;
+const d = post.data;
+const { Content } = await render(post);
+
+const siteBase =
+  (import.meta.env.SITE as string | undefined)?.replace(/\/$/, "") ||
+  (clientConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
+  Astro.url.origin;
+const baseForUrl = siteBase.endsWith("/") ? siteBase : siteBase + "/";
+
+const og = await getImage({
+  src: d.heroImage,
+  width: 1200,
+  height: 630,
+});
+const openGraphImageUrl = new URL(og.src, baseForUrl).toString();
+
+const datePublished = d.pubDate.toISOString();
+const dateModified = (d.updatedDate ?? d.pubDate).toISOString();
+
+const cfg = clientConfig as ClientConfig;
+const seoCtx = {
+  post,
+  siteBase,
+  canonicalPath,
+  heroImageAbsoluteUrl: openGraphImageUrl,
+  clientConfig: cfg,
+  inLanguage: "pt-BR",
+};
+const jsonLdData = buildBlogPostJsonLdGraph(seoCtx) as Record<string, unknown>;
+const breadcrumbItems = getBreadcrumbItems(seoCtx);
+---
+
+<BaseLayout
+  title={d.seoTitle?.trim() || d.title}
+  description={d.description}
+  ogImage={openGraphImageUrl}
+  ogType="article"
+  canonicalPath={canonicalPath}
+  articlePublishedTime={datePublished}
+  articleModifiedTime={d.updatedDate ? dateModified : undefined}
+  articleAuthor={d.author}
+  jsonLdData={jsonLdData}
+>
+  <article class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <ArticleBreadcrumbs items={breadcrumbItems} />
+    <header class="border-b border-slate-200 pb-8">
+      <p class="text-sm text-brand-secondary" aria-label="Metadados do artigo">
+        <time datetime={d.pubDate.toISOString()}>{d.pubDate.toLocaleDateString("pt-PT", { year: "numeric", month: "long", day: "numeric" })}</time>
+        {d.updatedDate && (
+          <>
+            <span class="px-1">·</span>
+            <span>Atualizado <time datetime={d.updatedDate.toISOString()}>{d.updatedDate.toLocaleDateString("pt-PT")}</time></span>
+          </>
+        )}
+        <span class="px-1">·</span>
+        <span>{d.author}</span>
+      </p>
+      <h1 class="mt-4 text-3xl font-bold leading-tight tracking-tight text-slate-900 sm:text-4xl">
+        {d.title}
+      </h1>
+      {d.category && (
+        <p class="mt-3 text-sm text-slate-500">
+          <span class="sr-only">Categoria: </span>
+          <a
+            href={`/category/${String(d.category).trim().toLowerCase()}/`}
+            class="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-medium text-slate-800 transition hover:border-[var(--client-color-primary)] hover:text-[var(--client-color-primary)]"
+            >{getCategoryDisplayName(d.category)}</a
+          >
+        </p>
+      )}
+      {d.tags.length > 0 && (
+        <ul class="mt-4 flex flex-wrap gap-2" aria-label="Etiquetas do artigo">
+          {d.tags.map((t) => {
+            const label = getTagDisplayName(t);
+            const href = `/tag/${tagToSlug(t)}/`;
+            return (
+              <li>
+                <a
+                  href={href}
+                  class="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs text-slate-600 transition hover:border-[var(--client-color-primary)] hover:text-[var(--client-color-primary)]"
+                >
+                  {label}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </header>
+    <figure class="-mx-4 my-8 sm:mx-0">
+      <BlogImage
+        src={d.heroImage}
+        alt={`Imagem de destaque: ${d.title}`}
+        width={1200}
+        height={630}
+        sizes="(min-width: 48rem) 48rem, 100vw"
+        quality={80}
+        priority
+        class="h-auto w-full max-h-[min(24rem,50vh)] rounded-lg object-cover object-center shadow-sm sm:max-h-none"
+      />
+    </figure>
+    <div class="post-body pt-2 leading-relaxed text-slate-800">
+      <Content />
+    </div>
+  </article>
+</BaseLayout>

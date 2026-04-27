@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* Cores de marca: valores padrão até o <html> injetar --client-color-* (BaseLayout). */
+@theme {
+  --color-brand-primary: var(--client-color-primary, #0ea5e9);
+  --color-brand-secondary: var(--client-color-secondary, #64748b);
+}
+
+@layer components {
+  .post-body :where(h1, h2, h3) {
+    @apply font-semibold text-slate-900;
+  }
+  .post-body h2 {
+    @apply mt-10 scroll-mt-24 text-2xl;
+  }
+  .post-body h3 {
+    @apply mt-8 text-xl;
+  }
+  .post-body p {
+    @apply my-4;
+  }
+  .post-body ul {
+    @apply my-4 list-disc pl-6;
+  }
+  .post-body blockquote {
+    @apply my-4 border-l-4 border-slate-200 pl-4 text-slate-600 italic;
+  }
+  .post-body a {
+    @apply font-medium text-[var(--client-color-primary)] underline-offset-2 hover:underline;
+  }
+  .post-body :where(strong) {
+    @apply font-semibold text-slate-900;
+  }
+  .post-body :where(code) {
+    @apply rounded bg-slate-100 px-1 py-0.5 font-mono text-sm text-slate-800;
+  }
+}

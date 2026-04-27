@@ -1,0 +1,19 @@
+---
+export type BadgeVariant = "default" | "secondary" | "success" | "warning" | "outline";
+
+const { variant = "default" } = Astro.props as { variant?: BadgeVariant };
+
+const base =
+  "inline-flex items-center justify-center rounded-full border px-2.5 py-0.5 text-xs font-medium leading-none";
+
+const byVariant: Record<BadgeVariant, string> = {
+  default: "border-transparent bg-zinc-900 text-white",
+  secondary: "border-zinc-200/80 bg-zinc-100 text-zinc-700",
+  success: "border-emerald-200/80 bg-emerald-50 text-emerald-800",
+  warning: "border-amber-200/80 bg-amber-50 text-amber-900",
+  outline: "border-zinc-200 bg-white text-zinc-700",
+};
+const cls = base + " " + byVariant[variant];
+---
+
+<span class={cls}><slot /></span>

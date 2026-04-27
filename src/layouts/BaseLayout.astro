@@ -1,0 +1,183 @@
+---
+import clientConfig from "../data/client-config.json";
+import "../styles/global.css";
+
+export interface Props {
+  title: string;
+  /** Se omitido, usa descricaoSeo do JSON. */
+  description?: string;
+  /** Caminho relativo (ex. /og.png) ou URL absoluta. */
+  ogImage?: string;
+  noindex?: boolean;
+  lang?: string;
+  /** Página canônica; padrão: pathname atual. */
+  canonicalPath?: string;
+  /** Tipo Open Graph (p.ex. "article" para posts). */
+  ogType?: "website" | "article";
+  locale?: string;
+  /** Metadados de artigo (Open Graph) */
+  articlePublishedTime?: string;
+  articleModifiedTime?: string;
+  articleAuthor?: string;
+  /** Se definido, substitui o JSON-LD padrão (ex.: BlogPosting). */
+  jsonLdData?: Record<string, unknown>;
+}
+
+const {
+  title,
+  description: descriptionOverride,
+  ogImage: ogImageProp,
+  noindex = false,
+  lang = "pt-BR",
+  canonicalPath,
+  ogType = "website",
+  locale = "pt_BR",
+  articlePublishedTime,
+  articleModifiedTime,
+  articleAuthor,
+  jsonLdData: jsonLdOverride,
+} = Astro.props as Props;
+
+const config = clientConfig as typeof clientConfig & {
+  footerLinks?: Array<{ label: string; href: string }>;
+  footerText?: string;
+};
+const footerLinks = config.footerLinks?.length ? config.footerLinks : [];
+const year = new Date().getFullYear();
+const footerTextDefault = `© ${year} ${config.nomeMarca}. Todos os direitos reservados.`;
+const footerText = (config.footerText && config.footerText.trim()) || footerTextDefault;
+const pageDescription = descriptionOverride?.trim() || config.descricaoSeo;
+const siteBase =
+  (import.meta.env.SITE as string | undefined)?.replace(/\/$/, "") ||
+  config.siteUrl?.replace(/\/$/, "") ||
+  Astro.url.origin;
+const pathname = (canonicalPath ?? Astro.url.pathname) || "/";
+const baseForUrl = siteBase.endsWith("/") ? siteBase : siteBase + "/";
+const canonicalUrl = new URL(pathname, baseForUrl).toString();
+const defaultImage = (config as { imagemCompartilhamento?: string }).imagemCompartilhamento || "/favicon.svg";
+const ogPathOrUrl = ogImageProp || defaultImage;
+const absoluteOg = /^https?:\/\//i.test(ogPathOrUrl)
+  ? ogPathOrUrl
+  : new URL(ogPathOrUrl, baseForUrl).toString();
+const fullTitle = `${title} | ${config.nomeMarca}`;
+
+const defaultJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: fullTitle,
+  description: pageDescription,
+  url: canonicalUrl,
+} as const;
+const jsonLd = jsonLdOverride ?? defaultJsonLd;
+
+const isPt = lang.toLowerCase().startsWith("pt");
+---
+
+<!DOCTYPE html>
+<html
+  lang={lang}
+  style={`--client-color-primary: ${config.cores.primaria}; --client-color-secondary: ${config.cores.secundaria}`}
+  data-theme="client"
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{fullTitle}</title>
+    <meta name="description" content={pageDescription} />
+    {articleAuthor && <meta name="author" content={articleAuthor} />}
+    {noindex ? (
+      <meta name="robots" content="noindex, nofollow" />
+    ) : (
+      <meta name="robots" content="index, follow" />
+    )}
+    <link rel="canonical" href={canonicalUrl} />
+    <meta name="theme-color" content={config.cores.primaria} />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="color-scheme" content="light" />
+
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content={config.nomeMarca} />
+    <meta property="og:locale" content={locale} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={pageDescription} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={absoluteOg} />
+    <meta property="og:image:alt" content={title} />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={pageDescription} />
+    <meta name="twitter:image" content={absoluteOg} />
+    <meta name="twitter:image:alt" content={title} />
+
+    {ogType === "article" && articlePublishedTime && (
+      <meta property="article:published_time" content={articlePublishedTime} />
+    )}
+    {ogType === "article" && articleModifiedTime && (
+      <meta property="article:modified_time" content={articleModifiedTime} />
+    )}
+    {ogType === "article" && articleAuthor && (
+      <meta property="article:author" content={articleAuthor} />
+    )}
+
+    <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+  </head>
+  <body class="flex min-h-svh flex-col bg-white text-slate-900">
+    <a
+      href="#conteudo-principal"
+      class="focus:not-sr-only sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:shadow focus:ring-2 focus:ring-[var(--client-color-primary)]"
+    >
+      {isPt ? "Ir para o conteúdo principal" : "Skip to main content"}
+    </a>
+    <header class="border-b border-slate-200 bg-white">
+      <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
+        <a href="/" class="text-lg font-semibold text-[var(--client-color-primary)]" aria-label={config.nomeMarca + " — página inicial"}>
+          {config.nomeMarca}
+        </a>
+        <nav aria-label={isPt ? "Menu principal" : "Main navigation"}>
+          <ul class="flex flex-wrap gap-1 sm:gap-4">
+            {config.menuLinks.map((item) => (
+              <li>
+                <a
+                  href={item.href}
+                  class="rounded-md px-2 py-1 text-slate-700 underline-offset-4 hover:underline focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--client-color-primary)]"
+                >
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </header>
+    <main id="conteudo-principal" class="flex-1">
+      <slot />
+    </main>
+    <footer class="mt-auto border-t border-slate-200 bg-slate-50" role="contentinfo">
+      <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+        {
+          footerLinks.length > 0 && (
+            <nav aria-label="Rodapé do site" class="mb-4">
+              <ul class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-start">
+                {footerLinks.map((item) => (
+                  <li>
+                    <a
+                      href={item.href}
+                      class="text-sm font-medium text-slate-600 underline-offset-4 transition hover:text-[var(--client-color-primary)] hover:underline"
+                    >
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )
+        }
+        <p class="text-center text-sm text-slate-500 sm:text-left">{footerText}</p>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,53 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import clientConfig from "../../data/client-config.json";
+import { getPublicBlogPosts } from "../../lib/blog";
+import {
+  getCategoryBySlug,
+  getCategorySlugsWithPosts,
+} from "../../lib/taxonomies";
+
+const posts = await getPublicBlogPosts(false);
+const slugs = getCategorySlugsWithPosts(posts);
+const items = slugs.map((slug) => {
+  const t = getCategoryBySlug(slug);
+  const name = t?.name ?? slug;
+  const count = posts.filter((p) => p.data.category?.trim().toLowerCase() === slug).length;
+  return { slug, name, count, desc: t?.description ?? "" };
+});
+
+const pageTitle = `Categorias | ${(clientConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
+const description = `Explora os artigos por categoria — ${(clientConfig as { descricaoSeo?: string }).descricaoSeo ?? "conteúdo do blog"}.`;
+---
+
+<BaseLayout title={pageTitle} description={description} canonicalPath="/categorias/">
+  <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <nav class="mb-6 text-sm text-slate-600" aria-label="Migalhas">
+      <ol class="flex flex-wrap items-center gap-1">
+        <li>
+          <a class="text-[var(--client-color-primary)] hover:underline" href="/">Início</a>
+          <span class="px-1 text-slate-400" aria-hidden="true">/</span>
+        </li>
+        <li><span class="font-medium text-slate-800">Categorias</span></li>
+      </ol>
+    </nav>
+    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Categorias do blog</h1>
+    <p class="mt-3 text-slate-600">{description}</p>
+    <ul class="mt-10 space-y-4" aria-label="Lista de categorias com publicações">
+      {
+        items.map((c) => (
+          <li class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <a href={`/category/${c.slug}/`} class="text-lg font-semibold text-[var(--client-color-primary)] hover:underline">
+              {c.name}
+            </a>
+            <p class="mt-1 text-sm text-slate-500">
+              {c.count} {c.count === 1 ? "artigo" : "artigos"}
+            </p>
+            {c.desc && <p class="mt-2 text-sm text-slate-600">{c.desc}</p>}
+          </li>
+        ))
+      }
+    </ul>
+    {items.length === 0 && <p class="mt-8 text-slate-600">Ainda não há categorias com artigos publicados.</p>}
+  </div>
+</BaseLayout>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f8fafc"/>
+  <rect x="80" y="80" width="1040" height="470" fill="#e0f2fe" rx="8"/>
+  <text x="120" y="200" font-family="system-ui,sans-serif" font-size="36" fill="#0ea5e9">Post 1</text>
+  <text x="120" y="260" font-family="system-ui,sans-serif" font-size="24" fill="#64748b">Astro content</text>
+</svg>

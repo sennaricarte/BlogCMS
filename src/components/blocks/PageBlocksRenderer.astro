@@ -1,0 +1,63 @@
+---
+import type { PageBlock } from "../../lib/page-blocks.zod";
+import ContactFormBlock from "./ContactFormBlock.astro";
+import CtaBlock from "./CtaBlock.astro";
+import FaqBlock from "./FaqBlock.astro";
+import HeroBlock from "./HeroBlock.astro";
+import ImageBlock from "./ImageBlock.astro";
+import LinksListBlock from "./LinksListBlock.astro";
+import MapBlock from "./MapBlock.astro";
+import QrCodeBlock from "./QrCodeBlock.astro";
+import QuoteBlock from "./QuoteBlock.astro";
+import SeparatorBlock from "./SeparatorBlock.astro";
+import VideoEmbedBlock from "./VideoEmbedBlock.astro";
+
+type Props = {
+  blocks: PageBlock[];
+  pageUrlFallback: string;
+  class?: string;
+};
+
+const { blocks, pageUrlFallback, class: className = "" } = Astro.props as Props;
+---
+
+<div class={`not-prose w-full max-w-3xl space-y-8 ${className}`}>
+  {
+    blocks.map((b) => {
+      if (b.type === "hero") {
+        return <HeroBlock class="w-full" {...b} />;
+      }
+      if (b.type === "contactForm") {
+        return <ContactFormBlock class="w-full" {...b} />;
+      }
+      if (b.type === "linksList") {
+        return <LinksListBlock class="w-full" {...b} />;
+      }
+      if (b.type === "faq") {
+        return <FaqBlock class="w-full" {...b} />;
+      }
+      if (b.type === "qrCode") {
+        return <QrCodeBlock class="w-full" {...b} pageUrlFallback={pageUrlFallback} />;
+      }
+      if (b.type === "mapLocation") {
+        return <MapBlock class="w-full" {...b} />;
+      }
+      if (b.type === "cta") {
+        return <CtaBlock class="w-full" {...b} />;
+      }
+      if (b.type === "image") {
+        return <ImageBlock class="w-full" {...b} />;
+      }
+      if (b.type === "quote") {
+        return <QuoteBlock class="w-full" {...b} />;
+      }
+      if (b.type === "separator") {
+        return <SeparatorBlock class="w-full" {...b} />;
+      }
+      if (b.type === "videoEmbed") {
+        return <VideoEmbedBlock class="w-full" {...b} />;
+      }
+      return null;
+    })
+  }
+</div>

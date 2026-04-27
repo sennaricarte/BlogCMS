@@ -1,0 +1,512 @@
+---
+export const prerender = false;
+
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { ADMIN_CMS_TARGET_KEY } from "../../lib/admin-cms-target";
+import { ADMIN_INTEGRATION_STORAGE_KEY } from "../../lib/admin-storage";
+import defaultClientConfig from "../../data/client-config.json";
+
+const pageTitle = "Configurações de integração";
+const pageDescription =
+  "Configure tokens do GitHub e da Vercel, teste a conexão e inicie o deploy. Os tokens no localStorage são um apoio local; a operação de deploy roda no servidor (opção B).";
+---
+
+<BaseLayout title={pageTitle} description={pageDescription} noindex canonicalPath="/admin/settings/">
+  <div class="mx-auto max-w-lg px-4 py-10 sm:px-6">
+    <header class="mb-8">
+      <p class="text-sm font-medium uppercase tracking-wide text-[var(--client-color-primary)]">Admin</p>
+      <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+        Integração GitHub &amp; Vercel
+      </h1>
+      <p class="mt-2 text-sm text-slate-600">
+        Estes dados ficam em <strong class="font-medium">localStorage</strong> neste dispositivo. Não os uses em
+        computadores partilhados; mais tarde poderão ser guardados no servidor.
+      </p>
+      <p class="mt-2 text-xs text-slate-500">
+        <a href="/admin/" class="text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+          >Abrir o painel de deploy (opção B)</a
+        >
+        ·
+        <a
+          href="/admin/posts/"
+          class="text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+          >CMS (artigos e páginas)</a
+        >
+      </p>
+    </header>
+
+    <form
+      id="form-integracao"
+      class="space-y-6"
+      aria-describedby="form-integracao-desc"
+      novalidate
+    >
+      <p id="form-integracao-desc" class="sr-only">
+        Formulário com token pessoal GitHub, token Vercel e identificador opcional de equipa Vercel.
+      </p>
+
+      <div>
+        <label for="github-token" class="block text-sm font-medium text-slate-800">
+          GitHub Personal Token
+        </label>
+        <p id="github-token-hint" class="mt-1 text-xs text-slate-500">
+          PAT com permissões de repositório adequadas (ex. <code class="rounded bg-slate-100 px-1">repo</code>).
+        </p>
+        <input
+          id="github-token"
+          name="GITHUB_PERSONAL_TOKEN"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          required
+          aria-required="true"
+          aria-describedby="github-token-hint"
+          class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm outline-none ring-slate-400 focus:border-[var(--client-color-primary)] focus:ring-2 focus:ring-[var(--client-color-primary)]/30"
+        />
+      </div>
+
+      <div>
+        <label for="vercel-token" class="block text-sm font-medium text-slate-800"> Vercel Token </label>
+        <p id="vercel-token-hint" class="mt-1 text-xs text-slate-500">
+          Token de acesso da Vercel (definições da conta → Tokens).
+        </p>
+        <input
+          id="vercel-token"
+          name="VERCEL_TOKEN"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          required
+          aria-required="true"
+          aria-describedby="vercel-token-hint"
+          class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm outline-none focus:border-[var(--client-color-primary)] focus:ring-2 focus:ring-[var(--client-color-primary)]/30"
+        />
+      </div>
+
+      <div>
+        <label for="vercel-team" class="block text-sm font-medium text-slate-800">
+          Vercel Team ID <span class="font-normal text-slate-500">(opcional)</span>
+        </label>
+        <p id="vercel-team-hint" class="mt-1 text-xs text-slate-500">
+          Apenas se usares uma equipa Vercel (formato <code class="rounded bg-slate-100 px-1">team_…</code>).
+        </p>
+        <input
+          id="vercel-team"
+          name="VERCEL_TEAM_ID"
+          type="text"
+          autocomplete="off"
+          inputmode="text"
+          aria-describedby="vercel-team-hint"
+          class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm outline-none focus:border-[var(--client-color-primary)] focus:ring-2 focus:ring-[var(--client-color-primary)]/30"
+        />
+      </div>
+
+      <div>
+        <label for="repo-slug" class="block text-sm font-medium text-slate-800"> Nome do repositório (novo) </label>
+        <p id="repo-slug-hint" class="mt-1 text-xs text-slate-500">Slug do repositório na tua conta GitHub, ex. <code class="rounded bg-slate-100 px-1">meu-site-blog</code> (único na conta).</p>
+        <input
+          id="repo-slug"
+          name="repositoryName"
+          type="text"
+          autocomplete="off"
+          inputmode="text"
+          required
+          aria-describedby="repo-slug-hint"
+          class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm outline-none focus:border-[var(--client-color-primary)] focus:ring-2 focus:ring-[var(--client-color-primary)]/30"
+        />
+      </div>
+
+      <fieldset class="space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
+        <legend class="px-1 text-sm font-semibold text-slate-800">Alvo do CMS (repositório existente)</legend>
+        <p class="text-xs text-slate-600">
+          Usado em <strong>Artigos / Páginas / Taxonomia</strong> e no botão «Publicar alterações» (Vercel). Não cria
+          repositório — apenas indica onde gravar ficheiros e de onde puxar.
+        </p>
+        <div>
+          <label for="cms-github-repo" class="block text-sm font-medium text-slate-800">Repositório GitHub</label>
+          <p id="cms-github-hint" class="mt-1 text-xs text-slate-500">Formato <code class="rounded bg-slate-100 px-1">proprietario/repositorio</code>.</p>
+          <input
+            id="cms-github-repo"
+            type="text"
+            autocomplete="off"
+            inputmode="text"
+            placeholder="ex.: utilizador/meu-site-blog"
+            aria-describedby="cms-github-hint"
+            class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+          />
+        </div>
+        <div>
+          <label for="cms-branch" class="block text-sm font-medium text-slate-800">Ramo</label>
+          <input
+            id="cms-branch"
+            type="text"
+            autocomplete="off"
+            class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900"
+            value="main"
+            placeholder="main"
+          />
+        </div>
+        <div>
+          <label for="cms-vercel-proj" class="block text-sm font-medium text-slate-800">Vercel — ID do projeto</label>
+          <p class="mt-1 text-xs text-slate-500">Project ID (inicia geralmente por <code class="rounded bg-slate-100 px-1">prj_</code>).</p>
+          <input
+            id="cms-vercel-proj"
+            type="text"
+            autocomplete="off"
+            class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900"
+            placeholder="prj_…"
+          />
+        </div>
+        <div>
+          <label for="cms-vercel-name" class="block text-sm font-medium text-slate-800">Vercel — nome do projeto (slug)</label>
+          <p class="mt-1 text-xs text-slate-500">O mesmo que aparece no URL <code class="text-xs">vercel.com/…/nome</code> (usado na API de deploy).</p>
+          <input
+            id="cms-vercel-name"
+            type="text"
+            autocomplete="off"
+            class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900"
+          />
+        </div>
+      </fieldset>
+
+      <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <button
+          type="button"
+          id="btn-guardar"
+          class="inline-flex w-full items-center justify-center rounded-lg bg-[var(--client-color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-slate-900 sm:w-auto"
+        >
+          Guardar localmente
+        </button>
+        <button
+          type="button"
+          id="btn-testar"
+          class="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--client-color-primary)] sm:w-auto"
+        >
+          Testar conexão
+        </button>
+        <button
+          type="button"
+          id="btn-deploy"
+          class="inline-flex w-full items-center justify-center rounded-lg border-2 border-[var(--client-color-primary)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--client-color-primary)] shadow-sm transition hover:bg-slate-50 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--client-color-primary)] sm:w-auto"
+        >
+          Iniciar deploy (GitHub + Vercel)
+        </button>
+      </div>
+    </form>
+
+    <div
+      id="mensagem-integracao"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      class="mt-6 min-h-[1.5rem] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 empty:hidden"
+    />
+
+    <div
+      id="deploy-em-curso"
+      role="status"
+      aria-live="assertive"
+      aria-atomic="true"
+      class="mt-4 hidden min-h-[2.5rem] rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800"
+    />
+  </div>
+</BaseLayout>
+
+<script
+  is:inline
+  define:vars={{
+    ADMIN_INTEGRATION_STORAGE_KEY,
+    ADMIN_CMS_TARGET_KEY,
+    defaultClientConfig,
+  }}
+>
+  (function () {
+    const $ = function (id) {
+      return document.getElementById(id);
+    };
+    const form = $("form-integracao");
+    const elGh = /** @type {HTMLInputElement} */ ($("github-token"));
+    const elV = /** @type {HTMLInputElement} */ ($("vercel-token"));
+    const elTeam = /** @type {HTMLInputElement} */ ($("vercel-team"));
+    const elMsg = $("mensagem-integracao");
+    const btnGuardar = /** @type {HTMLButtonElement} */ ($("btn-guardar"));
+    const btnTestar = /** @type {HTMLButtonElement} */ ($("btn-testar"));
+    const btnDeploy = /** @type {HTMLButtonElement} */ ($("btn-deploy"));
+    const elRepo = /** @type {HTMLInputElement} */ ($("repo-slug"));
+    const elDeploy = $("deploy-em-curso");
+    const elCmsRepo = /** @type {HTMLInputElement} */ ($("cms-github-repo"));
+    const elCmsBranch = /** @type {HTMLInputElement} */ ($("cms-branch"));
+    const elCmsVercelId = /** @type {HTMLInputElement} */ ($("cms-vercel-proj"));
+    const elCmsVercelName = /** @type {HTMLInputElement} */ ($("cms-vercel-name"));
+
+    function setMensagem(texto, isErro) {
+      if (!elMsg) return;
+      if (!texto) {
+        elMsg.textContent = "";
+        elMsg.className =
+          "mt-6 min-h-[1.5rem] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 empty:hidden";
+        return;
+      }
+      elMsg.className = isErro
+        ? "mt-6 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900"
+        : "mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900";
+      elMsg.textContent = texto;
+    }
+
+    function readPayload() {
+      const team = elTeam && elTeam.value ? elTeam.value.trim() : undefined;
+      return {
+        GITHUB_PERSONAL_TOKEN: (elGh && elGh.value.trim()) || "",
+        VERCEL_TOKEN: (elV && elV.value.trim()) || "",
+        ...(team ? { VERCEL_TEAM_ID: team } : {}),
+      };
+    }
+
+    function applyPayload(/** @type {Record<string, string>} */ data) {
+      if (elGh && data.GITHUB_PERSONAL_TOKEN) elGh.value = data.GITHUB_PERSONAL_TOKEN;
+      if (elV && data.VERCEL_TOKEN) elV.value = data.VERCEL_TOKEN;
+      if (elTeam) elTeam.value = data.VERCEL_TEAM_ID || "";
+    }
+
+    function readCmsPayload() {
+      return {
+        githubRepoFullName: (elCmsRepo && elCmsRepo.value.trim()) || "",
+        branch: (elCmsBranch && elCmsBranch.value.trim()) || "main",
+        vercelProjectId: (elCmsVercelId && elCmsVercelId.value.trim()) || "",
+        vercelProjectName: (elCmsVercelName && elCmsVercelName.value.trim()) || "",
+      };
+    }
+
+    function applyCmsPayload(/** @type {Record<string, string>} */ c) {
+      if (elCmsRepo && c.githubRepoFullName) elCmsRepo.value = c.githubRepoFullName;
+      if (elCmsBranch && c.branch) elCmsBranch.value = c.branch;
+      if (elCmsVercelId && c.vercelProjectId) elCmsVercelId.value = c.vercelProjectId;
+      if (elCmsVercelName && c.vercelProjectName) elCmsVercelName.value = c.vercelProjectName;
+    }
+
+    try {
+      const raw = localStorage.getItem(ADMIN_INTEGRATION_STORAGE_KEY);
+      if (raw) {
+        const data = /** @type {Record<string, string>} */ (JSON.parse(raw));
+        applyPayload(data);
+      }
+    } catch {
+      setMensagem("Não foi possível carregar definições guardadas.", true);
+    }
+
+    try {
+      const rawC = localStorage.getItem(ADMIN_CMS_TARGET_KEY);
+      if (rawC) {
+        const c = /** @type {Record<string, string>} */ (JSON.parse(rawC));
+        applyCmsPayload(c);
+      }
+    } catch {
+      /* — */
+    }
+
+    function setDeployStatus(texto, visivel) {
+      if (!elDeploy) return;
+      if (!texto) {
+        elDeploy.textContent = "";
+        elDeploy.classList.add("hidden");
+        return;
+      }
+      elDeploy.textContent = texto;
+      elDeploy.classList.toggle("hidden", !visivel);
+    }
+
+    function setBusy(busy) {
+      if (btnGuardar) btnGuardar.disabled = busy;
+      if (btnTestar) btnTestar.disabled = busy;
+      if (btnDeploy) btnDeploy.disabled = busy;
+    }
+
+    if (elRepo) {
+      try {
+        const saved = localStorage.getItem(ADMIN_INTEGRATION_STORAGE_KEY + "-repoName");
+        if (saved) elRepo.value = saved;
+      } catch { /* — */ }
+    }
+
+    btnGuardar.addEventListener("click", function () {
+      setMensagem("");
+      if (!elGh || !elV) return;
+      if (!elGh.value.trim() || !elV.value.trim()) {
+        setMensagem("Preencha pelo menos o token GitHub e o token Vercel antes de guardar.", true);
+        return;
+      }
+      try {
+        const payload = readPayload();
+        localStorage.setItem(ADMIN_INTEGRATION_STORAGE_KEY, JSON.stringify(payload));
+        const cms = readCmsPayload();
+        if (cms.githubRepoFullName || cms.vercelProjectId || cms.vercelProjectName) {
+          localStorage.setItem(ADMIN_CMS_TARGET_KEY, JSON.stringify(cms));
+        } else {
+          localStorage.removeItem(ADMIN_CMS_TARGET_KEY);
+        }
+        setMensagem("Definições guardadas neste navegador.");
+      } catch (e) {
+        setMensagem(
+          (e && /** @type {Error} */ (e).message) || "Não foi possível guardar. Verifica o armazenamento do browser.",
+          true
+        );
+      }
+    });
+
+    btnTestar.addEventListener("click", async function () {
+      setMensagem("");
+      if (!elGh || !elV) return;
+      if (!elGh.value.trim() || !elV.value.trim()) {
+        setMensagem("Preencha o token GitHub e o Vercel para testar a conexão.", true);
+        return;
+      }
+      btnTestar.disabled = true;
+      var original = btnTestar.textContent;
+      btnTestar.textContent = "A testar…";
+      try {
+        const res = await fetch("/api/admin/test-connection", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(readPayload()),
+        });
+        const json = /** @type {{ ok?: boolean; error?: string; github?: { login: string }; vercel?: { username: string; teamName?: string } }} */ (
+          await res.json()
+        );
+        if (!res.ok || !json.ok) {
+          var step = (json && json.error) || "Pedido rejeitado (HTTP " + res.status + ").";
+          setMensagem(step, true);
+          return;
+        }
+        const partes = [
+          "GitHub: @" + (json.github && json.github.login),
+          "Vercel: " + (json.vercel && json.vercel.username) +
+            (json.vercel && json.vercel.teamName ? " · equipa " + json.vercel.teamName : ""),
+        ];
+        setMensagem("Conexão OK — " + partes.join(" · "));
+      } catch (e) {
+        setMensagem(
+          "Falha de rede ou servidor. Em modo static sem API, o teste requer o servidor (ex. npm run dev / deploy com suporte a rotas). " +
+            ((e && /** @type {Error} */ (e).message) || ""),
+          true
+        );
+      } finally {
+        btnTestar.disabled = false;
+        btnTestar.textContent = original || "Testar conexão";
+      }
+    });
+
+    if (btnDeploy) {
+      btnDeploy.addEventListener("click", async function () {
+        setMensagem("");
+        if (!elGh || !elV || !elRepo) return;
+        if (!elGh.value.trim() || !elV.value.trim()) {
+          setMensagem("Preencha os tokens GitHub e Vercel antes do deploy.", true);
+          return;
+        }
+        if (!elRepo.value.trim()) {
+          setMensagem("Indica o nome do repositório (slug) que será criado no teu GitHub.", true);
+          return;
+        }
+        setDeployStatus("A iniciar…", true);
+        setBusy(true);
+        var originalDeploy = btnDeploy.textContent;
+        btnDeploy.textContent = "Deploy em curso…";
+        try {
+          const payload = readPayload();
+          const body = {
+            githubToken: payload.GITHUB_PERSONAL_TOKEN,
+            vercelToken: payload.VERCEL_TOKEN,
+            vercelTeamId: payload.VERCEL_TEAM_ID,
+            repositoryName: elRepo.value.trim(),
+            config: defaultClientConfig,
+            github: {
+              private: true,
+              description: "Site gerado a partir do template BlogCMS",
+            },
+            vercel: {
+              vercelProjectName: elRepo.value.trim().toLowerCase(),
+              teamId: payload.VERCEL_TEAM_ID,
+            },
+          };
+          const res = await fetch("/api/deploy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (res.status === 401) {
+            var j401 = await res.json();
+            setMensagem(
+              (j401 && j401.error) || "Revisa o token (401 Unauthorized).",
+              true
+            );
+            setDeployStatus("", false);
+            return;
+          }
+          if (res.status !== 200) {
+            var txt = await res.text();
+            setMensagem("Resposta inesperada: HTTP " + res.status + (txt ? " — " + txt.slice(0, 200) : ""), true);
+            setDeployStatus("", false);
+            return;
+          }
+          if (!res.body) {
+            setMensagem("Resposta vinda sem corpo (stream).", true);
+            setDeployStatus("", false);
+            return;
+          }
+          var reader = res.body.getReader();
+          var dec = new TextDecoder();
+          var buf = "";
+          function handleLine(/** @type {string} */ line) {
+            var lineTrim = line.trim();
+            if (!lineTrim) return false;
+            var o = JSON.parse(lineTrim);
+            if (o.type === "progress" && o.message) {
+              setDeployStatus(String(o.message), true);
+              return false;
+            }
+            if (o.type === "error") {
+              setMensagem(
+                o.message + (o.httpStatus === 401 ? " (revisa as chaves e tenta de novo.)" : ""),
+                true
+              );
+              setDeployStatus("", false);
+              return true;
+            }
+            if (o.type === "complete" && o.result) {
+              var r0 = o.result;
+              setDeployStatus("Concluído.", true);
+              setMensagem("Repo: " + (r0.githubRepositoryUrl || "—") + " · Vercel: " + (r0.vercelProjectName || "—"));
+              try {
+                localStorage.setItem(ADMIN_INTEGRATION_STORAGE_KEY + "-repoName", elRepo.value.trim());
+              } catch (e) { /* — */ }
+              return true;
+            }
+            return false;
+          }
+          while (true) {
+            var _r = await reader.read();
+            if (_r.done) break;
+            buf += dec.decode(_r.value, { stream: true });
+            var parts = buf.split("\n");
+            buf = parts.pop() || "";
+            for (var p = 0; p < parts.length; p++) {
+              if (handleLine(parts[p])) return;
+            }
+          }
+          if (buf.trim() && handleLine(buf)) {
+            return;
+          }
+        } catch (e) {
+          setMensagem(
+            (e && /** @type {Error} */ (e).message) || "Falha de rede. Verifica se o site está a correr com suporte a API (adapter Node, etc.)",
+            true
+          );
+          setDeployStatus("", false);
+        } finally {
+          setBusy(false);
+          btnDeploy.textContent = originalDeploy || "Iniciar deploy (GitHub + Vercel)";
+        }
+      });
+    }
+  })();
+</script>

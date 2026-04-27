@@ -1,0 +1,115 @@
+---
+import type { PageBlock } from "../../lib/page-blocks.zod";
+
+type P = Extract<PageBlock, { type: "contactForm" }> & { class?: string };
+
+const p = Astro.props as P;
+const {
+  title,
+  nameLabel,
+  emailLabel,
+  subjectLabel,
+  messageLabel,
+  submitLabel,
+  contactEmail,
+  privacyNote,
+  class: className = "",
+} = p;
+const formUid = `cf-${p.id}`.replace(/[^a-zA-Z0-9_-]/g, "");
+const mail = (contactEmail || "").trim();
+---
+
+<section class={`rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-sm ${className}`} aria-label="Formulário de contacto">
+  {title && <h2 class="text-xl font-semibold text-slate-900">{title}</h2>}
+  <p class="mt-1 text-sm text-slate-500">Os dados são enviados via cliente de e-mail (mailto) no teu dispositivo.</p>
+  <form
+    class="mt-6 space-y-4"
+    data-contact-form={formUid}
+    data-mailto={mail}
+  >
+    <div>
+      <label for={`${formUid}-name`} class="block text-sm font-medium text-slate-800">{nameLabel}</label>
+      <input
+        id={`${formUid}-name`}
+        name="name"
+        type="text"
+        required
+        autocomplete="name"
+        class="mt-1 w-full max-w-lg rounded-lg border border-slate-200 px-3 py-2 text-sm"
+      />
+    </div>
+    <div>
+      <label for={`${formUid}-email`} class="block text-sm font-medium text-slate-800">{emailLabel}</label>
+      <input
+        id={`${formUid}-email`}
+        name="email"
+        type="email"
+        required
+        autocomplete="email"
+        class="mt-1 w-full max-w-lg rounded-lg border border-slate-200 px-3 py-2 text-sm"
+      />
+    </div>
+    <div>
+      <label for={`${formUid}-sub`} class="block text-sm font-medium text-slate-800">{subjectLabel}</label>
+      <input
+        id={`${formUid}-sub`}
+        name="subject"
+        type="text"
+        required
+        autocomplete="off"
+        class="mt-1 w-full max-w-lg rounded-lg border border-slate-200 px-3 py-2 text-sm"
+      />
+    </div>
+    <div>
+      <label for={`${formUid}-msg`} class="block text-sm font-medium text-slate-800">{messageLabel}</label>
+      <textarea
+        id={`${formUid}-msg`}
+        name="message"
+        required
+        rows={5}
+        class="mt-1 w-full max-w-lg rounded-lg border border-slate-200 px-3 py-2 text-sm"
+      ></textarea>
+    </div>
+    {privacyNote && <p class="text-xs text-slate-500">{privacyNote}</p>}
+    <button
+      type="submit"
+      class="inline-flex min-h-11 min-w-[7rem] items-center justify-center rounded-lg bg-[var(--client-color-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+    >
+      {submitLabel}
+    </button>
+  </form>
+</section>
+
+<script is:inline>
+  (function () {
+    function wire() {
+      document.querySelectorAll("[data-contact-form][data-mailto]").forEach(function (form) {
+        if (form.dataset.wired === "1") return;
+        form.dataset.wired = "1";
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var fd = new FormData(form);
+          var name = String(fd.get("name") || "").trim();
+          var email = String(fd.get("email") || "").trim();
+          var subject = String(fd.get("subject") || "").trim();
+          var message = String(fd.get("message") || "").trim();
+          if (!name || !email) return;
+          var body =
+            "Nome: " +
+            name +
+            "\nE-mail: " +
+            email +
+            "\n\n" +
+            message;
+          var to = String(form.getAttribute("data-mailto") || "").trim();
+          var sub = encodeURIComponent(subject);
+          var bodyEnc = encodeURIComponent(body);
+          var href = (to ? "mailto:" + to : "mailto:") + "?subject=" + sub + "&body=" + bodyEnc;
+          window.location.href = href;
+        });
+      });
+    }
+    wire();
+    document.addEventListener("astro:page-load", wire);
+  })();
+</script>

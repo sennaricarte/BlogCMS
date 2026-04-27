@@ -1,0 +1,85 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import clientConfig from "../../data/client-config.json";
+import type { PageBlock } from "../../lib/page-blocks.zod";
+import { buildPageJsonLdGraph } from "../../lib/page-seo-jsonld";
+import PageBlocksRenderer from "../../components/blocks/PageBlocksRenderer.astro";
+
+type PageEntry = import("astro:content").CollectionEntry<"pages">;
+
+export async function getStaticPaths() {
+  const includeDrafts = import.meta.env.DEV;
+  const all = await getCollection("pages", (p) => {
+    if (import.meta.env.PROD) return !p.data.draft;
+    return includeDrafts || !p.data.draft;
+  });
+  return all.map((page) => ({
+    params: { slug: page.id },
+    props: { page },
+  }));
+}
+
+const { page } = Astro.props as { page: PageEntry };
+const d = page.data;
+const { Content } = await render(page);
+const blocks: PageBlock[] = d.pageBlocks?.length ? d.pageBlocks : [];
+const hasBlocks = blocks.length > 0;
+const rawMd = (page as { body?: string }).body;
+const hasMarkdown = typeof rawMd === "string" && rawMd.replace(/\r?\n/g, "").trim().length > 0;
+const canonicalPath = new URL(Astro.url.pathname, Astro.url).pathname;
+const siteBase =
+  (import.meta.env.SITE as string | undefined)?.replace(/\/$/, "") ||
+  (clientConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
+  Astro.url.origin;
+const pageUrl = new URL(canonicalPath, siteBase + "/").toString();
+const faqForSchema = blocks
+  .filter((b): b is Extract<PageBlock, { type: "faq" }> => b.type === "faq")
+  .flatMap((b) => b.items);
+const jsonLdData = buildPageJsonLdGraph({
+  pageUrl,
+  title: d.title,
+  description: d.description,
+  pubDateIso: d.pubDate.toISOString(),
+  faqItems: faqForSchema,
+});
+---
+
+<BaseLayout
+  title={d.title}
+  description={d.description}
+  noindex={d.draft}
+  canonicalPath={canonicalPath}
+  ogType="website"
+  jsonLdData={jsonLdData}
+>
+  <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <header class="border-b border-slate-200 pb-8">
+      <p class="text-sm text-slate-500">
+        <time datetime={d.pubDate.toISOString()}>
+          {d.pubDate.toLocaleDateString("pt-PT", { year: "numeric", month: "long", day: "numeric" })}
+        </time>
+        {d.draft && (
+          <span class="ml-2 rounded bg-amber-100 px-2 py-0.5 text-amber-900">Rascunho (pré‑visualização)</span>
+        )}
+      </p>
+      <h1 class="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">{d.title}</h1>
+    </header>
+    {
+      hasBlocks && (
+        <div class="not-prose mt-10">
+          <PageBlocksRenderer class="w-full" blocks={blocks} pageUrlFallback={pageUrl} />
+        </div>
+      )
+    }
+    {(!hasBlocks || hasMarkdown) && (
+      <div
+        class={`prose prose-slate max-w-none prose-headings:scroll-mt-20 prose-a:text-[var(--client-color-primary)] ${
+          hasBlocks ? "mt-12" : "mt-10"
+        }`}
+      >
+        <Content />
+      </div>
+    )}
+  </div>
+</BaseLayout>

@@ -1,0 +1,17 @@
+{
+  "projects": [
+    {
+      "id": "ab48692b-99f9-4478-81e8-c18689aacf09",
+      "name": "Blog Teste SEO",
+      "vercelUrl": "https://blog-teste-lac.vercel.app",
+      "siteUrl": "https://blog-teste-lac.vercel.app",
+      "githubUrl": "https://github.com/desentupidoraremaxseo-stack/blog-teste",
+      "createdAt": "2026-04-26T17:44:51.538Z",
+      "vercelProjectId": "prj_seed_blog_teste_senna",
+      "vercelProjectName": "blog-teste-lac",
+      "vercelScope": "desentupidoraremaxseo-stack",
+      "vercelTeamId": "",
+      "githubRepoFullName": "desentupidoraremaxseo-stack/blog-teste"
+    }
+  ]
+}

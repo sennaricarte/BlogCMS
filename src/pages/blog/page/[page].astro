@@ -1,0 +1,102 @@
+---
+import BlogImage from "../../../components/blog/BlogImage.astro";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { BLOG_PER_PAGE, getPublicBlogPosts, pageCount, paginate } from "../../../lib/blog";
+
+export async function getStaticPaths() {
+  const includeDrafts = import.meta.env.DEV;
+  const all = await getPublicBlogPosts(includeDrafts);
+  const total = all.length;
+  const totalPages = pageCount(total, BLOG_PER_PAGE);
+  if (totalPages <= 1) {
+    return [];
+  }
+  return Array.from({ length: totalPages - 1 }, (_, i) => ({
+    params: { page: String(i + 2) },
+  }));
+}
+
+const pageNum = Number.parseInt(Astro.params.page ?? "2", 10);
+const includeDrafts = import.meta.env.DEV;
+const all = await getPublicBlogPosts(includeDrafts);
+const total = all.length;
+const totalPages = pageCount(total, BLOG_PER_PAGE);
+const items = paginate(all, pageNum, BLOG_PER_PAGE);
+const pageTitle = pageNum > 1 ? `Blog (p. ${pageNum})` : "Blog";
+---
+
+<BaseLayout
+  title={pageTitle}
+  description="Artigos e notas, ordenados da mais recente para a mais antiga."
+  canonicalPath={`/blog/page/${pageNum}/`}
+>
+  <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <header class="border-b border-slate-200 pb-8">
+      <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Blog</h1>
+      <p class="mt-2 text-sm text-slate-500" aria-label="Número da página atual">
+        Página {pageNum} de {totalPages}
+      </p>
+    </header>
+    <ol class="mt-8 space-y-10" aria-label="Lista de artigos">
+      {items.map((post, index) => (
+        <li>
+          <article class="group flex flex-col gap-4 sm:flex-row sm:items-start">
+            <a href={`/blog/${post.id}/`} class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200" aria-hidden="true" tabindex={-1}>
+              <BlogImage
+                src={post.data.heroImage}
+                alt=""
+                width={400}
+                height={210}
+                class="h-40 w-full object-cover sm:h-32 sm:w-40"
+                sizes="(min-width: 40rem) 10rem, 100vw"
+                priority={index === 0}
+              />
+            </a>
+            <div class="min-w-0 flex-1">
+              <h2 class="text-xl font-semibold leading-snug text-slate-900">
+                <a
+                  href={`/blog/${post.id}/`}
+                  class="text-[var(--client-color-primary)] decoration-transparent underline-offset-2 hover:underline"
+                >
+                  {post.data.title}
+                </a>
+              </h2>
+              <p class="mt-1 text-sm text-slate-500">
+                <time datetime={post.data.pubDate.toISOString()}>{post.data.pubDate.toLocaleDateString("pt-PT", { year: "numeric", month: "short", day: "numeric" })}</time>
+                <span class="px-1">·</span>
+                {post.data.author}
+                {import.meta.env.DEV && post.data.draft && (
+                  <span class="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">Rascunho</span>
+                )}
+              </p>
+              <p class="mt-2 line-clamp-2 text-slate-600">{post.data.description}</p>
+            </div>
+          </article>
+        </li>
+      ))}
+    </ol>
+    <nav class="mt-12 flex items-center justify-between border-t border-slate-200 pt-8" aria-label="Paginação do blog">
+      {pageNum > 1 ? (
+        <a
+          href={pageNum === 2 ? "/blog/" : `/blog/page/${pageNum - 1}/`}
+          class="text-sm font-medium text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+        >
+          ← Anterior
+        </a>
+      ) : (
+        <span />
+      )}
+      <span class="text-sm text-slate-500" aria-label="Número da página atual">Página {pageNum} de {totalPages}</span>
+      {pageNum < totalPages ? (
+        <a
+          href={`/blog/page/${pageNum + 1}/`}
+          class="text-sm font-medium text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+        >
+          Próxima →
+        </a>
+      ) : (
+        <span />
+      )}
+    </nav>
+  </div>
+</BaseLayout>

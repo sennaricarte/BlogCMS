@@ -1,0 +1,174 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { getCollection } from "astro:content";
+
+const pageTitle = "Páginas";
+const pageDescription = "Arquivos em src/content/pages (coleção Astro) — caminho público /p/… .";
+const rows = await getCollection("pages");
+const sorted = [...rows].sort((a, b) => b.data.pubDate.getTime() - a.data.pubDate.getTime());
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="pages"
+  canonicalPath="/admin/pages/"
+>
+  <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <a
+      href="/admin/pages/novo/"
+      class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+    >
+      Nova página
+    </a>
+    <p class="text-xs text-slate-500" id="pg-remote-hint" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" data-cms-table-wrap>
+    <table class="min-w-full divide-y divide-slate-200 text-left text-sm" data-cms-table>
+      <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600">
+        <tr>
+          <th scope="col" class="px-4 py-3">Título</th>
+          <th scope="col" class="hidden px-4 py-3 sm:table-cell">Estado</th>
+          <th scope="col" class="hidden px-4 py-3 md:table-cell">Data</th>
+          <th scope="col" class="px-4 py-3 text-right">Ações</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100" id="pg-tbody">
+        {
+          sorted.map((p) => {
+            const st = p.data.draft ? "Rascunho" : "Publicado";
+            const date = p.data.pubDate.toLocaleDateString("pt-PT");
+            const search = `${p.data.title} ${st} ${date} ${p.id}`.toLowerCase();
+            return (
+              <tr data-search={search} data-slug={p.id}>
+                <td class="max-w-xs px-4 py-3 font-medium">
+                  <a
+                    class="text-[var(--client-color-primary)] hover:underline"
+                    href={`/admin/pages/edit/${p.id}/`}
+                  >
+                    {p.data.title}
+                  </a>
+                  <span class="mt-0.5 block text-xs text-slate-500 sm:hidden">
+                    {st} · {date}
+                  </span>
+                </td>
+                <td class="hidden px-4 py-3 sm:table-cell">
+                  {p.data.draft ? (
+                    <span class="inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-amber-900 ring-1 ring-amber-200/80">
+                      Rascunho
+                    </span>
+                  ) : (
+                    <span class="inline-flex rounded-md bg-emerald-50 px-2 py-0.5 text-emerald-900 ring-1 ring-emerald-200/80">
+                      Publicado
+                    </span>
+                  )}
+                </td>
+                <td class="hidden px-4 py-3 text-slate-600 md:table-cell">
+                  <time datetime={p.data.pubDate.toISOString()}>{date}</time>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <a href={`/p/${p.id}/`} class="text-sm text-slate-600 hover:underline" target="_blank" rel="noreferrer"
+                    >Ver</a
+                  >{" "}
+                  ·
+                  <a class="text-sm font-medium text-slate-800" href={`/admin/pages/edit/${p.id}/`}>
+                    Editar
+                  </a>
+                </td>
+              </tr>
+            );
+          })
+        }
+      </tbody>
+    </table>
+    <nav id="pages-list-nav" class="not-prose min-h-[3rem]" aria-live="polite"></nav>
+  </div>
+</AdminLayout>
+
+<script>
+  import { initAdminTablePagination } from "../../../scripts/admin-table-pagination";
+  initAdminTablePagination({ tbodyId: "pg-tbody", navId: "pages-list-nav", pageSize: 10 });
+</script>
+
+<script is:inline>
+  (function () {
+    var K_INTEGR = "blogcms-admin-integration";
+    var K_CMS = "blogcms-cms-target";
+    var el = document.getElementById("pg-remote-hint");
+    var tbody = document.getElementById("pg-tbody");
+    if (!el || !tbody) return;
+    function readJson(key) {
+      try {
+        var r = localStorage.getItem(key);
+        return r ? JSON.parse(r) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    var integ = readJson(K_INTEGR);
+    var target = readJson(K_CMS);
+    if (!integ || !integ.GITHUB_PERSONAL_TOKEN || !target || !target.githubRepoFullName) {
+      el.textContent = "Configure o token e o repositório alvo em Configurações para listar a partir do GitHub.";
+      return;
+    }
+    el.textContent = "A sincronizar…";
+    fetch("/api/admin/cms/github", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "listPages",
+        GITHUB_PERSONAL_TOKEN: integ.GITHUB_PERSONAL_TOKEN,
+        githubRepoFullName: target.githubRepoFullName,
+        branch: target.branch || "main",
+      }),
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (j) {
+        if (!j || !j.ok || !j.items) {
+          el.textContent = (j && j.error) || "Não foi possível listar.";
+          return;
+        }
+        el.textContent = "Lista alinhada com o repositório (" + j.items.length + " itens).";
+        tbody.textContent = "";
+        for (var i = 0; i < j.items.length; i++) {
+          var p = j.items[i];
+          var isD = p.draft;
+          var d = new Date(p.pubDate);
+          var dateStr = isNaN(d.getTime()) ? "—" : d.toLocaleDateString("pt-PT");
+          var stL = isD ? "Rascunho" : "Publicado";
+          var tr = document.createElement("tr");
+          tr.setAttribute("data-slug", p.slug);
+          tr.setAttribute("data-search", (p.title + " " + stL + " " + dateStr + " " + p.slug).toLowerCase());
+          tr.innerHTML =
+            '<td class="max-w-xs px-4 py-3 font-medium"><a class="text-[var(--client-color-primary)] hover:underline" href="/admin/pages/edit/' +
+            p.slug +
+            '/">' +
+            (p.title || p.slug) +
+            '</a><span class="mt-0.5 block text-xs text-slate-500 sm:hidden">' +
+            stL +
+            " · " +
+            dateStr +
+            "</span></td><td class=\"hidden px-4 py-3 sm:table-cell\">" +
+            (isD
+              ? '<span class="inline-flex rounded-md bg-amber-50 px-2 py-0.5 text-amber-900 ring-1 ring-amber-200/80">Rascunho</span>'
+              : '<span class="inline-flex rounded-md bg-emerald-50 px-2 py-0.5 text-emerald-900 ring-1 ring-emerald-200/80">Publicado</span>') +
+            "</td><td class=\"hidden px-4 py-3 text-slate-600 md:table-cell\">" +
+            dateStr +
+            '</td><td class="px-4 py-3 text-right"><a href="/p/' +
+            p.slug +
+            '/" class="text-sm text-slate-600 hover:underline" target="_blank" rel="noreferrer">Ver</a> · <a class="text-sm font-medium text-slate-800" href="/admin/pages/edit/' +
+            p.slug +
+            '/">Editar</a></td>';
+          tbody.appendChild(tr);
+        }
+      })
+      .catch(function () {
+        el.textContent = "Falha de rede ao listar a partir do GitHub.";
+      });
+  })();
+</script>

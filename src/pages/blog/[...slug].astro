@@ -1,0 +1,18 @@
+---
+import BlogPostLayout from "../../layouts/BlogPostLayout.astro";
+import { getPublicBlogPosts } from "../../lib/blog";
+
+export async function getStaticPaths() {
+  const includeDrafts = import.meta.env.DEV;
+  const posts = await getPublicBlogPosts(includeDrafts);
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const canonicalPath = new URL(Astro.url.pathname, Astro.url).pathname;
+---
+
+<BlogPostLayout post={post} canonicalPath={canonicalPath} />

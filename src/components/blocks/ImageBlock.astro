@@ -1,0 +1,24 @@
+---
+import type { PageBlock } from "../../lib/page-blocks.zod";
+
+type P = Extract<PageBlock, { type: "image" }> & { class?: string };
+
+const { src, alt, caption, class: className = "" } = Astro.props as P;
+---
+
+<figure class={`mx-auto w-full max-w-full ${className}`}>
+  <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm ring-1 ring-slate-900/5">
+    <img
+      src={src}
+      alt={alt}
+      class="h-auto w-full object-cover"
+      loading="lazy"
+      decoding="async"
+    />
+  </div>
+  {
+    caption && (
+      <figcaption class="mt-2 text-center text-sm text-slate-500">{caption}</figcaption>
+    )
+  }
+</figure>

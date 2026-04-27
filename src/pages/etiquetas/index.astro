@@ -1,0 +1,50 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import clientConfig from "../../data/client-config.json";
+import { getPublicBlogPosts } from "../../lib/blog";
+import { getTagBySlug, getTagSlugsWithPosts, getPostsForTagSlug } from "../../lib/taxonomies";
+
+const posts = await getPublicBlogPosts(false);
+const slugs = getTagSlugsWithPosts(posts);
+const items = slugs.map((slug) => {
+  const t = getTagBySlug(slug);
+  const name = t?.name ?? slug;
+  const count = getPostsForTagSlug(posts, slug).length;
+  return { slug, name, count, desc: t?.description ?? "" };
+});
+
+const pageTitle = `Etiquetas | ${(clientConfig as { nomeMarca?: string }).nomeMarca ?? "Blog"}`;
+const description = `Navega pelas etiquetas do blog — ${(clientConfig as { descricaoSeo?: string }).descricaoSeo ?? "artigos e recursos"}.`;
+---
+
+<BaseLayout title={pageTitle} description={description} canonicalPath="/etiquetas/">
+  <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <nav class="mb-6 text-sm text-slate-600" aria-label="Migalhas">
+      <ol class="flex flex-wrap items-center gap-1">
+        <li>
+          <a class="text-[var(--client-color-primary)] hover:underline" href="/">Início</a>
+          <span class="px-1 text-slate-400" aria-hidden="true">/</span>
+        </li>
+        <li><span class="font-medium text-slate-800">Etiquetas</span></li>
+      </ol>
+    </nav>
+    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Etiquetas</h1>
+    <p class="mt-3 text-slate-600">{description}</p>
+    <ul class="mt-10 flex flex-wrap gap-3" aria-label="Etiquetas com publicações">
+      {
+        items.map((t) => (
+          <li>
+            <a
+              href={`/tag/${t.slug}/`}
+              class="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              {t.name}
+              <span class="ml-2 text-xs text-slate-500">({t.count})</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+    {items.length === 0 && <p class="mt-8 text-slate-600">Ainda não há etiquetas com artigos.</p>}
+  </div>
+</BaseLayout>

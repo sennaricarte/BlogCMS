@@ -1,0 +1,25 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { MediaCenter } from "../../components/admin/MediaCenter";
+
+const pageTitle = "Central de Mídia";
+const pageDescription =
+  "Galeria no repositório GitHub alvo: pasta src/assets/media, com commit via API, nomes otimizados e alt para SEO. Sem Supabase Storage.";
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="media"
+  canonicalPath="/admin/media/"
+>
+  <p class="mb-6 text-sm text-zinc-600">
+    O mesmo token pessoal e repositório alvo (Configurações do CMS) usados no editor enviam
+    ficheiros para o site do cliente. A pré-visualização no admin usa
+    <code class="font-mono text-xs">raw.githubusercontent.com</code> (repositórios públicos ou acessíveis ao browser).
+  </p>
+
+  <MediaCenter client:load />
+</AdminLayout>

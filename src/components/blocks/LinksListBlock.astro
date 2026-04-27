@@ -1,0 +1,35 @@
+---
+import type { PageBlock } from "../../lib/page-blocks.zod";
+
+type P = Extract<PageBlock, { type: "linksList" }> & { class?: string };
+
+const { title, links, class: className = "" } = Astro.props as P;
+const list = links?.length ? links : [];
+---
+
+<section class={`rounded-2xl border border-slate-200 bg-slate-50/80 px-6 py-8 ${className}`} aria-label="Lista de ligações">
+  {title && <h2 class="text-xl font-semibold text-slate-900">{title}</h2>}
+  <ul class={`flex flex-col gap-3 ${title ? "mt-5" : ""}`} role="list">
+    {
+      list.map((link) => {
+        const external = /^https?:\/\//i.test(link.url);
+        return (
+          <li>
+            <a
+              href={link.url}
+              class="flex min-h-12 w-full max-w-md items-center justify-center rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-900 shadow-sm transition hover:border-[var(--client-color-primary)] hover:text-[var(--client-color-primary)]"
+              rel={external ? "nofollow noopener noreferrer" : undefined}
+              target={external ? "_blank" : undefined}
+              aria-label={
+                external ? `${link.label} (abre num novo separador)` : link.label
+              }
+            >
+              {link.label}
+            </a>
+          </li>
+        );
+      })
+    }
+  </ul>
+  {list.length === 0 && <p class="text-sm text-slate-500">Sem botões. Adiciona ligações no editor.</p>}
+</section>

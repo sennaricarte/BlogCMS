@@ -1,0 +1,36 @@
+---
+export interface Props {
+  items: Array<{ name: string; href: string }>;
+}
+
+const { items } = Astro.props;
+const last = items.length - 1;
+---
+
+<nav class="not-prose mb-6 text-sm text-slate-600" aria-label="Migalhas de navegação">
+  <ol class="flex flex-wrap items-center gap-1">
+    {
+      items.map((crumb, i) => (
+        <li class="flex items-center gap-1">
+          {i < last ? (
+            <>
+              <a
+                class="text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+                href={crumb.href}
+              >
+                {crumb.name}
+              </a>
+              <span class="px-0.5 text-slate-400" aria-hidden="true">
+                /
+              </span>
+            </>
+          ) : (
+            <span class="font-medium text-slate-800" aria-current="page">
+              {crumb.name}
+            </span>
+          )}
+        </li>
+      ))
+    }
+  </ol>
+</nav>

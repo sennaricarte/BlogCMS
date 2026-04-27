@@ -1,0 +1,45 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { DashboardProjects } from "../../components/admin/DashboardProjects";
+import data from "../../data/projects.json";
+import type { ClientProject } from "../../lib/projects-data";
+
+const pageTitle = "Painel";
+const pageDescription =
+  "Visão geral dos sites e do estado. Abra um site (Gerenciar site) para os atalhos de conteúdo.";
+
+const projects: ClientProject[] = Array.isArray((data as { projects?: ClientProject[] }).projects)
+  ? (data as { projects: ClientProject[] }).projects
+  : [];
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="dashboard"
+  canonicalPath="/admin/dashboard/"
+>
+  <div class="mb-8 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50/90 via-white to-slate-50/50 px-5 py-6 shadow-sm sm:px-7">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h2 class="text-xl font-bold tracking-tight text-slate-900">Seus sites</h2>
+        <p class="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-600">
+          Os cartões abaixo leem <code
+            class="rounded-md border border-slate-200/90 bg-slate-100/80 px-1.5 py-0.5 font-mono text-xs text-slate-800"
+            >src/data/projects.json</code
+          >. Novos projetos podem ser adicionados após o deploy (API) ou manualmente. Layout em grade responsiva.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <DashboardProjects client:load projects={projects} />
+
+  <p class="mt-10 text-sm text-slate-500">
+    <a class="font-medium text-slate-700 underline-offset-2 hover:underline" href="/admin/">
+      Infra: GitHub &amp; Vercel
+    </a>
+  </p>
+</AdminLayout>

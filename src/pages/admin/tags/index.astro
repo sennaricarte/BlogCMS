@@ -1,0 +1,23 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import taxonomies from "../../../data/taxonomies.json";
+import { TagsManager } from "../../../components/admin/TaxonomyItemsManager";
+import type { TaxonomiesData } from "../../../lib/taxonomies";
+
+const data = taxonomies as TaxonomiesData;
+
+const pageTitle = "Etiquetas";
+const pageDescription =
+  "Criar, editar e remover etiquetas do site. As alterações guardam-se no repositório (mesmo ficheiro que o editor de artigos).";
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="tags"
+  canonicalPath="/admin/tags/"
+>
+  <TagsManager client:load initialData={data} />
+</AdminLayout>

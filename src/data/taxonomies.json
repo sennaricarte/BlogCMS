@@ -1,0 +1,46 @@
+{
+  "categories": [
+    {
+      "slug": "tecnologia",
+      "name": "Tecnologia",
+      "description": "Tecnologias de frontend, automação e boas práticas para o teu site."
+    },
+    {
+      "slug": "conteudo",
+      "name": "Conteúdo",
+      "description": "Estratégia editorial, formatação e otimização de artigos."
+    }
+  ],
+  "tags": [
+    {
+      "slug": "astro",
+      "name": "Astro",
+      "description": "Artigos e recursos sobre o framework Astro."
+    },
+    {
+      "slug": "conteudo",
+      "name": "Conteúdo",
+      "description": "Criação e gestão de conteúdo web."
+    },
+    {
+      "slug": "seo",
+      "name": "SEO",
+      "description": "Otimização para motores de busca e resultados ricos."
+    },
+    {
+      "slug": "design",
+      "name": "Design",
+      "description": "Design, UI e experiência de leitura."
+    },
+    {
+      "slug": "tipografia",
+      "name": "Tipografia",
+      "description": "Tipografia, legibilidade e layout de texto."
+    },
+    {
+      "slug": "rascunho",
+      "name": "Rascunho",
+      "description": "Etiqueta interna para conteúdo em rascunho (geralmente não indexado em produção)."
+    }
+  ]
+}
