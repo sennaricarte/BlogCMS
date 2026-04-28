@@ -3,12 +3,18 @@
  * (ou antigos); quando o deploy some, a Vercel responde DEPLOYMENT_NOT_FOUND.
  * A URL de **produção** estável é `https://<vercelProjectName>.vercel.app` (slug do projecto).
  */
-export function preferStableVercelProductionUrl(raw: string, vercelProjectName: string): string {
-  const slug = vercelProjectName
+export function canonicalVercelProjectUrl(vercelProjectName: string): string {
+  const slug = (vercelProjectName || "")
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+  return slug ? `https://${slug}.vercel.app/` : "";
+}
+
+export function preferStableVercelProductionUrl(raw: string, vercelProjectName: string): string {
+  const canonical = canonicalVercelProjectUrl(vercelProjectName);
+  const slug = canonical.replace(/^https?:\/\//, "").replace(/\.vercel\.app\/?$/i, "");
   if (!slug || !raw.trim()) return raw.trim();
   try {
     const u = new URL(raw.trim());
@@ -16,12 +22,14 @@ export function preferStableVercelProductionUrl(raw: string, vercelProjectName: 
     const host = u.hostname.toLowerCase();
     if (!host.endsWith(".vercel.app")) return raw.trim();
     const withoutTld = host.slice(0, -".vercel.app".length);
-    const canonical = `https://${slug}.vercel.app/`;
     if (withoutTld === slug) return canonical;
+    // Deploy hosts comuns de equipa: "...-projects.vercel.app"
+    if (withoutTld.endsWith("-projects")) return canonical;
     const prefix = `${slug}-`;
     if (withoutTld.startsWith(prefix) && withoutTld.length > prefix.length) {
       const extra = withoutTld.slice(prefix.length);
-      if (/^[a-z0-9]{4,24}$/i.test(extra)) {
+      // Hash curto antigo, hash longo moderno, ou sufixos compostos de deploy.
+      if (/^[a-z0-9-]{4,80}$/i.test(extra)) {
         return canonical;
       }
     }

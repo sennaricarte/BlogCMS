@@ -8,6 +8,7 @@ import {
   projectVercelDeploymentsUrl,
   projectVercelSpeedInsightsUrl,
 } from "../../lib/vercel-project-admin-links";
+import { canonicalVercelProjectUrl } from "../../lib/vercel-public-url";
 import { DashboardProjectGsc } from "./DashboardProjectGsc";
 
 const K = ADMIN_INTEGRATION_STORAGE_KEY;
@@ -185,7 +186,8 @@ function normalizeDeploymentUrl(url: string | undefined): string | undefined {
 }
 
 function resolveLiveSiteHref(project: ClientProject, statusRow?: StatusRow): string {
-  const stable = projectPublicSiteUrl(project);
+  const canonical = canonicalVercelProjectUrl(project.vercelProjectName?.trim() || "");
+  const stable = canonical || projectPublicSiteUrl(project);
   const ready = statusRow?.readyDeploymentUrl;
   const dep = statusRow?.deploymentUrl;
   const raw = String(statusRow?.raw || "").toUpperCase();
