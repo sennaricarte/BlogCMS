@@ -123,6 +123,21 @@ function isLikelyArticleUrl(url: string): boolean {
   }
 }
 
+function resolveMaybeAbsoluteUrl(raw: string | undefined, baseUrl: string): string | undefined {
+  const v = (raw || "").trim();
+  if (!v) return undefined;
+  try {
+    return new URL(v, baseUrl).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function extractOgImageUrl(pageHtml: string, pageUrl: string): string | undefined {
+  const raw = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+  return resolveMaybeAbsoluteUrl(raw, pageUrl);
+}
+
 async function fetchHtml(url: string): Promise<Response> {
   return fetch(url, {
     headers: {
@@ -300,7 +315,7 @@ export const POST: APIRoute = async (context) => {
   if (fragment) {
     const meta = extractMetaFromPage(html);
     const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(fragment));
-    const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+    const ogImage = extractOgImageUrl(html, res.url || url);
     if (isSubstantialMarkdown(markdown)) {
       return json(
         {
@@ -368,7 +383,7 @@ export const POST: APIRoute = async (context) => {
           };
         }
         const meta = extractMetaFromPage(pageHtml);
-        const ogImage = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+        const ogImage = extractOgImageUrl(pageHtml, link);
         const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(article));
         if (!isSubstantialMarkdown(markdown)) {
           const reader = await extractViaReader(link);
@@ -497,7 +512,7 @@ export const POST: APIRoute = async (context) => {
         };
       }
       const meta = extractMetaFromPage(pageHtml);
-      const ogImage = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+      const ogImage = extractOgImageUrl(pageHtml, link);
       const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(article));
       if (!isSubstantialMarkdown(markdown)) {
         const reader = await extractViaReader(link);

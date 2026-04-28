@@ -30,6 +30,18 @@ function slugifyFileName(s: string): string {
     .slice(0, 80) || "artigo-importado";
 }
 
+function toAbsoluteUrlOrNull(input: string): string | null {
+  const v = (input || "").trim();
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 type ImportPost = {
   slug: string;
   title: string;
@@ -194,12 +206,20 @@ export const POST: APIRoute = async (context) => {
     const markdownBody = typeof p.markdownBody === "string" ? p.markdownBody : "";
 
     let heroImage = "../../assets/blog/hero-primeiro.svg";
-    const featUrl = (p.featuredImageUrl || "").trim();
+    const featUrl = toAbsoluteUrlOrNull(p.featuredImageUrl || "");
     if (featUrl) {
       const buf = await fetchFeaturedBuffer(featUrl);
       if (buf) {
         const localHero = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugIn, buf);
-        if (localHero) heroImage = localHero;
+        if (localHero) {
+          heroImage = localHero;
+        } else {
+          // Fallback: mantém imagem de destaque remota se o upload para o GitHub falhar.
+          heroImage = featUrl;
+        }
+      } else {
+        // Fallback: URL válida, mas não foi possível baixar/converter buffer.
+        heroImage = featUrl;
       }
     }
 
