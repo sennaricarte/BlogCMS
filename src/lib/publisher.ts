@@ -53,6 +53,15 @@ const IGNORED_FILE_NAMES = new Set([
   "Thumbs.db",
 ]);
 
+/**
+ * Conteúdo editorial é específico de cada cliente e não deve ser copiado
+ * para novos repositórios criados a partir deste template SaaS.
+ */
+const TEMPLATE_EXCLUDED_PREFIXES = [
+  "src/content/blog/",
+  "src/content/pages/",
+];
+
 const BINARY_EXTENSIONS = new Set([
   ".png",
   ".jpg",
@@ -74,6 +83,11 @@ const BINARY_EXTENSIONS = new Set([
 ]);
 
 function shouldSkipRelativePath(relativePosix: string, isDirectory: boolean): boolean {
+  for (const prefix of TEMPLATE_EXCLUDED_PREFIXES) {
+    if (relativePosix === prefix.slice(0, -1) || relativePosix.startsWith(prefix)) {
+      return true;
+    }
+  }
   const segments = relativePosix.split("/").filter(Boolean);
   for (const seg of segments) {
     if (IGNORED_DIR_NAMES.has(seg)) return true;
