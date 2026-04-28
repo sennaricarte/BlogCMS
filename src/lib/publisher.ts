@@ -235,7 +235,14 @@ function detectAstroRootDirectory(
 ): { astroRootDirectory: string; hasPackageJsonAtRoot: boolean; hasAstroConfigAtRoot: boolean } {
   const paths = new Set(files.map((f) => f.path));
   const hasRootPkg = paths.has("package.json");
-  const hasRootAstroCfg = paths.has("astro.config.mjs") || paths.has("astro.config.ts");
+  const ASTRO_CONFIG_FILES = new Set([
+    "astro.config.mjs",
+    "astro.config.ts",
+    "astro.config.js",
+    "astro.config.cjs",
+    "astro.config.mts",
+  ]);
+  const hasRootAstroCfg = Array.from(ASTRO_CONFIG_FILES).some((f) => paths.has(f));
   if (hasRootPkg && hasRootAstroCfg) {
     return {
       astroRootDirectory: ".",
@@ -244,27 +251,32 @@ function detectAstroRootDirectory(
     };
   }
 
-  const candidates = new Set<string>();
+  const pkgDirs = new Set<string>();
+  const astroDirs = new Set<string>();
   for (const p of paths) {
     const idx = p.lastIndexOf("/");
-    if (idx > 0) candidates.add(p.slice(0, idx));
-  }
-  for (const dir of candidates) {
-    const hasPkg = paths.has(`${dir}/package.json`);
-    const hasAstroCfg = paths.has(`${dir}/astro.config.mjs`) || paths.has(`${dir}/astro.config.ts`);
-    if (hasPkg && hasAstroCfg) {
-      return {
-        astroRootDirectory: dir,
-        hasPackageJsonAtRoot: hasRootPkg,
-        hasAstroConfigAtRoot: hasRootAstroCfg,
-      };
-    }
+    const dir = idx > 0 ? p.slice(0, idx) : ".";
+    const base = idx > 0 ? p.slice(idx + 1) : p;
+    if (base === "package.json") pkgDirs.add(dir);
+    if (ASTRO_CONFIG_FILES.has(base)) astroDirs.add(dir);
   }
 
-  throw new Error(
-    "Template Astro inválido: não encontramos `package.json` e `astro.config.mjs`/`astro.config.ts` no mesmo diretório. " +
-      "Confirma se o código está na raiz ou em `/server` antes do deploy.",
-  );
+  const intersection = Array.from(pkgDirs).filter((d) => astroDirs.has(d));
+  if (intersection.length > 0) {
+    intersection.sort((a, b) => a.length - b.length);
+    return {
+      astroRootDirectory: intersection[0]!,
+      hasPackageJsonAtRoot: hasRootPkg,
+      hasAstroConfigAtRoot: hasRootAstroCfg,
+    };
+  }
+
+  // Fallback resiliente: não bloqueia criação por falso negativo de detecção.
+  return {
+    astroRootDirectory: ".",
+    hasPackageJsonAtRoot: hasRootPkg,
+    hasAstroConfigAtRoot: hasRootAstroCfg,
+  };
 }
 
 async function mapPool<T, R>(
