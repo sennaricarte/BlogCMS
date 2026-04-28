@@ -203,3 +203,36 @@ export async function addProjectFromSuccessfulDeploy(input: {
   await upsertProjectInRegistry(entry);
   return entry;
 }
+
+/**
+ * Remove um projeto do registo por `id` (preferência) ou por chaves estáveis.
+ */
+export async function removeProjectFromRegistry(match: {
+  id?: string;
+  githubRepoFullName?: string;
+  vercelProjectId?: string;
+}): Promise<{ removed: boolean; projects: ClientProject[] }> {
+  const id = match.id?.trim();
+  const repo = match.githubRepoFullName?.trim();
+  const vercelId = match.vercelProjectId?.trim();
+
+  if (!id && !repo && !vercelId) {
+    throw new Error("Indica id, githubRepoFullName ou vercelProjectId para remover.");
+  }
+
+  return withFileLock(async () => {
+    const data = await readProjectsData();
+    const prev = data.projects;
+    const next = prev.filter((p) => {
+      if (id && p.id === id) return false;
+      if (repo && p.githubRepoFullName === repo) return false;
+      if (vercelId && p.vercelProjectId === vercelId) return false;
+      return true;
+    });
+    const removed = next.length !== prev.length;
+    if (removed) {
+      await writeProjectsDataBestEffort({ projects: next });
+    }
+    return { removed, projects: next };
+  });
+}

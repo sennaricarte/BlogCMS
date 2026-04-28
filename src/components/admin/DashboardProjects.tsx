@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Code2, ExternalLink, LayoutDashboard, Link2, MoreHorizontal, Plus, Search, X, Zap } from "lucide-react";
+import { Code2, ExternalLink, LayoutDashboard, Link2, MoreHorizontal, Plus, Search, Trash2, X, Zap } from "lucide-react";
 import { ADMIN_CMS_TARGET_KEY, getCmsTargetFromProject } from "../../lib/admin-cms-target";
 import { ADMIN_INTEGRATION_STORAGE_KEY } from "../../lib/admin-storage";
 import type { ClientProject } from "../../lib/projects-data";
@@ -21,12 +21,12 @@ type StatusRow = {
   raw?: string;
 };
 
-function readIntegration(): { vercelToken?: string; teamId?: string } {
+function readIntegration(): { githubToken?: string; vercelToken?: string; teamId?: string } {
   try {
     const raw = localStorage.getItem(K);
     if (!raw) return {};
-    const j = JSON.parse(raw) as { VERCEL_TOKEN?: string; VERCEL_TEAM_ID?: string };
-    return { vercelToken: j.VERCEL_TOKEN?.trim(), teamId: j.VERCEL_TEAM_ID?.trim() };
+    const j = JSON.parse(raw) as { GITHUB_PERSONAL_TOKEN?: string; VERCEL_TOKEN?: string; VERCEL_TEAM_ID?: string };
+    return { githubToken: j.GITHUB_PERSONAL_TOKEN?.trim(), vercelToken: j.VERCEL_TOKEN?.trim(), teamId: j.VERCEL_TEAM_ID?.trim() };
   } catch {
     return {};
   }
@@ -147,8 +147,9 @@ function OnlineStatusBadge() {
 }
 
 type CardMenuProps = { project: ClientProject; siteHref: string };
+type DeleteProjectHandler = (project: ClientProject, hardDelete?: boolean) => Promise<void>;
 
-function CardQuickMenu({ project, siteHref }: CardMenuProps) {
+function CardQuickMenu({ project, siteHref, onDeleteProject }: CardMenuProps & { onDeleteProject: DeleteProjectHandler }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -243,6 +244,31 @@ function CardQuickMenu({ project, siteHref }: CardMenuProps) {
             <Zap className="h-3.5 w-3.5 text-emerald-600" />
             Analytics (Speed Insights)
           </a>
+          <hr className="my-1 border-slate-100" />
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-700 hover:bg-red-50"
+            role="menuitem"
+            onClick={() => {
+              close();
+              void onDeleteProject(project, false);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Excluir do painel
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-900 hover:bg-red-100"
+            role="menuitem"
+            onClick={() => {
+              close();
+              void onDeleteProject(project, true);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Excluir painel + GitHub + Vercel
+          </button>
         </div>
       )}
     </div>
@@ -253,6 +279,7 @@ type Props = { projects: ClientProject[] };
 
 export function DashboardProjects({ projects }: Props) {
   const [localProjects, setLocalProjects] = useState<ClientProject[]>([]);
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<Record<string, StatusRow | undefined>>({});
   const [hint, setHint] = useState<string | null>(null);
   const [nameQuery, setNameQuery] = useState("");
@@ -275,8 +302,78 @@ export function DashboardProjects({ projects }: Props) {
         byKey.set(key, p);
       }
     }
-    return Array.from(byKey.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [projects, localProjects]);
+    return Array.from(byKey.values())
+      .filter((p) => !hiddenKeys.has((p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id)))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [projects, localProjects, hiddenKeys]);
+
+  const onDeleteProject = useCallback(async (project: ClientProject, hardDelete = false) => {
+    const ok = window.confirm(hardDelete
+      ? `Excluir "${project.name}" do painel E também apagar GitHub/Vercel?\n\nEsta ação é destrutiva e pode ser irreversível.`
+      : `Remover "${project.name}" do painel?\n\nEsta ação remove apenas o registo interno do BlogCMS. O repositório GitHub e o projeto Vercel NÃO serão apagados.`,
+    );
+    if (!ok) return;
+    if (hardDelete) {
+      const typed = window.prompt(`Digite EXCLUIR para confirmar a exclusão remota de "${project.name}"`);
+      if ((typed || "").trim().toUpperCase() !== "EXCLUIR") return;
+    }
+
+    const key = project.githubRepoFullName?.trim() || project.vercelProjectId?.trim() || project.id;
+    setHiddenKeys((prev) => new Set(prev).add(key));
+    setStatus((prev) => {
+      const next = { ...prev };
+      delete next[project.id];
+      return next;
+    });
+
+    try {
+      const local = readLocalProjectsCache();
+      const localNext = local.filter((p) => {
+        const k = p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id;
+        return k !== key;
+      });
+      localStorage.setItem(K_LOCAL_PROJECTS, JSON.stringify(localNext));
+      setLocalProjects(localNext);
+    } catch {
+      // continua mesmo sem cache local
+    }
+
+    try {
+      const integ = readIntegration();
+      const res = await fetch("/api/admin/projects/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: project.id,
+          githubRepoFullName: project.githubRepoFullName,
+          vercelProjectId: project.vercelProjectId,
+          vercelProjectName: project.vercelProjectName,
+          vercelTeamId: project.vercelTeamId || integ.teamId,
+          deleteRemote: hardDelete,
+          githubToken: hardDelete ? integ.githubToken : undefined,
+          vercelToken: hardDelete ? integ.vercelToken : undefined,
+        }),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string; remoteDeleted?: boolean; remoteErrors?: string[] };
+      if (!res.ok || !j.ok) {
+        setHint(j.error || "Projeto ocultado localmente, mas falhou a remoção no registo do servidor.");
+        return;
+      }
+      if (hardDelete) {
+        if (Array.isArray(j.remoteErrors) && j.remoteErrors.length > 0) {
+          setHint(
+            `Projeto "${project.name}" removido do painel, com falhas na exclusão remota: ${j.remoteErrors.join(" | ")}`,
+          );
+        } else {
+          setHint(`Projeto "${project.name}" removido do painel e excluído no GitHub/Vercel.`);
+        }
+      } else {
+        setHint(`Projeto "${project.name}" removido do painel.`);
+      }
+    } catch {
+      setHint("Projeto ocultado localmente. Não foi possível confirmar remoção no servidor.");
+    }
+  }, []);
 
   const filteredProjects = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
@@ -491,7 +588,7 @@ export function DashboardProjects({ projects }: Props) {
                       {st.kind === "line" ? st.text : "—"}
                     </span>
                   )}
-                  <CardQuickMenu project={p} siteHref={siteHref} />
+                  <CardQuickMenu project={p} siteHref={siteHref} onDeleteProject={onDeleteProject} />
                 </div>
               </div>
 
