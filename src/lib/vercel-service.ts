@@ -364,7 +364,7 @@ export class VercelService {
   async getLatestDeploymentState(
     projectId: string,
     init?: { signal?: AbortSignal },
-  ): Promise<{ readyState: string; url?: string } | null> {
+  ): Promise<{ readyState: string; url?: string; readyUrl?: string } | null> {
     return fetchLatestDeploymentForProject(projectId, {
       token: this.token,
       teamId: this.teamId ?? null,
@@ -379,7 +379,7 @@ export class VercelService {
 export async function fetchLatestDeploymentForProject(
   projectId: string,
   init: { token: string; teamId?: string | null; signal?: AbortSignal },
-): Promise<{ readyState: string; url?: string } | null> {
+): Promise<{ readyState: string; url?: string; readyUrl?: string } | null> {
   const id = projectId?.trim();
   if (!id) {
     return null;
@@ -391,7 +391,7 @@ export async function fetchLatestDeploymentForProject(
   const teamId = init.teamId?.trim() || undefined;
   const q = new URLSearchParams();
   q.set("projectId", id);
-  q.set("limit", "1");
+  q.set("limit", "20");
   q.set("target", "production");
   if (teamId) {
     q.set("teamId", teamId);
@@ -408,12 +408,17 @@ export async function fetchLatestDeploymentForProject(
   const data = (await res.json()) as {
     deployments?: Array<{ readyState?: string; url?: string }>;
   };
-  const d = data.deployments?.[0];
-  if (!d) {
+  const deployments = data.deployments || [];
+  const latest = deployments[0];
+  if (!latest) {
     return { readyState: "UNKNOWN" };
   }
+  const ready = deployments.find(
+    (d) => String(d.readyState || "").toUpperCase() === "READY" && typeof d.url === "string" && d.url.trim(),
+  );
   return {
-    readyState: d.readyState ?? "UNKNOWN",
-    url: typeof d.url === "string" ? d.url : undefined,
+    readyState: latest.readyState ?? "UNKNOWN",
+    url: typeof latest.url === "string" ? latest.url : undefined,
+    readyUrl: ready?.url,
   };
 }

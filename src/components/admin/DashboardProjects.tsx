@@ -22,6 +22,7 @@ type StatusRow = {
   error?: string;
   raw?: string;
   deploymentUrl?: string;
+  readyDeploymentUrl?: string;
 };
 
 function readIntegration(): { githubToken?: string; vercelToken?: string; teamId?: string } {
@@ -185,8 +186,10 @@ function normalizeDeploymentUrl(url: string | undefined): string | undefined {
 
 function resolveLiveSiteHref(project: ClientProject, statusRow?: StatusRow): string {
   const stable = projectPublicSiteUrl(project);
+  const ready = statusRow?.readyDeploymentUrl;
   const dep = statusRow?.deploymentUrl;
   const raw = String(statusRow?.raw || "").toUpperCase();
+  if (ready) return ready;
   // Só usa URL do deploy quando o estado reportado é READY.
   if (dep && raw === "READY") return dep;
   return stable;
@@ -509,6 +512,7 @@ export function DashboardProjects({ projects }: Props) {
             ok?: boolean;
             readyState?: string;
             deploymentUrl?: string;
+            readyDeploymentUrl?: string;
             error?: string;
           };
           if (!r.ok || !j.ok) {
@@ -530,6 +534,7 @@ export function DashboardProjects({ projects }: Props) {
             badgeClass: m.badgeClass,
             raw: j.readyState,
             deploymentUrl: normalizeDeploymentUrl(j.deploymentUrl),
+            readyDeploymentUrl: normalizeDeploymentUrl(j.readyDeploymentUrl),
           };
         } catch {
           next[p.id] = {

@@ -49,6 +49,7 @@ export const POST: APIRoute = async ({ request }) => {
       ok: true,
       readyState: st.readyState,
       deploymentUrl: st.url,
+      readyDeploymentUrl: st.readyUrl,
     });
   } catch (e) {
     const msg = e instanceof VercelApiError ? e.message : e instanceof Error ? e.message : "Falha na Vercel.";
