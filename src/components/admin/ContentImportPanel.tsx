@@ -44,6 +44,7 @@ export function ContentImportPanel() {
   const [tab, setTab] = useState<TabId>("wordpress");
   const [wpSiteUrl, setWpSiteUrl] = useState("");
   const [articleUrl, setArticleUrl] = useState("");
+  const [urlOnlyArticles, setUrlOnlyArticles] = useState(true);
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; err: boolean } | null>(null);
@@ -112,7 +113,7 @@ export function ContentImportPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ articleUrl: articleUrl.trim() }),
+        body: JSON.stringify({ articleUrl: articleUrl.trim(), onlyArticles: urlOnlyArticles }),
       });
       const j = (await res.json()) as {
         ok?: boolean;
@@ -374,6 +375,15 @@ export function ContentImportPanel() {
               {busy ? "A analisar…" : "Analisar página"}
             </button>
           </div>
+          <label className="inline-flex items-center gap-2 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              checked={urlOnlyArticles}
+              onChange={(e) => setUrlOnlyArticles(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 text-zinc-900"
+            />
+            Importar somente artigos (ignorar páginas institucionais/listagem)
+          </label>
         </section>
       )}
 

@@ -58,6 +58,50 @@ function isLikelyListingUrl(url: string): boolean {
   }
 }
 
+function isLikelyArticleUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const path = (u.pathname || "/").toLowerCase().replace(/\/+$/, "");
+    if (!path || path === "/") return false;
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length === 0) return false;
+    const first = segments[0] || "";
+    const blocked = new Set([
+      "sobre",
+      "about",
+      "contato",
+      "contact",
+      "politica-de-privacidade",
+      "privacy-policy",
+      "termos",
+      "terms",
+      "categorias",
+      "categoria",
+      "category",
+      "tags",
+      "tag",
+      "search",
+      "busca",
+      "admin",
+      "login",
+      "blog",
+      "posts",
+      "noticias",
+      "news",
+      "artigos",
+      "articles",
+      "p",
+      "page",
+      "pages",
+    ]);
+    if (blocked.has(first)) return false;
+    if (/\.(xml|json|pdf|png|jpe?g|gif|webp|svg|zip|rar)$/i.test(path)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function fetchHtml(url: string): Promise<Response> {
   return fetch(url, {
     headers: {
@@ -173,14 +217,15 @@ export const POST: APIRoute = async (context) => {
     return json({ ok: false, error: "Sessão em falta." }, 401, auth.responseHeaders);
   }
 
-  let body: { articleUrl?: string };
+  let body: { articleUrl?: string; onlyArticles?: boolean };
   try {
-    body = (await context.request.json()) as { articleUrl?: string };
+    body = (await context.request.json()) as { articleUrl?: string; onlyArticles?: boolean };
   } catch {
     return json({ ok: false, error: "JSON inválido." }, 400, auth.responseHeaders);
   }
 
   const url = normalizeAbsoluteUrl(body.articleUrl || "");
+  const onlyArticles = body.onlyArticles !== false;
   if (!url) {
     return json({ ok: false, error: "Indica uma URL absoluta (https://…)." }, 400, auth.responseHeaders);
   }
@@ -228,6 +273,9 @@ export const POST: APIRoute = async (context) => {
   let links = extractLikelyArticleLinks(html, finalUrl, 12);
   if (links.length === 0) {
     links = await discoverLinksFromSitemap(finalUrl, 16);
+  }
+  if (onlyArticles) {
+    links = links.filter(isLikelyArticleUrl);
   }
   if (links.length > 0 && preferBatch) {
     const candidates = await Promise.allSettled(
@@ -310,6 +358,9 @@ export const POST: APIRoute = async (context) => {
   // Se não for listagem ou não conseguiu em lote antes, tenta lote agora.
   if (links.length === 0) {
     links = await discoverLinksFromSitemap(finalUrl, 16);
+    if (onlyArticles) {
+      links = links.filter(isLikelyArticleUrl);
+    }
   }
   if (links.length === 0) {
     return json(
