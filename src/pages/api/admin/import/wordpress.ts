@@ -27,7 +27,11 @@ export const POST: APIRoute = async (context) => {
 
   const base = normalizeWpSiteUrl(body.wpSiteUrl || "");
   if (!base) {
-    return json({ ok: false, error: "Indica a URL do site WordPress." }, 400, auth.responseHeaders);
+    return json(
+      { ok: false, error: "Indica uma URL válida do site WordPress (ex.: https://exemplo.com)." },
+      400,
+      auth.responseHeaders,
+    );
   }
 
   const apiUrl = `${base}/wp-json/wp/v2/posts?per_page=100&_embed=1`;
@@ -58,9 +62,18 @@ export const POST: APIRoute = async (context) => {
 
   let raw: unknown;
   try {
-    raw = await res.json();
+    const text = await res.text();
+    raw = JSON.parse(text) as unknown;
   } catch {
-    return json({ ok: false, error: "Resposta JSON inválida da API." }, 502, auth.responseHeaders);
+    const contentType = res.headers.get("content-type") || "desconhecido";
+    return json(
+      {
+        ok: false,
+        error: `A resposta da API não está em JSON (content-type: ${contentType}). Verifica a URL (use https://...) e se o site expõe /wp-json/wp/v2/posts.`,
+      },
+      502,
+      auth.responseHeaders,
+    );
   }
 
   if (!Array.isArray(raw)) {

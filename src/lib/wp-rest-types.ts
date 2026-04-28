@@ -89,8 +89,31 @@ export function resolveWpImportDescription(
 export function normalizeWpSiteUrl(input: string): string {
   let u = input.trim();
   if (!u) return "";
+  // Corrige erro comum de digitação: "https;//" em vez de "https://".
+  u = u.replace(/^([a-z]+);\/\//i, "$1://");
   if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
-  return u.replace(/\/+$/, "");
+
+  let parsed: URL;
+  try {
+    parsed = new URL(u);
+  } catch {
+    return "";
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return "";
+  }
+
+  // Permite entrada com "/wp-json" e remove esse sufixo do base.
+  const cleanedPath = parsed.pathname
+    .replace(/\/+$/, "")
+    .replace(/\/wp-json$/i, "");
+  parsed.pathname = cleanedPath || "/";
+  parsed.search = "";
+  parsed.hash = "";
+
+  const normalizedPath = parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/+$/, "");
+  return `${parsed.origin}${normalizedPath}`;
 }
 
 export function stripHtmlToText(html: string, maxLen: number): string {
