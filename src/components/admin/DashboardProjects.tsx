@@ -737,23 +737,35 @@ export function DashboardProjects({ projects }: Props) {
               <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">Criado: {created}</p>
 
               <div className="mt-auto border-t border-slate-100 p-3">
-                <a
-                  href={projectHubHref(p)}
-                  onClick={(ev) => {
-                    persistCmsTargetIfPossible(p);
-                    // Para projetos ainda não persistidos no projects.json do servidor,
-                    // abre o CMS diretamente em vez da rota /admin/projects/[id].
-                    if (p.id.startsWith("local-")) {
-                      ev.preventDefault();
-                      window.location.href = "/admin/posts/";
-                    }
-                  }}
-                  className="inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
-                  aria-label={`Gerenciar o site: ${p.name}`}
-                >
-                  <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                  Gerenciar site
-                </a>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <a
+                    href={siteHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/20"
+                    aria-label={`Ver site no ar: ${p.name}`}
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+                    Ver site no ar
+                  </a>
+                  <a
+                    href={projectHubHref(p)}
+                    onClick={(ev) => {
+                      persistCmsTargetIfPossible(p);
+                      // Para projetos ainda não persistidos no projects.json do servidor,
+                      // abre o CMS diretamente em vez da rota /admin/projects/[id].
+                      if (p.id.startsWith("local-")) {
+                        ev.preventDefault();
+                        window.location.href = "/admin/posts/";
+                      }
+                    }}
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
+                    aria-label={`Gerenciar o site: ${p.name}`}
+                  >
+                    <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                    Gerenciar site
+                  </a>
+                </div>
               </div>
             </li>
           );
