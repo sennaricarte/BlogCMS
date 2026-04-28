@@ -142,9 +142,8 @@ export function buildClientProjectFromDeploy(args: {
     (config.nomeMarca && String(config.nomeMarca).trim()) || repositoryName.trim() || result.vercelProjectName;
   const siteFromConfig = (config.siteUrl || "").trim();
   const depUrl = (result.vercelDeployment?.url || "").trim();
-  const sub = result.vercelProjectName.toLowerCase().replace(/[^a-z0-9-]/g, "-");
   const rawPublic =
-    depUrl || siteFromConfig || (sub ? `https://${sub}.vercel.app` : "https://vercel.com");
+    depUrl || siteFromConfig || "https://vercel.com";
   const publicUrl = preferStableVercelProductionUrl(rawPublic, result.vercelProjectName);
 
   return {

@@ -326,8 +326,8 @@ const pageDescription =
       if (dep) {
         return /^https?:\/\//i.test(dep) ? dep : "https://" + dep.replace(/^\/+/, "");
       }
-      var name = result && result.vercelProjectName ? String(result.vercelProjectName).trim() : "";
-      return name ? "https://" + name + ".vercel.app" : "https://vercel.com";
+      // Não inventa domínio `<projeto>.vercel.app`: em equipas/aliases isso pode gerar DEPLOYMENT_NOT_FOUND.
+      return "https://vercel.com";
     }
 
     function cacheProjectFromDeploy(result, cfg, teamId) {

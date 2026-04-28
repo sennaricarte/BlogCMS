@@ -78,6 +78,24 @@ function normalizeProjectKey(v: string): string {
   return (v || "").trim().toLowerCase();
 }
 
+function sanitizeCachedProjectUrl(p: ClientProject): ClientProject {
+  const name = (p.vercelProjectName || "").trim().toLowerCase();
+  const scope = (p.vercelScope || "").trim().toLowerCase();
+  const raw = (p.vercelUrl || p.siteUrl || "").trim();
+  if (!name || !scope || !raw) return p;
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+    // Migração de cache antigo: "<project>.vercel.app" gerado localmente para projetos de equipa.
+    if (host === `${name}.vercel.app`) {
+      return { ...p, vercelUrl: "https://vercel.com", siteUrl: "https://vercel.com" };
+    }
+  } catch {
+    return p;
+  }
+  return p;
+}
+
 function readLocalProjectsCache(): ClientProject[] {
   try {
     const raw = localStorage.getItem(K_LOCAL_PROJECTS);
@@ -98,7 +116,7 @@ function readLocalProjectsCache(): ClientProject[] {
         x.vercelScope &&
         x.githubRepoFullName,
       );
-    });
+    }).map((p) => sanitizeCachedProjectUrl(p));
   } catch {
     return [];
   }
