@@ -14,6 +14,7 @@ const K = ADMIN_INTEGRATION_STORAGE_KEY;
 const K_CMS = ADMIN_CMS_TARGET_KEY;
 const K_LOCAL_PROJECTS = "blogcms-dashboard-projects-cache";
 const K_DELETED_KEYS = "blogcms-dashboard-deleted-keys";
+const K_DELETED_IDS = "blogcms-dashboard-deleted-ids";
 
 type StatusRow = {
   label: string;
@@ -99,6 +100,18 @@ function readLocalProjectsCache(): ClientProject[] {
 function readDeletedKeysCache(): Set<string> {
   try {
     const raw = localStorage.getItem(K_DELETED_KEYS);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.map((v) => String(v).trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function readDeletedIdsCache(): Set<string> {
+  try {
+    const raw = localStorage.getItem(K_DELETED_IDS);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return new Set();
@@ -293,6 +306,7 @@ type Props = { projects: ClientProject[] };
 export function DashboardProjects({ projects }: Props) {
   const [localProjects, setLocalProjects] = useState<ClientProject[]>([]);
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<Record<string, StatusRow | undefined>>({});
   const [hint, setHint] = useState<string | null>(null);
   const [nameQuery, setNameQuery] = useState("");
@@ -302,6 +316,7 @@ export function DashboardProjects({ projects }: Props) {
   useEffect(() => {
     setLocalProjects(readLocalProjectsCache());
     setHiddenKeys(readDeletedKeysCache());
+    setHiddenIds(readDeletedIdsCache());
   }, []);
 
   useEffect(() => {
@@ -311,6 +326,14 @@ export function DashboardProjects({ projects }: Props) {
       // ignore quota/storage errors
     }
   }, [hiddenKeys]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(K_DELETED_IDS, JSON.stringify(Array.from(hiddenIds)));
+    } catch {
+      // ignore quota/storage errors
+    }
+  }, [hiddenIds]);
 
   const allProjects = useMemo(() => {
     const byKey = new Map<string, ClientProject>();
@@ -325,9 +348,13 @@ export function DashboardProjects({ projects }: Props) {
       }
     }
     return Array.from(byKey.values())
-      .filter((p) => !hiddenKeys.has((p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id)))
+      .filter((p) => {
+        if (hiddenIds.has(p.id)) return false;
+        const k = p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id;
+        return !hiddenKeys.has(k);
+      })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [projects, localProjects, hiddenKeys]);
+  }, [projects, localProjects, hiddenKeys, hiddenIds]);
 
   const onDeleteProject = useCallback(async (project: ClientProject, hardDelete = false) => {
     const ok = window.confirm(hardDelete
@@ -340,12 +367,16 @@ export function DashboardProjects({ projects }: Props) {
       if ((typed || "").trim().toUpperCase() !== "EXCLUIR") return;
       const integCheck = readIntegration();
       if (!integCheck.githubToken || !integCheck.vercelToken) {
-        setHint("Para excluir também no GitHub/Vercel, configure os tokens em /admin/settings.");
-        return;
+        const fallback = window.confirm(
+          "Tokens ausentes para exclusão remota. Deseja excluir apenas do painel?",
+        );
+        if (!fallback) return;
+        hardDelete = false;
       }
     }
 
     const key = project.githubRepoFullName?.trim() || project.vercelProjectId?.trim() || project.id;
+    setHiddenIds((prev) => new Set(prev).add(project.id));
     setHiddenKeys((prev) => new Set(prev).add(key));
     setStatus((prev) => {
       const next = { ...prev };
