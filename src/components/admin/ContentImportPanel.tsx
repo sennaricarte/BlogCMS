@@ -41,11 +41,15 @@ export type PreviewRow = {
 type TabId = "wordpress" | "url";
 
 export function ContentImportPanel() {
+  const URL_BATCH_SIZE = 20;
   const [tab, setTab] = useState<TabId>("wordpress");
   const [wpSiteUrl, setWpSiteUrl] = useState("");
   const [articleUrl, setArticleUrl] = useState("");
   const [urlOnlyArticles, setUrlOnlyArticles] = useState(true);
   const [rows, setRows] = useState<PreviewRow[]>([]);
+  const [urlBatchOffset, setUrlBatchOffset] = useState(0);
+  const [urlTotalDiscovered, setUrlTotalDiscovered] = useState(0);
+  const [urlHasMore, setUrlHasMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; err: boolean } | null>(null);
 
@@ -67,6 +71,9 @@ export function ContentImportPanel() {
 
   const clearRows = useCallback(() => {
     setRows([]);
+    setUrlBatchOffset(0);
+    setUrlTotalDiscovered(0);
+    setUrlHasMore(false);
     setMessage(null);
   }, []);
 
@@ -105,20 +112,29 @@ export function ContentImportPanel() {
     }
   };
 
-  const scrapeUrl = async () => {
+  const scrapeUrl = async (resetBatch = true) => {
     setMessage(null);
     setBusy(true);
     try {
+      const offset = resetBatch ? 0 : urlBatchOffset;
       const res = await fetch("/api/admin/import/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ articleUrl: articleUrl.trim(), onlyArticles: urlOnlyArticles }),
+        body: JSON.stringify({
+          articleUrl: articleUrl.trim(),
+          onlyArticles: urlOnlyArticles,
+          offset,
+          limit: URL_BATCH_SIZE,
+        }),
       });
       const j = (await res.json()) as {
         ok?: boolean;
         error?: string;
         message?: string;
+        totalDiscovered?: number;
+        hasMore?: boolean;
+        nextOffset?: number;
         post?: {
           slug: string;
           title: string;
@@ -140,7 +156,7 @@ export function ContentImportPanel() {
         setMessage({ text: j.error || `Erro HTTP ${res.status}`, err: true });
         return;
       }
-      if (Array.isArray(j.posts) && j.posts.length > 0) {
+      if (Array.isArray(j.posts)) {
         const next: PreviewRow[] = j.posts.map((p) => ({
           id: `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           selected: true,
@@ -152,9 +168,18 @@ export function ContentImportPanel() {
           featuredImageUrl: p.featuredImageUrl,
           sourceLabel: "URL",
         }));
-        setRows((prev) => [...prev, ...next]);
+        setRows((prev) => {
+          const existing = new Set(prev.map((r) => r.slug));
+          const deduped = next.filter((r) => !existing.has(r.slug));
+          return resetBatch ? deduped : [...prev, ...deduped];
+        });
+        setUrlTotalDiscovered(typeof j.totalDiscovered === "number" ? j.totalDiscovered : 0);
+        setUrlHasMore(Boolean(j.hasMore));
+        setUrlBatchOffset(typeof j.nextOffset === "number" ? j.nextOffset : offset + j.posts.length);
         setMessage({
-          text: j.message || `${next.length} artigo(s) descoberto(s) e adicionado(s) à lista.`,
+          text:
+            j.message ||
+            `${j.posts.length} artigo(s) carregado(s) neste lote. ${Boolean(j.hasMore) ? "Pode carregar o próximo lote." : "Todos os lotes disponíveis foram carregados."}`,
           err: false,
         });
         return;
@@ -167,9 +192,8 @@ export function ContentImportPanel() {
 
       const p = j.post;
       const id = `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      setRows((prev) => [
-        ...prev,
-        {
+      setRows((prev) => {
+        const row: PreviewRow = {
           id,
           selected: true,
           slug: p.slug,
@@ -179,8 +203,14 @@ export function ContentImportPanel() {
           markdown: p.markdown,
           featuredImageUrl: p.featuredImageUrl,
           sourceLabel: "URL",
-        },
-      ]);
+        };
+        if (resetBatch) return [row];
+        if (prev.some((r) => r.slug === p.slug)) return prev;
+        return [...prev, row];
+      });
+      setUrlTotalDiscovered(1);
+      setUrlHasMore(false);
+      setUrlBatchOffset(1);
       setMessage({ text: j.message || "Página analisada e adicionada à lista em baixo.", err: false });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Falha de rede.", err: true });
@@ -369,10 +399,19 @@ export function ContentImportPanel() {
             <button
               type="button"
               disabled={busy || !articleUrl.trim()}
-              onClick={() => void scrapeUrl()}
+              onClick={() => void scrapeUrl(true)}
               className="inline-flex min-h-10 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? "A analisar…" : "Analisar página"}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !articleUrl.trim() || !urlHasMore}
+              onClick={() => void scrapeUrl(false)}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Carregar próximo lote de artigos descobertos"
+            >
+              {busy ? "A carregar…" : `Próximo lote (${URL_BATCH_SIZE})`}
             </button>
           </div>
           <label className="inline-flex items-center gap-2 text-sm text-zinc-700">
@@ -384,6 +423,12 @@ export function ContentImportPanel() {
             />
             Importar somente artigos (ignorar páginas institucionais/listagem)
           </label>
+          {urlTotalDiscovered > 0 && (
+            <p className="text-xs text-zinc-600" role="status">
+              Descobertos {urlTotalDiscovered} artigo(s). Carregados na lista: {rows.length}.{" "}
+              {urlHasMore ? "Há mais lotes disponíveis." : "Todos os lotes foram carregados."}
+            </p>
+          )}
         </section>
       )}
 

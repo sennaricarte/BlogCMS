@@ -10,6 +10,7 @@ import {
 export const prerender = false;
 const BATCH_LINK_LIMIT = 30;
 const BATCH_FETCH_LIMIT = 20;
+const MAX_BATCH_FETCH_LIMIT = 25;
 
 function json(o: Record<string, unknown>, status = 200, headers?: HeadersInit) {
   return new Response(JSON.stringify(o), {
@@ -264,15 +265,20 @@ export const POST: APIRoute = async (context) => {
     return json({ ok: false, error: "Sessão em falta." }, 401, auth.responseHeaders);
   }
 
-  let body: { articleUrl?: string; onlyArticles?: boolean };
+  let body: { articleUrl?: string; onlyArticles?: boolean; offset?: number; limit?: number };
   try {
-    body = (await context.request.json()) as { articleUrl?: string; onlyArticles?: boolean };
+    body = (await context.request.json()) as { articleUrl?: string; onlyArticles?: boolean; offset?: number; limit?: number };
   } catch {
     return json({ ok: false, error: "JSON inválido." }, 400, auth.responseHeaders);
   }
 
   const url = normalizeAbsoluteUrl(body.articleUrl || "");
   const onlyArticles = body.onlyArticles !== false;
+  const offset = Math.max(0, Number.isFinite(body.offset) ? Number(body.offset) : 0);
+  const limit = Math.min(
+    MAX_BATCH_FETCH_LIMIT,
+    Math.max(1, Number.isFinite(body.limit) ? Number(body.limit) : BATCH_FETCH_LIMIT),
+  );
   if (!url) {
     return json({ ok: false, error: "Indica uma URL absoluta (https://…)." }, 400, auth.responseHeaders);
   }
@@ -325,9 +331,26 @@ export const POST: APIRoute = async (context) => {
   if (onlyArticles) {
     links = links.filter(isLikelyArticleUrl);
   }
+  const pagedLinks = links.slice(offset, offset + limit);
+  const hasMore = offset + pagedLinks.length < links.length;
+  const nextOffset = offset + pagedLinks.length;
+  if (links.length > 0 && pagedLinks.length === 0) {
+    return json(
+      {
+        ok: true,
+        posts: [],
+        totalDiscovered: links.length,
+        hasMore: false,
+        nextOffset: links.length,
+        message: "Não há mais lotes para carregar nesta origem.",
+      },
+      200,
+      auth.responseHeaders,
+    );
+  }
   if (links.length > 0 && preferBatch) {
     const candidates = await Promise.allSettled(
-      links.slice(0, BATCH_FETCH_LIMIT).map(async (link) => {
+      pagedLinks.map(async (link) => {
         const pageRes = await fetchHtml(link);
         if (!pageRes.ok) return null;
         const pageHtml = await pageRes.text();
@@ -388,7 +411,10 @@ export const POST: APIRoute = async (context) => {
         {
           ok: true,
           posts,
-          message: `Página de listagem detectada. ${posts.length} artigo(s) foram extraído(s) automaticamente.`,
+          totalDiscovered: links.length,
+          hasMore,
+          nextOffset,
+          message: `Página de listagem detectada. Lote ${offset + 1}-${nextOffset} de ${links.length} URL(s) analisadas.`,
         },
         200,
         auth.responseHeaders,
@@ -423,6 +449,23 @@ export const POST: APIRoute = async (context) => {
       links = links.filter(isLikelyArticleUrl);
     }
   }
+  const fallbackPagedLinks = links.slice(offset, offset + limit);
+  const fallbackHasMore = offset + fallbackPagedLinks.length < links.length;
+  const fallbackNextOffset = offset + fallbackPagedLinks.length;
+  if (links.length > 0 && fallbackPagedLinks.length === 0) {
+    return json(
+      {
+        ok: true,
+        posts: [],
+        totalDiscovered: links.length,
+        hasMore: false,
+        nextOffset: links.length,
+        message: "Não há mais lotes para carregar nesta origem.",
+      },
+      200,
+      auth.responseHeaders,
+    );
+  }
   if (links.length === 0) {
     return json(
       {
@@ -436,7 +479,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const candidates = await Promise.allSettled(
-    links.slice(0, BATCH_FETCH_LIMIT).map(async (link) => {
+    fallbackPagedLinks.map(async (link) => {
       const pageRes = await fetchHtml(link);
       if (!pageRes.ok) return null;
       const pageHtml = await pageRes.text();
@@ -508,7 +551,10 @@ export const POST: APIRoute = async (context) => {
     {
       ok: true,
       posts,
-      message: `Página de listagem detectada. ${posts.length} artigo(s) foram extraído(s) automaticamente.`,
+      totalDiscovered: links.length,
+      hasMore: fallbackHasMore,
+      nextOffset: fallbackNextOffset,
+      message: `Página de listagem detectada. Lote ${offset + 1}-${fallbackNextOffset} de ${links.length} URL(s) analisadas.`,
     },
     200,
     auth.responseHeaders,
