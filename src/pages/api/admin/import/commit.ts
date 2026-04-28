@@ -6,7 +6,6 @@ import { CMS_PATHS } from "../../../../lib/cms-paths";
 import { GithubPublisher } from "../../../../lib/github-service";
 import { parseOwnerRepo } from "../../../../lib/github-repo-content";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
-import { uploadImageBufferToCmsStorage } from "../../../../lib/supabase-cms-storage-upload";
 import { detectImageKindFromBuffer, MAX_HERO_IMAGE_BYTES } from "../../../../lib/validate-hero-image";
 
 export const prerender = false;
@@ -55,6 +54,29 @@ async function fetchFeaturedBuffer(url: string): Promise<Buffer | null> {
     if (buf.length === 0 || buf.length > MAX_HERO_IMAGE_BYTES) return null;
     if (!detectImageKindFromBuffer(buf)) return null;
     return buf;
+  } catch {
+    return null;
+  }
+}
+
+async function uploadFeaturedToGithub(
+  publisher: GithubPublisher,
+  owner: string,
+  repo: string,
+  branch: string,
+  slugBase: string,
+  buf: Buffer,
+): Promise<string | null> {
+  const kind = detectImageKindFromBuffer(buf);
+  if (!kind) return null;
+  const fileBase = `${slugifyFileName(slugBase)}-${Date.now().toString(36)}`;
+  const fileName = `${fileBase}.${kind.ext}`;
+  const repoPath = `src/assets/blog/${fileName}`;
+  const heroImage = `../../assets/blog/${fileName}`;
+  const message = `content(assets): imagem destacada ${fileName}`;
+  try {
+    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, buf, message, { branch });
+    return heroImage;
   } catch {
     return null;
   }
@@ -141,12 +163,8 @@ export const POST: APIRoute = async (context) => {
     if (featUrl) {
       const buf = await fetchFeaturedBuffer(featUrl);
       if (buf) {
-        try {
-          const { publicUrl } = await uploadImageBufferToCmsStorage(buf, `${slugIn}-hero`);
-          heroImage = publicUrl;
-        } catch {
-          /* mantém hero por defeito */
-        }
+        const localHero = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugIn, buf);
+        if (localHero) heroImage = localHero;
       }
     }
 
