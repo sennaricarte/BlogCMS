@@ -8,7 +8,7 @@ import {
   projectVercelDeploymentsUrl,
   projectVercelSpeedInsightsUrl,
 } from "../../lib/vercel-project-admin-links";
-import { canonicalVercelProjectUrl } from "../../lib/vercel-public-url";
+import { canonicalVercelProjectUrl, preferStableVercelProductionUrl } from "../../lib/vercel-public-url";
 import { DashboardProjectGsc } from "./DashboardProjectGsc";
 
 const K = ADMIN_INTEGRATION_STORAGE_KEY;
@@ -186,10 +186,13 @@ function normalizeDeploymentUrl(url: string | undefined): string | undefined {
 }
 
 function resolveLiveSiteHref(project: ClientProject, statusRow?: StatusRow): string {
-  const canonical = canonicalVercelProjectUrl(project.vercelProjectName?.trim() || "");
+  const projectName = project.vercelProjectName?.trim() || "";
+  const canonical = canonicalVercelProjectUrl(projectName);
   const stable = canonical || projectPublicSiteUrl(project);
-  const ready = statusRow?.readyDeploymentUrl;
-  const dep = statusRow?.deploymentUrl;
+  const readyRaw = statusRow?.readyDeploymentUrl;
+  const depRaw = statusRow?.deploymentUrl;
+  const ready = readyRaw ? preferStableVercelProductionUrl(readyRaw, projectName) : undefined;
+  const dep = depRaw ? preferStableVercelProductionUrl(depRaw, projectName) : undefined;
   const raw = String(statusRow?.raw || "").toUpperCase();
   if (ready) return ready;
   // Só usa URL do deploy quando o estado reportado é READY.

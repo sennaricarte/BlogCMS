@@ -23,6 +23,8 @@ export function preferStableVercelProductionUrl(raw: string, vercelProjectName: 
     if (!host.endsWith(".vercel.app")) return raw.trim();
     const withoutTld = host.slice(0, -".vercel.app".length);
     if (withoutTld === slug) return canonical;
+    // Alguns aliases antigos aparecem como "<slug>.<scope>.vercel.app".
+    if (withoutTld.startsWith(`${slug}.`)) return canonical;
     // Deploy hosts comuns de equipa: "...-projects.vercel.app"
     if (withoutTld.endsWith("-projects")) return canonical;
     const prefix = `${slug}-`;
