@@ -13,6 +13,7 @@ import { DashboardProjectGsc } from "./DashboardProjectGsc";
 const K = ADMIN_INTEGRATION_STORAGE_KEY;
 const K_CMS = ADMIN_CMS_TARGET_KEY;
 const K_LOCAL_PROJECTS = "blogcms-dashboard-projects-cache";
+const K_DELETED_KEYS = "blogcms-dashboard-deleted-keys";
 
 type StatusRow = {
   label: string;
@@ -92,6 +93,18 @@ function readLocalProjectsCache(): ClientProject[] {
     });
   } catch {
     return [];
+  }
+}
+
+function readDeletedKeysCache(): Set<string> {
+  try {
+    const raw = localStorage.getItem(K_DELETED_KEYS);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.map((v) => String(v).trim()).filter(Boolean));
+  } catch {
+    return new Set();
   }
 }
 
@@ -288,7 +301,16 @@ export function DashboardProjects({ projects }: Props) {
 
   useEffect(() => {
     setLocalProjects(readLocalProjectsCache());
+    setHiddenKeys(readDeletedKeysCache());
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(K_DELETED_KEYS, JSON.stringify(Array.from(hiddenKeys)));
+    } catch {
+      // ignore quota/storage errors
+    }
+  }, [hiddenKeys]);
 
   const allProjects = useMemo(() => {
     const byKey = new Map<string, ClientProject>();
@@ -316,6 +338,11 @@ export function DashboardProjects({ projects }: Props) {
     if (hardDelete) {
       const typed = window.prompt(`Digite EXCLUIR para confirmar a exclusão remota de "${project.name}"`);
       if ((typed || "").trim().toUpperCase() !== "EXCLUIR") return;
+      const integCheck = readIntegration();
+      if (!integCheck.githubToken || !integCheck.vercelToken) {
+        setHint("Para excluir também no GitHub/Vercel, configure os tokens em /admin/settings.");
+        return;
+      }
     }
 
     const key = project.githubRepoFullName?.trim() || project.vercelProjectId?.trim() || project.id;
@@ -356,6 +383,10 @@ export function DashboardProjects({ projects }: Props) {
       });
       const j = (await res.json()) as { ok?: boolean; error?: string; remoteDeleted?: boolean; remoteErrors?: string[] };
       if (!res.ok || !j.ok) {
+        if (res.status === 404) {
+          setHint(`Projeto "${project.name}" removido localmente do painel.`);
+          return;
+        }
         setHint(j.error || "Projeto ocultado localmente, mas falhou a remoção no registo do servidor.");
         return;
       }
