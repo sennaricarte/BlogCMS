@@ -183,6 +183,15 @@ function normalizeDeploymentUrl(url: string | undefined): string | undefined {
   return `https://${v}`;
 }
 
+function resolveLiveSiteHref(project: ClientProject, statusRow?: StatusRow): string {
+  const stable = projectPublicSiteUrl(project);
+  const dep = statusRow?.deploymentUrl;
+  const raw = String(statusRow?.raw || "").toUpperCase();
+  // Só usa URL do deploy quando o estado reportado é READY.
+  if (dep && raw === "READY") return dep;
+  return stable;
+}
+
 function OnlineStatusBadge() {
   return (
     <span
@@ -662,7 +671,7 @@ export function DashboardProjects({ projects }: Props) {
         {filteredProjects.map((p) => {
           const s = status[p.id];
           const st = resolveStatus(s, p, hasVercelToken);
-          const siteHref = s?.deploymentUrl || projectPublicSiteUrl(p);
+          const siteHref = resolveLiveSiteHref(p, s);
           const created = (() => {
             try {
               return new Date(p.createdAt).toLocaleDateString("pt-BR", {
