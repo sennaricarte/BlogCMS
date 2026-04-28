@@ -45,6 +45,19 @@ function slugFromUrl(url: string): string {
   return base || `import-${Date.now()}`;
 }
 
+function isLikelyListingUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const p = (u.pathname || "/").toLowerCase().replace(/\/+$/, "") || "/";
+    if (p === "/") return true;
+    if (["/blog", "/posts", "/noticias", "/news", "/artigos", "/articles"].includes(p)) return true;
+    if (/\/(categoria|category|tag|tags)\//.test(p)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 async function fetchHtml(url: string): Promise<Response> {
   return fetch(url, {
     headers: {
@@ -208,14 +221,80 @@ export const POST: APIRoute = async (context) => {
     );
   }
 
-  // Fallback para páginas que renderizam conteúdo via JS (SPA): leitor remoto.
-  const readerSingle = await extractViaReader(res.url || url);
+  const finalUrl = res.url || url;
+  const preferBatch = isLikelyListingUrl(finalUrl);
+
+  // Para home/listagem, tenta primeiro descobrir links de artigos e importar em lote.
+  let links = extractLikelyArticleLinks(html, finalUrl, 12);
+  if (links.length === 0) {
+    links = await discoverLinksFromSitemap(finalUrl, 16);
+  }
+  if (links.length > 0 && preferBatch) {
+    const candidates = await Promise.allSettled(
+      links.slice(0, 8).map(async (link) => {
+        const pageRes = await fetchHtml(link);
+        if (!pageRes.ok) return null;
+        const pageHtml = await pageRes.text();
+        const article = extractArticleHtml(pageHtml);
+        if (!article) {
+          const reader = await extractViaReader(link);
+          if (!reader) return null;
+          return {
+            slug: slugFromUrl(link),
+            title: reader.title,
+            description: reader.description,
+            pubDate: reader.pubDate,
+            markdown: reader.markdown,
+            featuredImageUrl: undefined,
+          };
+        }
+        const meta = extractMetaFromPage(pageHtml);
+        const ogImage = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+        return {
+          slug: slugFromUrl(link),
+          title: meta.title,
+          description: meta.description.slice(0, 160),
+          pubDate: new Date().toISOString().slice(0, 10),
+          markdown: articleHtmlToMarkdown(article),
+          featuredImageUrl: ogImage,
+        };
+      }),
+    );
+
+    const posts: Array<{
+      slug: string;
+      title: string;
+      description: string;
+      pubDate: string;
+      markdown: string;
+      featuredImageUrl?: string;
+    }> = [];
+    for (const result of candidates) {
+      if (result.status === "fulfilled" && result.value) {
+        posts.push(result.value);
+      }
+    }
+    if (posts.length > 0) {
+      return json(
+        {
+          ok: true,
+          posts,
+          message: `Página de listagem detectada. ${posts.length} artigo(s) foram extraído(s) automaticamente.`,
+        },
+        200,
+        auth.responseHeaders,
+      );
+    }
+  }
+
+  // Fallback para páginas que renderizam conteúdo via JS (SPA): leitor remoto (URL única).
+  const readerSingle = await extractViaReader(finalUrl);
   if (readerSingle) {
     return json(
       {
         ok: true,
         post: {
-          slug: slugFromUrl(res.url || url),
+          slug: slugFromUrl(finalUrl),
           title: readerSingle.title,
           description: readerSingle.description,
           pubDate: readerSingle.pubDate,
@@ -228,10 +307,9 @@ export const POST: APIRoute = async (context) => {
     );
   }
 
-  // Fallback para home/listagem: tenta descobrir links de artigos e importar em lote.
-  let links = extractLikelyArticleLinks(html, res.url || url, 12);
+  // Se não for listagem ou não conseguiu em lote antes, tenta lote agora.
   if (links.length === 0) {
-    links = await discoverLinksFromSitemap(res.url || url, 16);
+    links = await discoverLinksFromSitemap(finalUrl, 16);
   }
   if (links.length === 0) {
     return json(

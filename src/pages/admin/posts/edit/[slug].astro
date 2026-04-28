@@ -16,9 +16,6 @@ if (!slug) {
 }
 
 const entry = await getEntry("blog", slug);
-if (!entry) {
-  return Astro.redirect("/admin/posts/", 302);
-}
 
 const pageTitle = "Editar artigo";
 const pageDescription =
@@ -39,23 +36,23 @@ if (!rawHero) {
   rawHero = "../../assets/blog/hero-primeiro.svg";
 }
 
-const d = entry.data;
+const d = entry?.data;
 const publicSiteBase = (siteConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ?? "";
 const initialPayload = {
   slug,
-  title: d.title,
-  seoTitle: d.seoTitle ?? "",
-  seoFocusKeyword: d.seoFocusKeyword ?? "",
-  description: d.description,
-  body: entry.body,
-  pubDate: d.pubDate.toISOString().slice(0, 10),
-  updatedDate: d.updatedDate ? d.updatedDate.toISOString().slice(0, 10) : "",
-  author: d.author,
+  title: d?.title ?? slug,
+  seoTitle: d?.seoTitle ?? "",
+  seoFocusKeyword: d?.seoFocusKeyword ?? "",
+  description: d?.description ?? "",
+  body: entry?.body ?? "",
+  pubDate: d?.pubDate ? d.pubDate.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+  updatedDate: d?.updatedDate ? d.updatedDate.toISOString().slice(0, 10) : "",
+  author: d?.author ?? "Importação CMS",
   heroImage: rawHero,
-  tags: d.tags ?? [],
-  category: d.category ? String(d.category).trim().toLowerCase() : "",
-  draft: d.draft,
-  scheduled: Boolean(d.scheduled),
+  tags: d?.tags ?? [],
+  category: d?.category ? String(d.category).trim().toLowerCase() : "",
+  draft: d?.draft ?? true,
+  scheduled: Boolean(d?.scheduled),
 };
 const initialJson = JSON.stringify(initialPayload).replace(/</g, "\\u003c");
 
@@ -111,7 +108,7 @@ const taxonomiesJson = JSON.stringify(taxonomies);
             </p>
             <input type="hidden" id="f-body" name="body" value="" />
             <div class="mt-2 w-full min-w-0">
-              <EditPostBodyField client:load initialMarkdown={entry.body}>
+              <EditPostBodyField client:load initialMarkdown={entry?.body ?? ""}>
                 <p slot="fallback" class="min-h-40 rounded-lg border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
                   Carregando o editor…
                 </p>
