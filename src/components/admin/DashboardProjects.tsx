@@ -192,6 +192,8 @@ function resolveLiveSiteHref(project: ClientProject, statusRow?: StatusRow): str
   if (ready) return ready;
   // Só usa URL do deploy quando o estado reportado é READY.
   if (dep && raw === "READY") return dep;
+  // Sem deploy saudável conhecido: abre a área de deploys para evitar 404 no domínio público.
+  if (raw && raw !== "READY") return projectVercelDeploymentsUrl(project);
   return stable;
 }
 
