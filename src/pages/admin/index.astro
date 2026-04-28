@@ -223,6 +223,7 @@ const pageDescription =
 >
   (function () {
     var ORDER = ["REPO_CREATED", "FILES_PUSHED", "PROPAGATION_WAIT", "VERCEL_CONNECTED", "DEPLOY_STARTED"];
+    var LOCAL_PROJECTS_KEY = "blogcms-dashboard-projects-cache";
     var dotPending = "h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300";
     var dotDone = "h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500";
     var dotActive = "h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--client-color-primary)]";
@@ -297,6 +298,75 @@ const pageDescription =
       if (idx + 1 < ORDER.length) {
         markActive(ORDER[idx + 1]);
       }
+    }
+
+    function safeReadLocalProjects() {
+      try {
+        var raw = localStorage.getItem(LOCAL_PROJECTS_KEY);
+        if (!raw) return [];
+        var parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function safeWriteLocalProjects(items) {
+      try {
+        localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(items));
+      } catch {
+        /* sem bloqueio de UX */
+      }
+    }
+
+    function toPublicSiteUrl(result) {
+      var dep = result && result.vercelDeployment && result.vercelDeployment.url ? String(result.vercelDeployment.url) : "";
+      if (dep) {
+        return /^https?:\/\//i.test(dep) ? dep : "https://" + dep.replace(/^\/+/, "");
+      }
+      var name = result && result.vercelProjectName ? String(result.vercelProjectName).trim() : "";
+      return name ? "https://" + name + ".vercel.app" : "https://vercel.com";
+    }
+
+    function cacheProjectFromDeploy(result, cfg, teamId) {
+      if (!result) return;
+      var now = new Date().toISOString();
+      var siteUrl = toPublicSiteUrl(result);
+      var entry = {
+        id: "local-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8),
+        name: (cfg && cfg.nomeMarca ? String(cfg.nomeMarca).trim() : "") || result.vercelProjectName || "Novo site",
+        vercelUrl: siteUrl,
+        siteUrl: siteUrl,
+        githubUrl: result.githubRepositoryUrl || "",
+        createdAt: now,
+        vercelProjectId: result.vercelProjectId || "",
+        vercelProjectName: result.vercelProjectName || "",
+        vercelScope: result.vercelScope || "",
+        vercelTeamId: teamId || "",
+        githubRepoFullName: result.githubFullName || "",
+      };
+
+      var list = safeReadLocalProjects();
+      var key = (entry.githubRepoFullName || entry.vercelProjectId || entry.id).trim();
+      var next = [];
+      var replaced = false;
+      for (var i = 0; i < list.length; i++) {
+        var p = list[i];
+        var pk = ((p && (p.githubRepoFullName || p.vercelProjectId || p.id)) || "").trim();
+        if (pk && pk === key) {
+          next.push({
+            ...p,
+            ...entry,
+            id: p.id || entry.id,
+            createdAt: p.createdAt || entry.createdAt,
+          });
+          replaced = true;
+        } else {
+          next.push(p);
+        }
+      }
+      if (!replaced) next.push(entry);
+      safeWriteLocalProjects(next);
     }
 
     function updateButton() {
@@ -407,7 +477,19 @@ const pageDescription =
                 markDone(k);
               });
               var r0 = o.result;
-              setMsg("Feito. GitHub: " + (r0.githubRepositoryUrl || "—") + " | Vercel: " + (r0.vercelProjectName || "—"), false);
+              cacheProjectFromDeploy(r0, config, elTeam && elTeam.value.trim() ? elTeam.value.trim() : "");
+              if (o.projectsUpdate && o.projectsUpdate.status === "error") {
+                setMsg(
+                  "Deploy concluído, mas o registo automático em 'Seus sites' falhou no servidor. " +
+                    "Já guardei este site localmente neste navegador. GitHub: " +
+                    (r0.githubRepositoryUrl || "—") +
+                    " | Vercel: " +
+                    (r0.vercelProjectName || "—"),
+                  false
+                );
+              } else {
+                setMsg("Feito. GitHub: " + (r0.githubRepositoryUrl || "—") + " | Vercel: " + (r0.vercelProjectName || "—"), false);
+              }
               return true;
             }
             return false;

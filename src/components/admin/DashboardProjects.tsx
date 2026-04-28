@@ -12,6 +12,7 @@ import { DashboardProjectGsc } from "./DashboardProjectGsc";
 
 const K = ADMIN_INTEGRATION_STORAGE_KEY;
 const K_CMS = ADMIN_CMS_TARGET_KEY;
+const K_LOCAL_PROJECTS = "blogcms-dashboard-projects-cache";
 
 type StatusRow = {
   label: string;
@@ -66,6 +67,32 @@ function persistCmsTargetIfPossible(p: ClientProject) {
 
 function projectHubHref(p: ClientProject) {
   return `/admin/projects/${p.id}/`;
+}
+
+function readLocalProjectsCache(): ClientProject[] {
+  try {
+    const raw = localStorage.getItem(K_LOCAL_PROJECTS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((p): p is ClientProject => {
+      if (!p || typeof p !== "object") return false;
+      const x = p as Partial<ClientProject>;
+      return Boolean(
+        x.id &&
+        x.name &&
+        x.siteUrl &&
+        x.githubUrl &&
+        x.createdAt &&
+        x.vercelProjectId &&
+        x.vercelProjectName &&
+        x.vercelScope &&
+        x.githubRepoFullName,
+      );
+    });
+  } catch {
+    return [];
+  }
 }
 
 type StatusDisplay = { kind: "online" } | { kind: "line"; text: string; className: string; detail?: string };
@@ -225,17 +252,37 @@ function CardQuickMenu({ project, siteHref }: CardMenuProps) {
 type Props = { projects: ClientProject[] };
 
 export function DashboardProjects({ projects }: Props) {
+  const [localProjects, setLocalProjects] = useState<ClientProject[]>([]);
   const [status, setStatus] = useState<Record<string, StatusRow | undefined>>({});
   const [hint, setHint] = useState<string | null>(null);
   const [nameQuery, setNameQuery] = useState("");
 
   const searchId = "dashboard-sites-search";
 
+  useEffect(() => {
+    setLocalProjects(readLocalProjectsCache());
+  }, []);
+
+  const allProjects = useMemo(() => {
+    const byKey = new Map<string, ClientProject>();
+    for (const p of projects) {
+      const key = p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id;
+      byKey.set(key, p);
+    }
+    for (const p of localProjects) {
+      const key = p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id;
+      if (!byKey.has(key)) {
+        byKey.set(key, p);
+      }
+    }
+    return Array.from(byKey.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [projects, localProjects]);
+
   const filteredProjects = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => p.name.toLowerCase().includes(q));
-  }, [projects, nameQuery]);
+    if (!q) return allProjects;
+    return allProjects.filter((p) => p.name.toLowerCase().includes(q));
+  }, [allProjects, nameQuery]);
 
   useEffect(() => {
     const { vercelToken, teamId } = readIntegration();
@@ -246,7 +293,7 @@ export function DashboardProjects({ projects }: Props) {
 
     (async () => {
       const next: Record<string, StatusRow> = {};
-      for (const p of projects) {
+      for (const p of allProjects) {
         if (!p.vercelProjectId?.trim()) {
           next[p.id] = {
             label: "Sem ligação",
@@ -291,11 +338,11 @@ export function DashboardProjects({ projects }: Props) {
       }
       setStatus(next);
     })();
-  }, [projects]);
+  }, [allProjects]);
 
   const hasVercelToken = Boolean(readIntegration().vercelToken);
 
-  if (!projects.length) {
+  if (!allProjects.length) {
     return (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" aria-label="Estado vazio do painel">
         <div
@@ -384,7 +431,7 @@ export function DashboardProjects({ projects }: Props) {
           role="status"
           aria-live="polite"
         >
-          {filteredProjects.length} de {projects.length} {projects.length === 1 ? "site" : "sites"}
+          {filteredProjects.length} de {allProjects.length} {allProjects.length === 1 ? "site" : "sites"}
         </p>
       </div>
 
