@@ -25,8 +25,8 @@ export function preferStableVercelProductionUrl(raw: string, vercelProjectName: 
         return canonical;
       }
     }
-    // Para hosts *.vercel.app diferentes do nome do projeto, força URL canónica estável.
-    return canonical;
+    // Se não bater com padrão de preview conhecido, preserva o host original.
+    return u.toString();
   } catch {
     return raw.trim();
   }

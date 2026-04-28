@@ -144,7 +144,7 @@ export function buildClientProjectFromDeploy(args: {
   const depUrl = (result.vercelDeployment?.url || "").trim();
   const sub = result.vercelProjectName.toLowerCase().replace(/[^a-z0-9-]/g, "-");
   const rawPublic =
-    siteFromConfig || depUrl || (sub ? `https://${sub}.vercel.app` : "https://vercel.com");
+    depUrl || siteFromConfig || (sub ? `https://${sub}.vercel.app` : "https://vercel.com");
   const publicUrl = preferStableVercelProductionUrl(rawPublic, result.vercelProjectName);
 
   return {

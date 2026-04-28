@@ -21,6 +21,7 @@ type StatusRow = {
   badgeClass: string;
   error?: string;
   raw?: string;
+  deploymentUrl?: string;
 };
 
 function readIntegration(): { githubToken?: string; vercelToken?: string; teamId?: string } {
@@ -173,6 +174,13 @@ function resolveStatus(
     };
   }
   return { kind: "line", text: s.label, className: "text-slate-700" };
+}
+
+function normalizeDeploymentUrl(url: string | undefined): string | undefined {
+  const v = (url || "").trim();
+  if (!v) return undefined;
+  if (/^https?:\/\//i.test(v)) return v;
+  return `https://${v}`;
 }
 
 function OnlineStatusBadge() {
@@ -491,6 +499,7 @@ export function DashboardProjects({ projects }: Props) {
           const j = (await r.json()) as {
             ok?: boolean;
             readyState?: string;
+            deploymentUrl?: string;
             error?: string;
           };
           if (!r.ok || !j.ok) {
@@ -507,7 +516,12 @@ export function DashboardProjects({ projects }: Props) {
             continue;
           }
           const m = mapReadyState(String(j.readyState || "UNKNOWN"));
-          next[p.id] = { label: m.label, badgeClass: m.badgeClass, raw: j.readyState };
+          next[p.id] = {
+            label: m.label,
+            badgeClass: m.badgeClass,
+            raw: j.readyState,
+            deploymentUrl: normalizeDeploymentUrl(j.deploymentUrl),
+          };
         } catch {
           next[p.id] = {
             label: "Rede",
@@ -648,7 +662,7 @@ export function DashboardProjects({ projects }: Props) {
         {filteredProjects.map((p) => {
           const s = status[p.id];
           const st = resolveStatus(s, p, hasVercelToken);
-          const siteHref = projectPublicSiteUrl(p);
+          const siteHref = s?.deploymentUrl || projectPublicSiteUrl(p);
           const created = (() => {
             try {
               return new Date(p.createdAt).toLocaleDateString("pt-BR", {
