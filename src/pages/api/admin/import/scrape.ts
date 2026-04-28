@@ -8,7 +8,7 @@ import {
 } from "../../../../lib/import-convert";
 
 export const prerender = false;
-const BATCH_LINK_LIMIT = 30;
+const BATCH_LINK_LIMIT = 500;
 const BATCH_FETCH_LIMIT = 20;
 const MAX_BATCH_FETCH_LIMIT = 25;
 
@@ -226,7 +226,7 @@ async function extractViaReader(url: string): Promise<ReaderExtract | null> {
   return { title, description, markdown, pubDate };
 }
 
-async function discoverLinksFromSitemap(baseUrl: string, limit = 16): Promise<string[]> {
+async function discoverLinksFromSitemap(baseUrl: string, limit = BATCH_LINK_LIMIT): Promise<string[]> {
   const origin = new URL(baseUrl).origin;
   const sitemapIndexUrl = `${origin}/sitemap.xml`;
   const indexXml = await fetchText(sitemapIndexUrl);
@@ -236,7 +236,7 @@ async function discoverLinksFromSitemap(baseUrl: string, limit = 16): Promise<st
   const likelyArticleSitemaps = indexLocs.filter(
     (u) => /type=articles|article|post|blog/i.test(u),
   );
-  const targets = (likelyArticleSitemaps.length > 0 ? likelyArticleSitemaps : indexLocs).slice(0, 8);
+  const targets = likelyArticleSitemaps.length > 0 ? likelyArticleSitemaps : indexLocs;
 
   const articleUrls = new Set<string>();
   for (const smUrl of targets) {
