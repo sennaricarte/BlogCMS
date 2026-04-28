@@ -161,6 +161,10 @@ function resolveStatus(
     return { kind: "line", text: "A configurar", className: "text-slate-500" };
   }
   if (s.label === "Erro" || s.label === "Rede" || s.label === "Cancelado") {
+    if (hasUrl) {
+      // Se houver URL pública, não bloqueia o cartão como indisponível por falha pontual da API da Vercel.
+      return { kind: "online" };
+    }
     return {
       kind: "line",
       text: "Indisponível",
@@ -462,6 +466,8 @@ export function DashboardProjects({ projects }: Props) {
 
     (async () => {
       const next: Record<string, StatusRow> = {};
+      const idsToHide = new Set<string>();
+      const keysToHide = new Set<string>();
       for (const p of allProjects) {
         if (!p.vercelProjectId?.trim()) {
           next[p.id] = {
@@ -488,6 +494,11 @@ export function DashboardProjects({ projects }: Props) {
             error?: string;
           };
           if (!r.ok || !j.ok) {
+            const errTxt = String(j.error || "");
+            if (/project not found/i.test(errTxt) || /projeto n[oã]o encontrado/i.test(errTxt)) {
+              idsToHide.add(p.id);
+              keysToHide.add(normalizeProjectKey(p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id));
+            }
             next[p.id] = {
               label: "Erro",
               badgeClass: "bg-red-50 text-red-800 ring-1 ring-red-200/80",
@@ -506,8 +517,20 @@ export function DashboardProjects({ projects }: Props) {
         }
       }
       setStatus(next);
+      if (idsToHide.size > 0 || keysToHide.size > 0) {
+        const mergedIds = new Set(hiddenIds);
+        idsToHide.forEach((v) => mergedIds.add(v));
+        const mergedKeys = new Set(hiddenKeys);
+        keysToHide.forEach((v) => mergedKeys.add(v));
+        setHiddenIds(mergedIds);
+        setHiddenKeys(mergedKeys);
+        writeDeletedCaches(mergedKeys, mergedIds);
+        setLocalProjects((prev) =>
+          prev.filter((p) => !mergedIds.has(p.id) && !mergedKeys.has(normalizeProjectKey(p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id))),
+        );
+      }
     })();
-  }, [allProjects]);
+  }, [allProjects, hiddenIds, hiddenKeys]);
 
   const hasVercelToken = Boolean(readIntegration().vercelToken);
 
