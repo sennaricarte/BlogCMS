@@ -30,3 +30,62 @@ export function articleHtmlToMarkdown(html: string): string {
   const cleaned = stripNoiseFromHtmlFragment(html);
   return htmlToMarkdown(cleaned);
 }
+
+/** Tenta descobrir links de artigos numa página de listagem/home. */
+export function extractLikelyArticleLinks(fullPageHtml: string, baseUrl: string, limit = 12): string[] {
+  const $ = cheerio.load(fullPageHtml, { decodeEntities: true });
+  const base = new URL(baseUrl);
+  const out = new Set<string>();
+
+  $("a[href]").each((_, el) => {
+    const href = ($(el).attr("href") || "").trim();
+    if (!href) return;
+
+    let abs: URL;
+    try {
+      abs = new URL(href, base);
+    } catch {
+      return;
+    }
+
+    if (abs.origin !== base.origin) return;
+    abs.hash = "";
+    abs.search = "";
+
+    const path = abs.pathname.replace(/\/+$/, "");
+    if (!path || path === "/") return;
+
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length === 0) return;
+
+    // Heurística para evitar páginas de navegação/arquivo.
+    const banPrefix = new Set([
+      "tag",
+      "tags",
+      "categoria",
+      "categorias",
+      "category",
+      "author",
+      "authors",
+      "sobre",
+      "about",
+      "contato",
+      "contact",
+      "admin",
+      "login",
+      "wp-admin",
+      "wp-content",
+      "search",
+      "busca",
+      "page",
+      "pages",
+      "p",
+    ]);
+    if (banPrefix.has(segments[0]?.toLowerCase() || "")) return;
+
+    if (/\.(xml|json|pdf|png|jpe?g|webp|gif|svg|zip|rar)$/i.test(path)) return;
+    out.add(`${abs.origin}${path}`);
+  });
+
+  return Array.from(out).slice(0, limit);
+}

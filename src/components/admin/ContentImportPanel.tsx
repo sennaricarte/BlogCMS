@@ -117,6 +117,7 @@ export function ContentImportPanel() {
       const j = (await res.json()) as {
         ok?: boolean;
         error?: string;
+        message?: string;
         post?: {
           slug: string;
           title: string;
@@ -125,11 +126,44 @@ export function ContentImportPanel() {
           markdown: string;
           featuredImageUrl?: string;
         };
+        posts?: Array<{
+          slug: string;
+          title: string;
+          description: string;
+          pubDate: string;
+          markdown: string;
+          featuredImageUrl?: string;
+        }>;
       };
-      if (!res.ok || !j.ok || !j.post) {
+      if (!res.ok || !j.ok) {
         setMessage({ text: j.error || `Erro HTTP ${res.status}`, err: true });
         return;
       }
+      if (Array.isArray(j.posts) && j.posts.length > 0) {
+        const next: PreviewRow[] = j.posts.map((p) => ({
+          id: `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          selected: true,
+          slug: p.slug,
+          title: p.title,
+          description: p.description,
+          pubDate: p.pubDate,
+          markdown: p.markdown,
+          featuredImageUrl: p.featuredImageUrl,
+          sourceLabel: "URL",
+        }));
+        setRows((prev) => [...prev, ...next]);
+        setMessage({
+          text: j.message || `${next.length} artigo(s) descoberto(s) e adicionado(s) à lista.`,
+          err: false,
+        });
+        return;
+      }
+
+      if (!j.post) {
+        setMessage({ text: "Resposta inesperada: nenhum artigo foi extraído.", err: true });
+        return;
+      }
+
       const p = j.post;
       const id = `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setRows((prev) => [
@@ -146,7 +180,7 @@ export function ContentImportPanel() {
           sourceLabel: "URL",
         },
       ]);
-      setMessage({ text: "Página analisada e adicionada à lista em baixo.", err: false });
+      setMessage({ text: j.message || "Página analisada e adicionada à lista em baixo.", err: false });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Falha de rede.", err: true });
     } finally {
@@ -384,12 +418,29 @@ export function ContentImportPanel() {
                 type="button"
                 disabled={busy || selectedCount === 0 || !credsOk}
                 onClick={() => void commitSelected()}
+                title={
+                  !credsOk
+                    ? "Configure token GitHub e repositório em /admin/settings para habilitar a importação."
+                    : selectedCount === 0
+                      ? "Selecione pelo menos um artigo para importar."
+                      : undefined
+                }
+                aria-disabled={busy || selectedCount === 0 || !credsOk}
                 className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy ? "A gravar…" : `Importar selecionados (${selectedCount})`}
               </button>
             </div>
           </div>
+          {!credsOk && (
+            <p className="text-xs text-amber-700" role="status">
+              Para habilitar este botão, configure o token GitHub e o repositório em{" "}
+              <a className="font-medium underline underline-offset-2" href="/admin/settings/">
+                /admin/settings
+              </a>
+              .
+            </p>
+          )}
 
           <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white shadow-sm" data-cms-table-wrap>
             <table className="min-w-full text-left text-sm" data-cms-table>
