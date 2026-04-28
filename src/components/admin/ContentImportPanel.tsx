@@ -50,6 +50,7 @@ export function ContentImportPanel() {
   const [urlBatchOffset, setUrlBatchOffset] = useState(0);
   const [urlTotalDiscovered, setUrlTotalDiscovered] = useState(0);
   const [urlHasMore, setUrlHasMore] = useState(false);
+  const [loadingAllBatches, setLoadingAllBatches] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; err: boolean } | null>(null);
 
@@ -219,6 +220,125 @@ export function ContentImportPanel() {
     }
   };
 
+  const scrapeAllUrlBatches = async () => {
+    setMessage(null);
+    setBusy(true);
+    setLoadingAllBatches(true);
+    try {
+      let offset = 0;
+      let hasMore = true;
+      let safety = 0;
+      const allRows: PreviewRow[] = [];
+      const slugs = new Set<string>();
+      let totalDiscovered = 0;
+
+      while (hasMore && safety < 80) {
+        safety += 1;
+        const res = await fetch("/api/admin/import/scrape", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            articleUrl: articleUrl.trim(),
+            onlyArticles: urlOnlyArticles,
+            offset,
+            limit: URL_BATCH_SIZE,
+          }),
+        });
+        const j = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          message?: string;
+          totalDiscovered?: number;
+          hasMore?: boolean;
+          nextOffset?: number;
+          post?: {
+            slug: string;
+            title: string;
+            description: string;
+            pubDate: string;
+            markdown: string;
+            featuredImageUrl?: string;
+          };
+          posts?: Array<{
+            slug: string;
+            title: string;
+            description: string;
+            pubDate: string;
+            markdown: string;
+            featuredImageUrl?: string;
+          }>;
+        };
+        if (!res.ok || !j.ok) {
+          setMessage({ text: j.error || `Erro HTTP ${res.status}`, err: true });
+          return;
+        }
+
+        if (typeof j.totalDiscovered === "number") {
+          totalDiscovered = j.totalDiscovered;
+        }
+
+        if (Array.isArray(j.posts)) {
+          for (const p of j.posts) {
+            if (slugs.has(p.slug)) continue;
+            slugs.add(p.slug);
+            allRows.push({
+              id: `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              selected: true,
+              slug: p.slug,
+              title: p.title,
+              description: p.description,
+              pubDate: p.pubDate,
+              markdown: p.markdown,
+              featuredImageUrl: p.featuredImageUrl,
+              sourceLabel: "URL",
+            });
+          }
+          const nextOffset = typeof j.nextOffset === "number" ? j.nextOffset : offset + j.posts.length;
+          hasMore = Boolean(j.hasMore) && nextOffset > offset;
+          offset = nextOffset;
+          continue;
+        }
+
+        if (j.post) {
+          if (!slugs.has(j.post.slug)) {
+            slugs.add(j.post.slug);
+            allRows.push({
+              id: `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              selected: true,
+              slug: j.post.slug,
+              title: j.post.title,
+              description: j.post.description,
+              pubDate: j.post.pubDate,
+              markdown: j.post.markdown,
+              featuredImageUrl: j.post.featuredImageUrl,
+              sourceLabel: "URL",
+            });
+          }
+          hasMore = false;
+          offset = 1;
+          continue;
+        }
+
+        hasMore = false;
+      }
+
+      setRows(allRows);
+      setUrlTotalDiscovered(totalDiscovered || allRows.length);
+      setUrlHasMore(false);
+      setUrlBatchOffset(offset);
+      setMessage({
+        text: `${allRows.length} artigo(s) carregado(s) no total.${totalDiscovered > allRows.length ? ` Descobertos ${totalDiscovered} URLs válidos.` : ""}`,
+        err: false,
+      });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha de rede.", err: true });
+    } finally {
+      setBusy(false);
+      setLoadingAllBatches(false);
+    }
+  };
+
   const commitSelected = async () => {
     setMessage(null);
     const integ = readLs<IntegrationLs>(K_INTEGR);
@@ -247,6 +367,7 @@ export function ContentImportPanel() {
           GITHUB_PERSONAL_TOKEN: token,
           githubRepoFullName,
           branch: (target.branch || "main").trim() || "main",
+          allowDuplicates: false,
           posts: picked.map((r) => ({
             slug: r.slug,
             title: r.title,
@@ -262,6 +383,7 @@ export function ContentImportPanel() {
         ok?: boolean;
         error?: string;
         created?: string[];
+        skipped?: Array<{ slug: string; reason: string }>;
         errors?: Array<{ slug: string; error: string }>;
         message?: string;
       };
@@ -273,13 +395,17 @@ export function ContentImportPanel() {
           j.errors.map((e) => `${e.slug}: ${e.error}`).join(" | "),
         );
       }
+      if (Array.isArray(j.skipped) && j.skipped.length) {
+        parts.push(`Ignorados: ${j.skipped.map((s) => `${s.slug} (${s.reason})`).join(", ")}.`);
+      }
       setMessage({
         text: parts.join(" ") || j.error || "Resposta inesperada.",
         err: !j.ok && (!j.created || j.created.length === 0),
       });
-      if (Array.isArray(j.created) && j.created.length > 0) {
+      if ((Array.isArray(j.created) && j.created.length > 0) || (Array.isArray(j.skipped) && j.skipped.length > 0)) {
         const createdSet = new Set(j.created);
-        setRows((prev) => prev.filter((r) => !r.selected || !createdSet.has(r.slug)));
+        const skippedSet = new Set((j.skipped || []).map((s) => s.slug));
+        setRows((prev) => prev.filter((r) => !r.selected || (!createdSet.has(r.slug) && !skippedSet.has(r.slug))));
       }
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Falha de rede.", err: true });
@@ -412,6 +538,15 @@ export function ContentImportPanel() {
               aria-label="Carregar próximo lote de artigos descobertos"
             >
               {busy ? "A carregar…" : `Próximo lote (${URL_BATCH_SIZE})`}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !articleUrl.trim()}
+              onClick={() => void scrapeAllUrlBatches()}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Carregar todos os lotes de artigos desta URL"
+            >
+              {loadingAllBatches ? "A carregar todos…" : "Carregar todos"}
             </button>
           </div>
           <label className="inline-flex items-center gap-2 text-sm text-zinc-700">

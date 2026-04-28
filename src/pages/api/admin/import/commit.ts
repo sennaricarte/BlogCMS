@@ -43,6 +43,23 @@ type ImportPost = {
   featuredImageUrl?: string;
 };
 
+async function blogPathExists(
+  publisher: GithubPublisher,
+  owner: string,
+  repo: string,
+  branch: string,
+  slug: string,
+): Promise<boolean> {
+  const path = `${CMS_PATHS.blog}/${slug}.md`;
+  try {
+    await publisher.getFileText(owner, repo, path, { branch });
+    return true;
+  } catch (e) {
+    if (e instanceof RequestError && e.status === 404) return false;
+    throw e;
+  }
+}
+
 async function fetchFeaturedBuffer(url: string): Promise<Buffer | null> {
   try {
     const r = await fetch(url, {
@@ -118,6 +135,7 @@ export const POST: APIRoute = async (context) => {
     GITHUB_PERSONAL_TOKEN?: string;
     githubRepoFullName?: string;
     branch?: string;
+    allowDuplicates?: boolean;
     posts?: ImportPost[];
   };
   try {
@@ -146,13 +164,30 @@ export const POST: APIRoute = async (context) => {
   }
 
   const branch = (body.branch ?? "main").trim() || "main";
+  const allowDuplicates = body.allowDuplicates === true;
   const publisher = new GithubPublisher({ token });
 
   const created: string[] = [];
   const errors: Array<{ slug: string; error: string }> = [];
+  const skipped: Array<{ slug: string; reason: string }> = [];
+  const seenInBatch = new Set<string>();
 
   for (const p of body.posts) {
     const slugIn = slugifyFileName(p.slug || p.title);
+    if (seenInBatch.has(slugIn)) {
+      skipped.push({ slug: slugIn, reason: "Duplicado no lote atual." });
+      continue;
+    }
+    seenInBatch.add(slugIn);
+
+    if (!allowDuplicates) {
+      const exists = await blogPathExists(publisher, owner, repo, branch, slugIn);
+      if (exists) {
+        skipped.push({ slug: slugIn, reason: "Já existe no repositório." });
+        continue;
+      }
+    }
+
     const title = (p.title || "").trim() || slugIn;
     const description = (p.description || title).trim().slice(0, 160);
     const pubDate = (p.pubDate || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
@@ -180,7 +215,10 @@ export const POST: APIRoute = async (context) => {
     };
 
     try {
-      const { path, slug } = await uniqueBlogPath(publisher, owner, repo, branch, slugIn);
+      const target = allowDuplicates
+        ? await uniqueBlogPath(publisher, owner, repo, branch, slugIn)
+        : { path: `${CMS_PATHS.blog}/${slugIn}.md`, slug: slugIn };
+      const { path, slug } = target;
       const text = serializeBlogMarkdown(markdownBody, data);
       await publisher.createOrUpdateFile(
         owner,
@@ -203,11 +241,14 @@ export const POST: APIRoute = async (context) => {
     {
       ok: errors.length === 0,
       created,
+      skipped,
       errors,
       message:
         created.length > 0
-          ? `${created.length} artigo(s) criado(s) no ramo ${branch}.`
-          : "Nenhum artigo foi criado.",
+          ? `${created.length} artigo(s) criado(s) no ramo ${branch}.${skipped.length > 0 ? ` ${skipped.length} repetido(s) ignorado(s).` : ""}`
+          : skipped.length > 0
+            ? `Nenhum artigo novo criado. ${skipped.length} repetido(s) foram ignorado(s).`
+            : "Nenhum artigo foi criado.",
     },
     errors.length === body.posts!.length ? 502 : 200,
     auth.responseHeaders,
