@@ -16,15 +16,17 @@ export function preferStableVercelProductionUrl(raw: string, vercelProjectName: 
     const host = u.hostname.toLowerCase();
     if (!host.endsWith(".vercel.app")) return raw.trim();
     const withoutTld = host.slice(0, -".vercel.app".length);
-    if (withoutTld === slug) return u.toString();
+    const canonical = `https://${slug}.vercel.app/`;
+    if (withoutTld === slug) return canonical;
     const prefix = `${slug}-`;
     if (withoutTld.startsWith(prefix) && withoutTld.length > prefix.length) {
       const extra = withoutTld.slice(prefix.length);
       if (/^[a-z0-9]{4,24}$/i.test(extra)) {
-        return `https://${slug}.vercel.app/`;
+        return canonical;
       }
     }
-    return u.toString();
+    // Para hosts *.vercel.app diferentes do nome do projeto, força URL canónica estável.
+    return canonical;
   } catch {
     return raw.trim();
   }
