@@ -186,6 +186,13 @@ const pageDescription =
         </button>
         <button
           type="button"
+          id="btn-validar-delete-gh"
+          class="inline-flex w-full items-center justify-center rounded-lg border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-800 shadow-sm transition hover:bg-red-50 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-red-400 sm:w-auto"
+        >
+          Validar exclusão GitHub
+        </button>
+        <button
+          type="button"
           id="btn-deploy"
           class="inline-flex w-full items-center justify-center rounded-lg border-2 border-[var(--client-color-primary)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--client-color-primary)] shadow-sm transition hover:bg-slate-50 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[var(--client-color-primary)] sm:w-auto"
         >
@@ -231,6 +238,7 @@ const pageDescription =
     const elMsg = $("mensagem-integracao");
     const btnGuardar = /** @type {HTMLButtonElement} */ ($("btn-guardar"));
     const btnTestar = /** @type {HTMLButtonElement} */ ($("btn-testar"));
+    const btnValidarDeleteGh = /** @type {HTMLButtonElement} */ ($("btn-validar-delete-gh"));
     const btnDeploy = /** @type {HTMLButtonElement} */ ($("btn-deploy"));
     const elRepo = /** @type {HTMLInputElement} */ ($("repo-slug"));
     const elDeploy = $("deploy-em-curso");
@@ -318,6 +326,7 @@ const pageDescription =
     function setBusy(busy) {
       if (btnGuardar) btnGuardar.disabled = busy;
       if (btnTestar) btnTestar.disabled = busy;
+      if (btnValidarDeleteGh) btnValidarDeleteGh.disabled = busy;
       if (btnDeploy) btnDeploy.disabled = busy;
     }
 
@@ -392,6 +401,44 @@ const pageDescription =
       } finally {
         btnTestar.disabled = false;
         btnTestar.textContent = original || "Testar conexão";
+      }
+    });
+
+    btnValidarDeleteGh.addEventListener("click", async function () {
+      setMensagem("");
+      if (!elGh || !elGh.value.trim()) {
+        setMensagem("Preencha o token GitHub para validar permissão de exclusão.", true);
+        return;
+      }
+      if (!elCmsRepo || !elCmsRepo.value.trim()) {
+        setMensagem("Informe o repositório alvo do CMS (dono/repositório) para validar.", true);
+        return;
+      }
+      btnValidarDeleteGh.disabled = true;
+      const original = btnValidarDeleteGh.textContent;
+      btnValidarDeleteGh.textContent = "A validar…";
+      try {
+        const res = await fetch("/api/admin/github-delete-permission", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            GITHUB_PERSONAL_TOKEN: elGh.value.trim(),
+            githubRepoFullName: elCmsRepo.value.trim(),
+          }),
+        });
+        const j = /** @type {{ ok?: boolean; canDelete?: boolean; error?: string; message?: string; permissions?: { admin?: boolean; maintain?: boolean; push?: boolean } }} */ (await res.json());
+        if (j.ok && j.canDelete) {
+          setMensagem(j.message || "Permissão OK para excluir repositório no GitHub.");
+          return;
+        }
+        const p = j.permissions;
+        const permTxt = p ? ` (admin=${String(!!p.admin)}, maintain=${String(!!p.maintain)}, push=${String(!!p.push)})` : "";
+        setMensagem((j.error || `Validação falhou (HTTP ${res.status}).`) + permTxt, true);
+      } catch (e) {
+        setMensagem((e && /** @type {Error} */ (e).message) || "Erro de rede ao validar permissão.", true);
+      } finally {
+        btnValidarDeleteGh.disabled = false;
+        btnValidarDeleteGh.textContent = original || "Validar exclusão GitHub";
       }
     });
 
