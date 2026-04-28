@@ -8,6 +8,8 @@ import {
 } from "../../../../lib/import-convert";
 
 export const prerender = false;
+const BATCH_LINK_LIMIT = 30;
+const BATCH_FETCH_LIMIT = 20;
 
 function json(o: Record<string, unknown>, status = 200, headers?: HeadersInit) {
   return new Response(JSON.stringify(o), {
@@ -66,7 +68,7 @@ function isLikelyArticleUrl(url: string): boolean {
     const segments = path.split("/").filter(Boolean);
     if (segments.length === 0) return false;
     const first = segments[0] || "";
-    const blocked = new Set([
+    const blockedRoots = new Set([
       "sobre",
       "about",
       "contato",
@@ -94,7 +96,25 @@ function isLikelyArticleUrl(url: string): boolean {
       "page",
       "pages",
     ]);
-    if (blocked.has(first)) return false;
+    if (blockedRoots.has(first)) return false;
+    const full = segments.join("/");
+    const blockedTokens = [
+      "sobre",
+      "about",
+      "contato",
+      "contact",
+      "termos",
+      "terms",
+      "politica-de-privacidade",
+      "privacy-policy",
+      "glossario",
+      "glossary",
+      "colunistas",
+      "parceria",
+      "quem-somos",
+      "institutional",
+    ];
+    if (blockedTokens.some((token) => full.includes(token))) return false;
     if (/\.(xml|json|pdf|png|jpe?g|gif|webp|svg|zip|rar)$/i.test(path)) return false;
     return true;
   } catch {
@@ -270,16 +290,16 @@ export const POST: APIRoute = async (context) => {
   const preferBatch = isLikelyListingUrl(finalUrl);
 
   // Para home/listagem, tenta primeiro descobrir links de artigos e importar em lote.
-  let links = extractLikelyArticleLinks(html, finalUrl, 12);
-  if (links.length === 0) {
-    links = await discoverLinksFromSitemap(finalUrl, 16);
-  }
+  const linksFromPage = extractLikelyArticleLinks(html, finalUrl, BATCH_LINK_LIMIT);
+  const linksFromSitemap = await discoverLinksFromSitemap(finalUrl, BATCH_LINK_LIMIT);
+  let links = [...linksFromSitemap, ...linksFromPage];
+  links = Array.from(new Set(links));
   if (onlyArticles) {
     links = links.filter(isLikelyArticleUrl);
   }
   if (links.length > 0 && preferBatch) {
     const candidates = await Promise.allSettled(
-      links.slice(0, 8).map(async (link) => {
+      links.slice(0, BATCH_FETCH_LIMIT).map(async (link) => {
         const pageRes = await fetchHtml(link);
         if (!pageRes.ok) return null;
         const pageHtml = await pageRes.text();
@@ -357,7 +377,7 @@ export const POST: APIRoute = async (context) => {
 
   // Se não for listagem ou não conseguiu em lote antes, tenta lote agora.
   if (links.length === 0) {
-    links = await discoverLinksFromSitemap(finalUrl, 16);
+    links = await discoverLinksFromSitemap(finalUrl, BATCH_LINK_LIMIT);
     if (onlyArticles) {
       links = links.filter(isLikelyArticleUrl);
     }
@@ -375,7 +395,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const candidates = await Promise.allSettled(
-    links.slice(0, 8).map(async (link) => {
+    links.slice(0, BATCH_FETCH_LIMIT).map(async (link) => {
       const pageRes = await fetchHtml(link);
       if (!pageRes.ok) return null;
       const pageHtml = await pageRes.text();
