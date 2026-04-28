@@ -71,6 +71,10 @@ function projectHubHref(p: ClientProject) {
   return `/admin/projects/${p.id}/`;
 }
 
+function normalizeProjectKey(v: string): string {
+  return (v || "").trim().toLowerCase();
+}
+
 function readLocalProjectsCache(): ClientProject[] {
   try {
     const raw = localStorage.getItem(K_LOCAL_PROJECTS);
@@ -103,7 +107,7 @@ function readDeletedKeysCache(): Set<string> {
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.map((v) => String(v).trim()).filter(Boolean));
+    return new Set(parsed.map((v) => normalizeProjectKey(String(v))).filter(Boolean));
   } catch {
     return new Set();
   }
@@ -118,6 +122,15 @@ function readDeletedIdsCache(): Set<string> {
     return new Set(parsed.map((v) => String(v).trim()).filter(Boolean));
   } catch {
     return new Set();
+  }
+}
+
+function writeDeletedCaches(keys: Set<string>, ids: Set<string>) {
+  try {
+    localStorage.setItem(K_DELETED_KEYS, JSON.stringify(Array.from(keys)));
+    localStorage.setItem(K_DELETED_IDS, JSON.stringify(Array.from(ids)));
+  } catch {
+    // ignore
   }
 }
 
@@ -321,28 +334,20 @@ export function DashboardProjects({ projects }: Props) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(K_DELETED_KEYS, JSON.stringify(Array.from(hiddenKeys)));
+      writeDeletedCaches(hiddenKeys, hiddenIds);
     } catch {
       // ignore quota/storage errors
     }
-  }, [hiddenKeys]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(K_DELETED_IDS, JSON.stringify(Array.from(hiddenIds)));
-    } catch {
-      // ignore quota/storage errors
-    }
-  }, [hiddenIds]);
+  }, [hiddenKeys, hiddenIds]);
 
   const allProjects = useMemo(() => {
     const byKey = new Map<string, ClientProject>();
     for (const p of projects) {
-      const key = p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id;
+      const key = normalizeProjectKey(p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id);
       byKey.set(key, p);
     }
     for (const p of localProjects) {
-      const key = p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id;
+      const key = normalizeProjectKey(p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id);
       if (!byKey.has(key)) {
         byKey.set(key, p);
       }
@@ -350,7 +355,7 @@ export function DashboardProjects({ projects }: Props) {
     return Array.from(byKey.values())
       .filter((p) => {
         if (hiddenIds.has(p.id)) return false;
-        const k = p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id;
+        const k = normalizeProjectKey(p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id);
         return !hiddenKeys.has(k);
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -375,9 +380,14 @@ export function DashboardProjects({ projects }: Props) {
       }
     }
 
-    const key = project.githubRepoFullName?.trim() || project.vercelProjectId?.trim() || project.id;
-    setHiddenIds((prev) => new Set(prev).add(project.id));
-    setHiddenKeys((prev) => new Set(prev).add(key));
+    const key = normalizeProjectKey(project.githubRepoFullName?.trim() || project.vercelProjectId?.trim() || project.id);
+    const nextIds = new Set(hiddenIds);
+    nextIds.add(project.id);
+    const nextKeys = new Set(hiddenKeys);
+    nextKeys.add(key);
+    setHiddenIds(nextIds);
+    setHiddenKeys(nextKeys);
+    writeDeletedCaches(nextKeys, nextIds);
     setStatus((prev) => {
       const next = { ...prev };
       delete next[project.id];
@@ -387,7 +397,7 @@ export function DashboardProjects({ projects }: Props) {
     try {
       const local = readLocalProjectsCache();
       const localNext = local.filter((p) => {
-        const k = p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id;
+        const k = normalizeProjectKey(p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id);
         return k !== key;
       });
       localStorage.setItem(K_LOCAL_PROJECTS, JSON.stringify(localNext));
@@ -435,7 +445,7 @@ export function DashboardProjects({ projects }: Props) {
     } catch {
       setHint("Projeto ocultado localmente. Não foi possível confirmar remoção no servidor.");
     }
-  }, []);
+  }, [hiddenIds, hiddenKeys]);
 
   const filteredProjects = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
@@ -706,8 +716,14 @@ export function DashboardProjects({ projects }: Props) {
               <div className="mt-auto border-t border-slate-100 p-3">
                 <a
                   href={projectHubHref(p)}
-                  onClick={() => {
+                  onClick={(ev) => {
                     persistCmsTargetIfPossible(p);
+                    // Para projetos ainda não persistidos no projects.json do servidor,
+                    // abre o CMS diretamente em vez da rota /admin/projects/[id].
+                    if (p.id.startsWith("local-")) {
+                      ev.preventDefault();
+                      window.location.href = "/admin/posts/";
+                    }
                   }}
                   className="inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
                   aria-label={`Gerenciar o site: ${p.name}`}
