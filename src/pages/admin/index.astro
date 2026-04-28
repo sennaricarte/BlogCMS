@@ -224,6 +224,8 @@ const pageDescription =
   (function () {
     var ORDER = ["REPO_CREATED", "FILES_PUSHED", "PROPAGATION_WAIT", "VERCEL_CONNECTED", "DEPLOY_STARTED"];
     var LOCAL_PROJECTS_KEY = "blogcms-dashboard-projects-cache";
+    var ADMIN_INTEGRATION_STORAGE_KEY = "blogcms-admin-integration";
+    var ADMIN_CMS_TARGET_KEY = "blogcms-cms-target";
     var dotPending = "h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300";
     var dotDone = "h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500";
     var dotActive = "h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--client-color-primary)]";
@@ -369,6 +371,35 @@ const pageDescription =
       safeWriteLocalProjects(next);
     }
 
+    function persistIntegrationAndCmsTarget(ghToken, vercelToken, teamId, result) {
+      try {
+        localStorage.setItem(
+          ADMIN_INTEGRATION_STORAGE_KEY,
+          JSON.stringify({
+            GITHUB_PERSONAL_TOKEN: ghToken || "",
+            VERCEL_TOKEN: vercelToken || "",
+            ...(teamId ? { VERCEL_TEAM_ID: teamId } : {}),
+          })
+        );
+      } catch {
+        /* sem bloqueio de UX */
+      }
+
+      try {
+        localStorage.setItem(
+          ADMIN_CMS_TARGET_KEY,
+          JSON.stringify({
+            githubRepoFullName: (result && result.githubFullName) || "",
+            branch: "main",
+            vercelProjectId: (result && result.vercelProjectId) || "",
+            vercelProjectName: (result && result.vercelProjectName) || "",
+          })
+        );
+      } catch {
+        /* sem bloqueio de UX */
+      }
+    }
+
     function updateButton() {
       var ok = !!(elGh && elV && elGh.value.trim() && elV.value.trim());
       if (btn) {
@@ -477,6 +508,12 @@ const pageDescription =
                 markDone(k);
               });
               var r0 = o.result;
+              persistIntegrationAndCmsTarget(
+                elGh && elGh.value ? elGh.value.trim() : "",
+                elV && elV.value ? elV.value.trim() : "",
+                elTeam && elTeam.value ? elTeam.value.trim() : "",
+                r0
+              );
               cacheProjectFromDeploy(r0, config, elTeam && elTeam.value.trim() ? elTeam.value.trim() : "");
               if (o.projectsUpdate && o.projectsUpdate.status === "error") {
                 setMsg(

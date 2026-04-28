@@ -477,6 +477,23 @@ const pageDescription =
               setDeployStatus("Concluído.", true);
               setMensagem("Repo: " + (r0.githubRepositoryUrl || "—") + " · Vercel: " + (r0.vercelProjectName || "—"));
               try {
+                localStorage.setItem(
+                  ADMIN_INTEGRATION_STORAGE_KEY,
+                  JSON.stringify({
+                    GITHUB_PERSONAL_TOKEN: payload.GITHUB_PERSONAL_TOKEN || "",
+                    VERCEL_TOKEN: payload.VERCEL_TOKEN || "",
+                    ...(payload.VERCEL_TEAM_ID ? { VERCEL_TEAM_ID: payload.VERCEL_TEAM_ID } : {}),
+                  })
+                );
+                localStorage.setItem(
+                  ADMIN_CMS_TARGET_KEY,
+                  JSON.stringify({
+                    githubRepoFullName: r0.githubFullName || "",
+                    branch: "main",
+                    vercelProjectId: r0.vercelProjectId || "",
+                    vercelProjectName: r0.vercelProjectName || "",
+                  })
+                );
                 localStorage.setItem(ADMIN_INTEGRATION_STORAGE_KEY + "-repoName", elRepo.value.trim());
               } catch (e) { /* — */ }
               return true;
