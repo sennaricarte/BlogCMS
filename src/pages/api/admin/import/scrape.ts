@@ -166,6 +166,33 @@ type ReaderExtract = {
   pubDate: string;
 };
 
+function normalizeImportedMarkdown(md: string): string {
+  const base = (md || "").replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (!base) return "";
+  return base
+    .replace(/([^\n])\n(#{1,6}\s)/g, "$1\n\n$2")
+    .replace(/([^\n])\n(\d+\.\s)/g, "$1\n\n$2")
+    .replace(/([^\n])\n(-\s)/g, "$1\n\n$2")
+    .replace(/([^\n])\n(\|.+\|)/g, "$1\n\n$2")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function markdownTextLength(md: string): number {
+  return (md || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`[^`]*`/g, " ")
+    .replace(/!\[[^\]]*]\([^)]+\)/g, " ")
+    .replace(/\[[^\]]+]\([^)]+\)/g, " ")
+    .replace(/[#>*_|-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim().length;
+}
+
+function isSubstantialMarkdown(md: string): boolean {
+  return markdownTextLength(md) >= 260;
+}
+
 async function extractViaReader(url: string): Promise<ReaderExtract | null> {
   const readerUrl = `https://r.jina.ai/http://${url.replace(/^https?:\/\//i, "").replace(/^\/+/, "")}`;
   const text = await fetchText(readerUrl);
@@ -173,7 +200,7 @@ async function extractViaReader(url: string): Promise<ReaderExtract | null> {
 
   const mdIdx = text.indexOf("Markdown Content:");
   if (mdIdx < 0) return null;
-  const markdown = text.slice(mdIdx + "Markdown Content:".length).trim();
+  const markdown = normalizeImportedMarkdown(text.slice(mdIdx + "Markdown Content:".length));
   if (!markdown) return null;
 
   const title =
@@ -266,24 +293,25 @@ export const POST: APIRoute = async (context) => {
   const fragment = extractArticleHtml(html);
   if (fragment) {
     const meta = extractMetaFromPage(html);
-    const markdown = articleHtmlToMarkdown(fragment);
+    const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(fragment));
     const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
-
-    return json(
-      {
-        ok: true,
-        post: {
-          slug: slugFromUrl(url),
-          title: meta.title,
-          description: meta.description.slice(0, 160),
-          pubDate: new Date().toISOString().slice(0, 10),
-          markdown,
-          featuredImageUrl: ogImage,
+    if (isSubstantialMarkdown(markdown)) {
+      return json(
+        {
+          ok: true,
+          post: {
+            slug: slugFromUrl(url),
+            title: meta.title,
+            description: meta.description.slice(0, 160),
+            pubDate: new Date().toISOString().slice(0, 10),
+            markdown,
+            featuredImageUrl: ogImage,
+          },
         },
-      },
-      200,
-      auth.responseHeaders,
-    );
+        200,
+        auth.responseHeaders,
+      );
+    }
   }
 
   const finalUrl = res.url || url;
@@ -318,12 +346,25 @@ export const POST: APIRoute = async (context) => {
         }
         const meta = extractMetaFromPage(pageHtml);
         const ogImage = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+        const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(article));
+        if (!isSubstantialMarkdown(markdown)) {
+          const reader = await extractViaReader(link);
+          if (!reader) return null;
+          return {
+            slug: slugFromUrl(link),
+            title: reader.title,
+            description: reader.description,
+            pubDate: reader.pubDate,
+            markdown: reader.markdown,
+            featuredImageUrl: ogImage,
+          };
+        }
         return {
           slug: slugFromUrl(link),
           title: meta.title,
           description: meta.description.slice(0, 160),
           pubDate: new Date().toISOString().slice(0, 10),
-          markdown: articleHtmlToMarkdown(article),
+          markdown,
           featuredImageUrl: ogImage,
         };
       }),
@@ -414,12 +455,25 @@ export const POST: APIRoute = async (context) => {
       }
       const meta = extractMetaFromPage(pageHtml);
       const ogImage = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+      const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(article));
+      if (!isSubstantialMarkdown(markdown)) {
+        const reader = await extractViaReader(link);
+        if (!reader) return null;
+        return {
+          slug: slugFromUrl(link),
+          title: reader.title,
+          description: reader.description,
+          pubDate: reader.pubDate,
+          markdown: reader.markdown,
+          featuredImageUrl: ogImage,
+        };
+      }
       return {
         slug: slugFromUrl(link),
         title: meta.title,
         description: meta.description.slice(0, 160),
         pubDate: new Date().toISOString().slice(0, 10),
-        markdown: articleHtmlToMarkdown(article),
+        markdown,
         featuredImageUrl: ogImage,
       };
     }),

@@ -2,14 +2,55 @@ import * as cheerio from "cheerio";
 import { stripNoiseFromHtmlFragment } from "./import-html-clean";
 import { htmlToMarkdown } from "./html-to-markdown";
 
-/** Extrai HTML de `<article>` ou, em alternativa, `<main>`. */
+function scoreCandidateHtml(html: string): number {
+  const text = stripHtmlToText(html);
+  if (!text) return 0;
+  const paragraphHits = (html.match(/<p[\s>]/gi) || []).length;
+  const headingHits = (html.match(/<h[1-6][\s>]/gi) || []).length;
+  return text.length + paragraphHits * 80 + headingHits * 40;
+}
+
+function stripHtmlToText(html: string): string {
+  return (html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Extrai HTML do candidato mais provável de corpo (article/main/post-content). */
 export function extractArticleHtml(fullPageHtml: string): string | null {
   const $ = cheerio.load(fullPageHtml, { decodeEntities: true });
-  let $node = $("article").first();
-  if (!$node.length) $node = $("main").first();
-  if (!$node.length) return null;
-  const inner = $node.html();
-  return inner?.trim() ? inner.trim() : null;
+  const selectors = [
+    "article",
+    "main",
+    "[role='main']",
+    ".post-content",
+    ".entry-content",
+    ".article-content",
+    ".content article",
+    ".single-post",
+  ];
+
+  let bestHtml = "";
+  let bestScore = 0;
+  for (const sel of selectors) {
+    $(sel).each((_, el) => {
+      const inner = ($(el).html() || "").trim();
+      if (!inner) return;
+      const score = scoreCandidateHtml(inner);
+      if (score > bestScore) {
+        bestScore = score;
+        bestHtml = inner;
+      }
+    });
+  }
+
+  if (!bestHtml) return null;
+  // Evita retornar "casca" com pouco conteúdo (menus, teaser, etc).
+  if (stripHtmlToText(bestHtml).length < 220) return null;
+  return bestHtml;
 }
 
 export function extractMetaFromPage(fullPageHtml: string): { title: string; description: string } {
