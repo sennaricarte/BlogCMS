@@ -149,6 +149,11 @@ export interface DeployToClientRepoResult {
   branch: string;
   commitSha: string;
   htmlUrl: string;
+  templateAudit: {
+    astroRootDirectory: string;
+    hasPackageJsonAtRoot: boolean;
+    hasAstroConfigAtRoot: boolean;
+  };
 }
 
 function requireGithubToken(override: string | undefined, context: string): string {
@@ -225,6 +230,43 @@ async function loadTemplateFiles(
 
 const BLOB_CONCURRENCY = 8;
 
+function detectAstroRootDirectory(
+  files: Array<{ path: string }>,
+): { astroRootDirectory: string; hasPackageJsonAtRoot: boolean; hasAstroConfigAtRoot: boolean } {
+  const paths = new Set(files.map((f) => f.path));
+  const hasRootPkg = paths.has("package.json");
+  const hasRootAstroCfg = paths.has("astro.config.mjs") || paths.has("astro.config.ts");
+  if (hasRootPkg && hasRootAstroCfg) {
+    return {
+      astroRootDirectory: ".",
+      hasPackageJsonAtRoot: true,
+      hasAstroConfigAtRoot: true,
+    };
+  }
+
+  const candidates = new Set<string>();
+  for (const p of paths) {
+    const idx = p.lastIndexOf("/");
+    if (idx > 0) candidates.add(p.slice(0, idx));
+  }
+  for (const dir of candidates) {
+    const hasPkg = paths.has(`${dir}/package.json`);
+    const hasAstroCfg = paths.has(`${dir}/astro.config.mjs`) || paths.has(`${dir}/astro.config.ts`);
+    if (hasPkg && hasAstroCfg) {
+      return {
+        astroRootDirectory: dir,
+        hasPackageJsonAtRoot: hasRootPkg,
+        hasAstroConfigAtRoot: hasRootAstroCfg,
+      };
+    }
+  }
+
+  throw new Error(
+    "Template Astro inválido: não encontramos `package.json` e `astro.config.mjs`/`astro.config.ts` no mesmo diretório. " +
+      "Confirma se o código está na raiz ou em `/server` antes do deploy.",
+  );
+}
+
 async function mapPool<T, R>(
   items: T[],
   limit: number,
@@ -265,6 +307,7 @@ export async function deployToClientRepo(
   const commitMessage = options.commitMessage?.trim() || "chore: deploy client template";
 
   const files = await loadTemplateFiles(templateRoot, clientConfig);
+  const templateAudit = detectAstroRootDirectory(files);
   const octokit = createGitHubClient(token);
 
   const { data: me } = await octokit.users.getAuthenticated();
@@ -343,5 +386,6 @@ export async function deployToClientRepo(
     branch: branchName,
     commitSha: commit.sha,
     htmlUrl,
+    templateAudit,
   };
 }

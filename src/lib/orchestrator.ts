@@ -92,7 +92,7 @@ export interface DeployNewSiteClientData {
   /** Opções extra do `GithubPublisher.createClientSite` (privacidade, template, etc.). */
   github?: CreateClientSiteOptions;
   /** Nome do projeto na Vercel e/ou equipa (`teamId`). */
-  vercel?: { vercelProjectName?: string; teamId?: string };
+  vercel?: { vercelProjectName?: string; teamId?: string; rootDirectory?: string };
 }
 
 /** Resultado agregado com URL do GitHub e identificação / URL do projeto Vercel. */
@@ -117,6 +117,12 @@ export interface DeployNewSiteResult {
   vercel: VercelCreateProjectResult;
   /** `username` (conta) ou `slug` (equipa) para links `vercel.com/{scope}/…`. */
   vercelScope: string;
+  /** Auditoria do template usado para criar o repositório no GitHub. */
+  templateAudit: {
+    astroRootDirectory: string;
+    hasPackageJsonAtRoot: boolean;
+    hasAstroConfigAtRoot: boolean;
+  };
 }
 
 /** Tokens de um cliente (multi-tenant). Não fazer `console.log` destes valores. */
@@ -243,12 +249,15 @@ export async function deployNewSite(
   log("2/3 A ligar o repositório na Vercel (framework Astro) e a pedir o primeiro deploy…");
 
   const teamId = clientData.vercel?.teamId ?? options?.targetTokens?.vercelTeamId;
+  const rootDirectory =
+    clientData.vercel?.rootDirectory?.trim() || ghResult.templateAudit.astroRootDirectory || ".";
 
   let vercelResult: VercelCreateProjectResult;
   try {
     vercelResult = await vercel.createProjectForGithubRepository(ghResult.repository.fullName, {
       vercelProjectName: clientData.vercel?.vercelProjectName,
       teamId,
+      rootDirectory,
     });
   } catch (e) {
     if (isRetryableVercelProjectError(e)) {
@@ -257,6 +266,7 @@ export async function deployNewSite(
       vercelResult = await vercel.createProjectForGithubRepository(ghResult.repository.fullName, {
         vercelProjectName: clientData.vercel?.vercelProjectName,
         teamId,
+        rootDirectory,
       });
     } else {
       throw e;
@@ -273,6 +283,7 @@ export async function deployNewSite(
     "2/3 Concluído: projeto Vercel criado e repositório associado.",
     `id=${vercelResult.id} nome=«${vercelResult.name}»`,
   );
+  log("2/3 Configuração de build detectada.", `framework=astro rootDirectory=${rootDirectory}`);
   if (vercelResult.url) {
     console.log(`${PREFIX}      ↳ ${vercelResult.url}`);
   }
@@ -322,5 +333,6 @@ export async function deployNewSite(
     vercelDeployment,
     vercel: vercelResult,
     vercelScope,
+    templateAudit: ghResult.templateAudit,
   };
 }

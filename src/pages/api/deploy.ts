@@ -16,7 +16,7 @@ type ClientDataPayload = {
   repositoryName?: string;
   config?: ClientConfig;
   github?: { private?: boolean; description?: string };
-  vercel?: { vercelProjectName?: string; teamId?: string };
+  vercel?: { vercelProjectName?: string; teamId?: string; rootDirectory?: string };
 };
 
 type DeployRequestBody = {
@@ -32,7 +32,7 @@ type DeployRequestBody = {
   repositoryName?: string;
   config?: ClientConfig;
   github?: { private?: boolean; description?: string };
-  vercel?: { vercelProjectName?: string; teamId?: string };
+  vercel?: { vercelProjectName?: string; teamId?: string; rootDirectory?: string };
 };
 
 function jsonError(message: string, status: number, extra?: Record<string, string>): Response {
@@ -176,6 +176,7 @@ export const POST: APIRoute = async ({ request }) => {
             vercelScope: result.vercelScope,
             vercelDeployment: result.vercelDeployment,
             vercel: result.vercel,
+            templateAudit: result.templateAudit,
           },
           projectsUpdate,
         });

@@ -24,6 +24,7 @@ type StatusRow = {
   raw?: string;
   deploymentUrl?: string;
   readyDeploymentUrl?: string;
+  failureReason?: string;
 };
 
 function readIntegration(): { githubToken?: string; vercelToken?: string; teamId?: string } {
@@ -536,6 +537,7 @@ export function DashboardProjects({ projects }: Props) {
             readyState?: string;
             deploymentUrl?: string;
             readyDeploymentUrl?: string;
+            failureReason?: string;
             error?: string;
           };
           if (!r.ok || !j.ok) {
@@ -558,6 +560,8 @@ export function DashboardProjects({ projects }: Props) {
             raw: j.readyState,
             deploymentUrl: normalizeDeploymentUrl(j.deploymentUrl),
             readyDeploymentUrl: normalizeDeploymentUrl(j.readyDeploymentUrl),
+            failureReason: j.failureReason,
+            error: j.failureReason,
           };
         } catch {
           next[p.id] = {

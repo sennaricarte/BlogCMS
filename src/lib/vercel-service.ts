@@ -21,6 +21,11 @@ export interface VercelProjectFromGitHubInput {
    * O `teamId` por defeito na instância de `VercelService` vem do construtor, não de `process.env`.
    */
   teamId?: string;
+  /**
+   * Diretório raiz do app no repositório Git (ex.: ".", "server").
+   * Importante para monorepos e templates com código Astro fora da raiz.
+   */
+  rootDirectory?: string;
 }
 
 export interface VercelCreateProjectResult {
@@ -28,6 +33,7 @@ export interface VercelCreateProjectResult {
   name: string;
   accountId: string;
   url?: string;
+  rootDirectory?: string;
   link?: { type: string; repo: string } | null;
   framework?: string | null;
 }
@@ -97,10 +103,12 @@ export async function connectGithubRepoToVercelProject(
   }
 
   const teamId = input.teamId?.trim() || undefined;
+  const rootDirectory = (input.rootDirectory?.trim() || ".").replace(/^\/+|\/+$/g, "") || ".";
 
   const body = {
     name: projectName,
     framework: "astro" as const,
+    rootDirectory,
     gitRepository: {
       type: "github" as const,
       repo: fullName,
@@ -134,6 +142,7 @@ export async function connectGithubRepoToVercelProject(
     id?: string;
     name?: string;
     accountId?: string;
+    rootDirectory?: string;
     link?: { type?: string; repo?: string } | null;
     framework?: string | null;
   };
@@ -143,6 +152,7 @@ export async function connectGithubRepoToVercelProject(
     name: data.name ?? projectName,
     accountId: data.accountId ?? "",
     url: typeof json.url === "string" ? json.url : undefined,
+    rootDirectory: typeof data.rootDirectory === "string" ? data.rootDirectory : rootDirectory,
     link: data.link
       ? { type: data.link.type ?? "github", repo: data.link.repo ?? fullName }
       : { type: "github", repo: fullName },
@@ -331,13 +341,14 @@ export class VercelService {
    */
   async createProjectForGithubRepository(
     githubRepoFullName: string,
-    options?: { vercelProjectName?: string; teamId?: string; signal?: AbortSignal },
+    options?: { vercelProjectName?: string; teamId?: string; rootDirectory?: string; signal?: AbortSignal },
   ): Promise<VercelCreateProjectResult> {
     return connectGithubRepoToVercelProject(
       {
         githubRepoFullName,
         vercelProjectName: options?.vercelProjectName,
         teamId: options?.teamId ?? this.teamId,
+        rootDirectory: options?.rootDirectory,
       },
       { token: this.token, signal: options?.signal },
     );
@@ -364,7 +375,7 @@ export class VercelService {
   async getLatestDeploymentState(
     projectId: string,
     init?: { signal?: AbortSignal },
-  ): Promise<{ readyState: string; url?: string; readyUrl?: string } | null> {
+  ): Promise<{ readyState: string; url?: string; readyUrl?: string; failureReason?: string } | null> {
     return fetchLatestDeploymentForProject(projectId, {
       token: this.token,
       teamId: this.teamId ?? null,
@@ -379,7 +390,7 @@ export class VercelService {
 export async function fetchLatestDeploymentForProject(
   projectId: string,
   init: { token: string; teamId?: string | null; signal?: AbortSignal },
-): Promise<{ readyState: string; url?: string; readyUrl?: string } | null> {
+): Promise<{ readyState: string; url?: string; readyUrl?: string; failureReason?: string } | null> {
   const id = projectId?.trim();
   if (!id) {
     return null;
@@ -406,7 +417,7 @@ export async function fetchLatestDeploymentForProject(
     throw new VercelApiError(msg, { status: res.status, cause: err });
   }
   const data = (await res.json()) as {
-    deployments?: Array<{ readyState?: string; url?: string }>;
+    deployments?: Array<{ uid?: string; id?: string; readyState?: string; url?: string; errorMessage?: string }>;
   };
   const deployments = data.deployments || [];
   const latest = deployments[0];
@@ -416,9 +427,59 @@ export async function fetchLatestDeploymentForProject(
   const ready = deployments.find(
     (d) => String(d.readyState || "").toUpperCase() === "READY" && typeof d.url === "string" && d.url.trim(),
   );
+  const latestState = String(latest.readyState || "UNKNOWN").toUpperCase();
+  let failureReason = "";
+  if (latestState === "ERROR" || latestState === "FAILED" || latestState === "CANCELED") {
+    failureReason =
+      (typeof latest.errorMessage === "string" && latest.errorMessage.trim()) ||
+      (await fetchDeploymentFailureReason(latest.uid || latest.id || "", {
+        token,
+        teamId,
+        signal: init.signal,
+      }));
+  }
   return {
     readyState: latest.readyState ?? "UNKNOWN",
     url: typeof latest.url === "string" ? latest.url : undefined,
     readyUrl: ready?.url,
+    failureReason: failureReason || undefined,
   };
+}
+
+function extractEventText(node: unknown): string[] {
+  if (!node) return [];
+  if (typeof node === "string") return [node];
+  if (Array.isArray(node)) return node.flatMap((x) => extractEventText(x));
+  if (typeof node !== "object") return [];
+  const out: string[] = [];
+  const o = node as Record<string, unknown>;
+  for (const k of ["text", "message", "error", "errorMessage", "summary", "detail"]) {
+    if (typeof o[k] === "string" && o[k].trim()) out.push(String(o[k]));
+  }
+  for (const v of Object.values(o)) out.push(...extractEventText(v));
+  return out;
+}
+
+async function fetchDeploymentFailureReason(
+  deploymentId: string,
+  init: { token: string; teamId?: string; signal?: AbortSignal },
+): Promise<string> {
+  const depId = deploymentId.trim();
+  if (!depId) return "";
+  const q = new URLSearchParams();
+  q.set("limit", "100");
+  if (init.teamId) q.set("teamId", init.teamId);
+  const res = await fetch(`${VERCEL_API_BASE}/v2/deployments/${encodeURIComponent(depId)}/events?${q.toString()}`, {
+    headers: { Authorization: `Bearer ${init.token}` },
+    signal: init.signal,
+  }).catch(() => null);
+  if (!res || !res.ok) return "";
+  const body = (await res.json().catch(() => ({}))) as { events?: unknown[] };
+  const texts = extractEventText(body.events || [])
+    .map((s) => s.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (!texts.length) return "";
+  const interesting = texts.filter((t) => /(error|failed|fail|cannot|missing|not found|invalid)/i.test(t));
+  const picked = (interesting.length ? interesting : texts).slice(-3);
+  return picked.join(" | ").slice(0, 800);
 }
