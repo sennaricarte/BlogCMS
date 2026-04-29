@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ClientConfig } from "./publisher";
@@ -10,6 +11,20 @@ import { preferStableVercelProductionUrl } from "./vercel-public-url";
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
 /** Raiz do repositório em dev / `npm start` a partir do folder do projeto. */
 const PROJECTS_RELATIVE = join("src", "data", "projects.json");
+
+/**
+ * Em Vercel (e muitas funções serverless), o código em `/var/task/...` é só de leitura.
+ * Gravar `src/data/projects.json` no bundle falha com ENOENT/EPERM ao criar pastas.
+ * Usamos `/tmp` (gravável) ou `BLOGCMS_PROJECTS_JSON_PATH` se definido.
+ */
+function customProjectsJsonPath(): string | undefined {
+  const p = process.env.BLOGCMS_PROJECTS_JSON_PATH?.trim();
+  return p || undefined;
+}
+
+function isVercelRuntime(): boolean {
+  return process.env.VERCEL === "1";
+}
 const JSON_SPACE = 2;
 const UTF8 = "utf-8" as const;
 
@@ -28,10 +43,16 @@ function withFileLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Ficheiro `projects.json` (código-fonte), escrito a partir do servidor de API após deploy.
- * Em `process.cwd()` deve estar a raiz do BlogCMS (com pasta `src/`).
+ * Caminho usado para **ler e gravar** o registo de projetos em runtime.
+ * Em desenvolvimento local: `src/data/projects.json` na raiz do repo.
+ * Na Vercel: ficheiro em `/tmp` (filesystem gravável do lambda).
  */
 export function getProjectsDataPathForWrite(): string {
+  const custom = customProjectsJsonPath();
+  if (custom) return custom;
+  if (isVercelRuntime()) {
+    return join(tmpdir(), "blogcms-projects.json");
+  }
   return join(process.cwd(), PROJECTS_RELATIVE);
 }
 
@@ -109,15 +130,23 @@ async function writeProjectsAtomic(
 }
 
 /**
- * Lê o `projects.json` a partir de `process.cwd()` ou, se necessário, do path relativo a este módulo.
+ * Lê o registo: primeiro o store gravável (tmp na Vercel ou ficheiro local),
+ * depois tenta sementes só de leitura (repo / bundle) para não começar vazio em produção.
  */
 export async function readProjectsData(): Promise<ProjectsFileShape> {
-  const primary = getProjectsDataPathForWrite();
+  const writable = getProjectsDataPathForWrite();
+  const fromWritable = await readProjectsFileIfExists(writable);
+  if (fromWritable) return fromWritable;
+
+  const repoPath = join(process.cwd(), PROJECTS_RELATIVE);
+  const fromRepo = await readProjectsFileIfExists(repoPath);
+  if (fromRepo) return fromRepo;
+
   const alt = fallbackPathFromThisModule();
-  return (
-    (await readProjectsFileIfExists(primary)) ??
-    (await readProjectsFileIfExists(alt)) ?? { projects: [] }
-  );
+  const fromAlt = await readProjectsFileIfExists(alt);
+  if (fromAlt) return fromAlt;
+
+  return { projects: [] };
 }
 
 export async function writeProjectsData(
@@ -133,6 +162,12 @@ export async function writeProjectsData(
  */
 export async function writeProjectsDataBestEffort(data: ProjectsFileShape): Promise<void> {
   const primary = getProjectsDataPathForWrite();
+  // Na Vercel / path custom: só um destino gravável; não tentar escrever no bundle.
+  if (isVercelRuntime() || customProjectsJsonPath()) {
+    await writeProjectsData(data, primary);
+    return;
+  }
+
   const alt = fallbackPathFromThisModule();
   const paths = Array.from(new Set([primary, alt]));
   let lastErr: unknown;
@@ -205,7 +240,8 @@ export async function upsertProjectInRegistry(entry: ClientProject): Promise<Pro
 }
 
 /**
- * Chamado após `deployNewSite` concluir com sucesso: persiste em `src/data/projects.json`.
+ * Chamado após `deployNewSite` concluir com sucesso: persiste o registo (local: `src/data/projects.json`;
+ * Vercel: `/tmp/blogcms-projects.json`, salvo entre invocações na mesma instância).
  */
 export async function addProjectFromSuccessfulDeploy(input: {
   result: DeployNewSiteResult;
