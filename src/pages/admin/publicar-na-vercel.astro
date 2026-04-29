@@ -63,11 +63,39 @@ const canonicalPath = "/admin/publicar-na-vercel/";
         <li>Avance para “Deploy” (pode ajustar as definições de build no passo seguinte antes de confirmar).</li>
       </ol>
 
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">2.1 Root Directory (causa n.º 1 de erro)</h2>
+      <p class="mt-2 text-sm text-slate-700">
+        Em <strong>Project → Settings → General → Root Directory</strong> (ou no ecrã de importação, se aparecer o
+        campo), o valor tem de ser a pasta onde está o <code class="font-mono text-xs">package.json</code>.
+      </p>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+        <li>
+          <strong>Repositório Astro na raiz:</strong> deixe <strong>Root Directory vazio</strong> (não escreva
+          <code class="font-mono text-xs">.</code>, <code class="font-mono text-xs">./</code> nem nomes de pastas).
+        </li>
+        <li>
+          Só preencha Root Directory se o projeto for um <strong>monorepo</strong> e o site estiver numa subpasta (ex.:
+          <code class="font-mono text-xs">apps/site</code>).
+        </li>
+        <li>
+          No GitHub, abra a página principal do repositório: deve aparecer <code class="font-mono text-xs">package.json</code>
+          na lista de ficheiros do topo. Se não aparecer, não importou o repositório certo ou o ramo está errado.
+        </li>
+      </ul>
+
       <h2 class="mt-10 text-lg font-semibold text-slate-900">3. Build e instalação (definições recomendadas)</h2>
       <p class="mt-2 text-sm text-slate-700">
         Na Vercel, em <strong>Build &amp; Output Settings</strong>, use normalmente:
       </p>
       <dl class="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm sm:grid-cols-2">
+        <div class="sm:col-span-2">
+          <dt class="font-medium text-slate-800">Root Directory</dt>
+          <dd class="mt-0.5 text-slate-700">
+            <strong>Vazio</strong> na maioria dos casos. Se estiver errado, o log mostra
+            <code class="font-mono text-xs">Could not read package.json</code> ou
+            <code class="font-mono text-xs">ENOENT</code>.
+          </dd>
+        </div>
         <div>
           <dt class="font-medium text-slate-800">Framework Preset</dt>
           <dd class="mt-0.5 text-slate-600">A Vercel deteta Astro automaticamente; pode deixar em automático.</dd>
@@ -111,11 +139,30 @@ const canonicalPath = "/admin/publicar-na-vercel/";
         no painel do projeto.
       </p>
 
-      <h2 class="mt-10 text-lg font-semibold text-slate-900">7. Se o build falhar</h2>
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">7. Erro «Could not read package.json» / «npm install» ENOENT</h2>
+      <p class="mt-2 text-sm text-slate-700">
+        A Vercel está a correr <code class="font-mono text-xs">npm install</code> numa pasta onde <strong>não existe</strong>
+        <code class="font-mono text-xs">package.json</code> (caminho tipo <code class="font-mono text-xs">/vercel/path0/</code>).
+      </p>
+      <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-700">
+        <li>
+          <strong>Settings → General → Root Directory</strong> → apague qualquer valor, guarde, e faça
+          <strong>Deployments → Redeploy</strong>.
+        </li>
+        <li>
+          No GitHub, confirme que o ramo <code class="font-mono text-xs">main</code> tem
+          <code class="font-mono text-xs">package.json</code> na raiz do repositório que ligou à Vercel.
+        </li>
+        <li>
+          Se importou outro repositório (vazio ou só documentação), volte a importar o repositório do site gerado pelo
+          BlogCMS.
+        </li>
+      </ol>
+
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">8. Outros erros de build</h2>
       <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
         <li>Abra o deploy com erro e leia o log (falta de dependência, versão do Node, etc.).</li>
-        <li>Em <strong>Settings → General</strong>, confira a versão do Node (o projeto BlogCMS recomenda Node 22+).</li>
-        <li>Confirme que não há ficheiros sensíveis em falta: o repositório deve incluir <code class="font-mono text-xs">package.json</code> na raiz.</li>
+        <li>Em <strong>Settings → General</strong>, confira a versão do Node (recomendado Node 22+).</li>
       </ul>
     </div>
 

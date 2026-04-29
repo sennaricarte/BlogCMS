@@ -454,22 +454,33 @@ Este projeto foi preparado para você publicar manualmente na Vercel, com total 
 2. Selecione o repositório \`${repoName}\` no seu GitHub.
 3. Confirme a branch principal: \`${branch}\`.
 
-## 2) Build and Output Settings
+## 2) Root Directory (obrigatório verificar)
+
+Na configuração do projeto na Vercel (**Settings → General → Root Directory** ou no assistente de importação):
+
+- Deixe **vazio** (raiz do repositório), a menos que o \`package.json\` esteja mesmo numa **subpasta** (monorepo).
+- **Não** use \`./\` nem caminhos relativos com \`../\`.
+- O ficheiro \`package.json\` tem de estar **na raiz do repositório** que está a importar (confirme no GitHub: página principal do repo → deve listar \`package.json\`).
+
+Se o Root Directory apontar para uma pasta sem \`package.json\`, o build falha com \`ENOENT ... package.json\`.
+
+## 3) Build and Output Settings
 
 Use estes valores:
 
+- **Root Directory:** vazio (raiz)
 - Build Command: \`npm run build\`
 - Install Command: \`npm install\`
 - Output Directory: deixe em branco (padrão)
 
-## 3) Environment Variables
+## 4) Environment Variables
 
 Se você não usa variáveis de ambiente customizadas, deixe vazio.
 
 Se for usar no futuro, adicione em:
 \`Vercel > Project > Settings > Environment Variables\`.
 
-## 4) Domínio
+## 5) Domínio
 
 Depois do primeiro deploy:
 
@@ -477,11 +488,19 @@ Depois do primeiro deploy:
 2. Adicione seu domínio principal
 3. Atualize DNS conforme instruções da Vercel
 
-## 5) Conferência final
+## 6) Conferência final
 
 - URL esperada do site: ${siteUrl}
 - Nome da marca configurado: ${brand}
 - SEO base já vem no arquivo \`src/data/site-config.json\`
+
+## 7) Erro «Could not read package.json» / ENOENT
+
+Significa que a Vercel está a instalar na **pasta errada**. Corrija:
+
+1. **Project → Settings → General → Root Directory** → apague tudo e guarde (raiz do repo).
+2. Confirme no GitHub que o ramo \`${branch}\` tem \`package.json\` na **raiz** do repositório.
+3. Faça **Redeploy** do último commit.
 
 ---
 
