@@ -37,6 +37,7 @@ export type ClientConfig = SiteConfig;
 
 /** Sempre POSIX para comparar com `r` na árvore de ficheiros. */
 const CONFIG_FILE_IN_TEMPLATE = "src/data/site-config.json";
+const DEPLOY_GUIDE_FILE_IN_TEMPLATE = "DEPLOY-VERCEL.md";
 
 const IGNORED_DIR_NAMES = new Set([
   ".git",
@@ -198,6 +199,7 @@ function isBinaryFile(path: string, buffer: Buffer): boolean {
 async function loadTemplateFiles(
   templateRoot: string,
   clientConfig: SiteConfig,
+  options: { repoName: string; defaultBranch: string },
 ): Promise<Array<{ path: string; buffer: Buffer; encoding: "utf-8" | "base64" }>> {
   const rootAbs = join(templateRoot);
   if (!(await pathExists(rootAbs))) {
@@ -242,10 +244,19 @@ async function loadTemplateFiles(
   }
 
   await walk(rootAbs);
-  if (out.length === 0) {
+  const deployGuide = buildVercelDeployGuide(clientConfig, options.repoName, options.defaultBranch);
+  const deployGuideBuffer = Buffer.from(deployGuide, "utf-8");
+  const filtered = out.filter((f) => f.path !== DEPLOY_GUIDE_FILE_IN_TEMPLATE);
+  filtered.push({
+    path: DEPLOY_GUIDE_FILE_IN_TEMPLATE,
+    buffer: deployGuideBuffer,
+    encoding: "utf-8",
+  });
+
+  if (filtered.length === 0) {
     throw new Error("Nenhum arquivo encontrado no template. Verifique templateRoot e regras de exclusão.");
   }
-  return out;
+  return filtered;
 }
 
 const BLOB_CONCURRENCY = 8;
@@ -338,7 +349,10 @@ export async function deployToClientRepo(
   const defaultBranch = options.defaultBranch?.trim() || "main";
   const commitMessage = options.commitMessage?.trim() || "chore: deploy client template";
 
-  const files = await loadTemplateFiles(templateRoot, clientConfig);
+  const files = await loadTemplateFiles(templateRoot, clientConfig, {
+    repoName: options.repoName.trim(),
+    defaultBranch,
+  });
   const templateAudit = detectAstroRootDirectory(files);
   const octokit = createGitHubClient(token);
 
@@ -420,4 +434,57 @@ export async function deployToClientRepo(
     htmlUrl,
     templateAudit,
   };
+}
+
+function buildVercelDeployGuide(
+  clientConfig: SiteConfig,
+  repoName: string,
+  defaultBranch: string,
+): string {
+  const branch = defaultBranch || "main";
+  const brand = (clientConfig.nomeMarca || "").trim() || repoName;
+  const siteUrl = (clientConfig.siteUrl || "").trim() || "https://seu-dominio.com";
+  return `# Deploy manual na Vercel
+
+Este projeto foi preparado para você publicar manualmente na Vercel, com total controle.
+
+## 1) Importar o repositório
+
+1. Acesse https://vercel.com/new
+2. Selecione o repositório \`${repoName}\` no seu GitHub.
+3. Confirme a branch principal: \`${branch}\`.
+
+## 2) Build and Output Settings
+
+Use estes valores:
+
+- Build Command: \`npm run build\`
+- Install Command: \`npm install\`
+- Output Directory: deixe em branco (padrão)
+
+## 3) Environment Variables
+
+Se você não usa variáveis de ambiente customizadas, deixe vazio.
+
+Se for usar no futuro, adicione em:
+\`Vercel > Project > Settings > Environment Variables\`.
+
+## 4) Domínio
+
+Depois do primeiro deploy:
+
+1. Vá em \`Settings > Domains\`
+2. Adicione seu domínio principal
+3. Atualize DNS conforme instruções da Vercel
+
+## 5) Conferência final
+
+- URL esperada do site: ${siteUrl}
+- Nome da marca configurado: ${brand}
+- SEO base já vem no arquivo \`src/data/site-config.json\`
+
+---
+
+Se algo falhar no deploy, abra a aba **Deployments** na Vercel e copie o log de erro para suporte.
+`;
 }

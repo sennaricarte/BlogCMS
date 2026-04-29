@@ -19,6 +19,11 @@ const pageDescription =
         O token é enviado por HTTPS e só vive no ambiente de servidor (API). Preenche os campos obrigatórios para ativar
         o botão.
       </p>
+      <p class="mt-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">
+        Experiência assistida: após criar o repositório, o cliente recebe um guia
+        <code class="rounded bg-emerald-100/80 px-1 font-mono">DEPLOY-VERCEL.md</code>
+        com instruções claras para configurar e publicar na Vercel.
+      </p>
       <p class="mt-2 text-xs text-slate-500">
         <a href="/admin/settings/" class="text-[var(--client-color-primary)] underline-offset-2 hover:underline"
           >Definições (teste de ligação e localStorage)</a
@@ -456,11 +461,16 @@ const pageDescription =
                   "Deploy concluído, mas o registo automático em 'Seus sites' falhou no servidor. " +
                     "Já guardei este site localmente neste navegador. GitHub: " +
                     (r0.githubRepositoryUrl || "—") +
-                    ".",
+                    ". Próximo passo: abrir o arquivo DEPLOY-VERCEL.md no repositório e seguir o checklist.",
                   false
                 );
               } else {
-                setMsg("Feito. Repositório criado no GitHub: " + (r0.githubRepositoryUrl || "—"), false);
+                setMsg(
+                  "Feito. Repositório criado no GitHub: " +
+                    (r0.githubRepositoryUrl || "—") +
+                    ". Agora abra DEPLOY-VERCEL.md no repo para publicar na Vercel com o passo a passo.",
+                  false,
+                );
               }
               return true;
             }
