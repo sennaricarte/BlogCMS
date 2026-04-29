@@ -616,16 +616,25 @@ export function DashboardProjects({ projects }: Props) {
             Crie seu primeiro site com GitHub e Vercel. Depois, o resumo e os links de produção aparecem neste
             painel.
           </p>
-          <a
-            href="/admin/"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
-            aria-label="Criar novo site: GitHub e Vercel"
-          >
-            <span className="text-lg font-light leading-none" aria-hidden>
-              +
-            </span>
-            Criar primeiro site
-          </a>
+          <div className="mt-6 flex w-full max-w-md flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
+            <a
+              href="/admin/"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
+              aria-label="Criar novo site no GitHub"
+            >
+              <span className="text-lg font-light leading-none" aria-hidden>
+                +
+              </span>
+              Criar primeiro site
+            </a>
+            <a
+              href="/admin/publicar-na-vercel/"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border-2 border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/25"
+              aria-label="Ver instruções para publicar o site na Vercel"
+            >
+              Veja como publicar seu site
+            </a>
+          </div>
         </div>
       </div>
     );

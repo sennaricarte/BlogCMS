@@ -8,14 +8,26 @@ import Icon from "../components/admin/Icon.astro";
 export interface Props {
   title: string;
   description: string;
-  section?: "dashboard" | "posts" | "import" | "pages" | "media" | "categories" | "tags" | "appearance" | "settings" | "deploy" | "project";
+  section?:
+    | "dashboard"
+    | "posts"
+    | "import"
+    | "pages"
+    | "media"
+    | "categories"
+    | "tags"
+    | "appearance"
+    | "settings"
+    | "deploy"
+    | "project"
+    | "publish-guide";
   canonicalPath: string;
 }
 
 const { title, description, section, canonicalPath } = Astro.props;
 
-/** Lista de sites: ecrã focado; o menu de secções (Posts, Páginas, …) abre a partir de “Gerenciar site”. */
-const showCmsNav = section !== "dashboard";
+/** Lista de sites e guia de publicação: ecrã focado; o menu CMS abre a partir de “Gerenciar site”. */
+const showCmsNav = section !== "dashboard" && section !== "publish-guide";
 
 const navMain: Array<{
   href: string;
@@ -166,7 +178,7 @@ const navMain: Array<{
             </div>
             <div class="flex flex-wrap items-center gap-2">
               {
-                section === "dashboard" && (
+                (section === "dashboard" || section === "publish-guide") && (
                   <a
                     href="/admin/"
                     class="order-first inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300/30 sm:order-first"
@@ -206,7 +218,7 @@ const navMain: Array<{
                 type="button"
                 class:list={[
                   "inline-flex min-h-10 min-w-10 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:opacity-50",
-                  section === "dashboard"
+                  section === "dashboard" || section === "publish-guide"
                     ? "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                     : "border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50",
                 ]}

@@ -1,0 +1,138 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+
+const pageTitle = "Como publicar o site na Vercel";
+const pageDescription =
+  "Passo a passo para o cliente importar o repositório GitHub na Vercel, configurar build e colocar o site no ar.";
+const canonicalPath = "/admin/publicar-na-vercel/";
+---
+
+<AdminLayout
+  title={pageTitle}
+  description={pageDescription}
+  section="publish-guide"
+  canonicalPath={canonicalPath}
+>
+  <nav class="mb-6 text-sm" aria-label="Navegação secundária">
+    <ol class="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-600">
+      <li>
+        <a
+          href="/admin/dashboard/"
+          class="font-medium text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+          >Painel</a
+        >
+      </li>
+      <li class="text-slate-300" aria-hidden="true">/</li>
+      <li class="font-medium text-slate-900" aria-current="page">Publicar na Vercel</li>
+    </ol>
+  </nav>
+
+  <article
+    class="rounded-2xl border border-slate-200/90 bg-white px-5 py-8 shadow-sm sm:px-8"
+    aria-labelledby="heading-guia-vercel"
+  >
+    <header class="border-b border-slate-100 pb-6">
+      <h1 id="heading-guia-vercel" class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+        Como publicar o seu site na Vercel
+      </h1>
+      <p class="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600">
+        Depois de criar o repositório no GitHub pelo BlogCMS, o <strong>código fica só no GitHub</strong>. A publicação
+        na internet é feita <strong>na conta Vercel do cliente</strong>, em poucos minutos. No repositório também
+        existe o ficheiro <code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">DEPLOY-VERCEL.md</code> com
+        um resumo alinhado a este guia.
+      </p>
+    </header>
+
+    <div class="mt-8 max-w-none text-slate-800 [&_a]:font-medium [&_a]:text-[var(--client-color-primary)] [&_a]:underline-offset-2 [&_a]:hover:underline">
+      <h2 class="text-lg font-semibold text-slate-900">1. O que precisa</h2>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+        <li>Conta em <a href="https://vercel.com" target="_blank" rel="noopener noreferrer">vercel.com</a> (pode usar “Sign up with GitHub”).</li>
+        <li>O repositório do site já criado no GitHub (URL que recebeu ao concluir a criação).</li>
+        <li>Acesso de administrador ao repositório na Vercel (importação pede autorização OAuth uma vez).</li>
+      </ul>
+
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">2. Importar o projeto</h2>
+      <ol class="mt-2 list-decimal space-y-2 pl-5 text-sm text-slate-700">
+        <li>
+          Abra <a href="https://vercel.com/new" target="_blank" rel="noopener noreferrer">vercel.com/new</a>.
+        </li>
+        <li>Escolha “Import Git Repository” e selecione o repositório do site.</li>
+        <li>Confirme o ramo principal (normalmente <code class="font-mono text-xs">main</code>).</li>
+        <li>Avance para “Deploy” (pode ajustar as definições de build no passo seguinte antes de confirmar).</li>
+      </ol>
+
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">3. Build e instalação (definições recomendadas)</h2>
+      <p class="mt-2 text-sm text-slate-700">
+        Na Vercel, em <strong>Build &amp; Output Settings</strong>, use normalmente:
+      </p>
+      <dl class="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm sm:grid-cols-2">
+        <div>
+          <dt class="font-medium text-slate-800">Framework Preset</dt>
+          <dd class="mt-0.5 text-slate-600">A Vercel deteta Astro automaticamente; pode deixar em automático.</dd>
+        </div>
+        <div>
+          <dt class="font-medium text-slate-800">Build Command</dt>
+          <dd class="mt-0.5 font-mono text-xs text-slate-700">npm run build</dd>
+        </div>
+        <div>
+          <dt class="font-medium text-slate-800">Install Command</dt>
+          <dd class="mt-0.5 font-mono text-xs text-slate-700">npm install</dd>
+        </div>
+        <div>
+          <dt class="font-medium text-slate-800">Output Directory</dt>
+          <dd class="mt-0.5 text-slate-600">Deixe em branco (predefinição do adapter Astro na Vercel).</dd>
+        </div>
+      </dl>
+      <p class="mt-3 text-xs text-slate-500">
+        Se a Vercel sugerir outro comando de build, prefira o indicado no <code class="font-mono">package.json</code> do
+        repositório (normalmente <code class="font-mono">npm run build</code>).
+      </p>
+
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">4. Variáveis de ambiente</h2>
+      <p class="mt-2 text-sm text-slate-700">
+        Em <strong>Environment Variables</strong>, só precisa de preencher algo se o projeto usar segredos (por
+        exemplo Supabase, chaves de API). Se o site for só conteúdo estático + CMS via GitHub, pode deixar vazio e
+        adicionar mais tarde em <span class="font-medium">Project → Settings → Environment Variables</span>.
+      </p>
+
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">5. Domínio e HTTPS</h2>
+      <ol class="mt-2 list-decimal space-y-2 pl-5 text-sm text-slate-700">
+        <li>Após o primeiro deploy com sucesso, abra <strong>Project → Settings → Domains</strong>.</li>
+        <li>Adicione o domínio do cliente e siga as instruções de DNS que a Vercel mostrar.</li>
+        <li>O certificado HTTPS é gerido automaticamente pela Vercel.</li>
+      </ol>
+
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">6. Atualizar o site depois</h2>
+      <p class="mt-2 text-sm text-slate-700">
+        Cada alteração enviada para o ramo <code class="font-mono text-xs">main</code> no GitHub pode disparar um novo
+        deploy automaticamente (se a integração Git estiver ativa). Caso contrário, use <strong>Deployments → Redeploy</strong>
+        no painel do projeto.
+      </p>
+
+      <h2 class="mt-10 text-lg font-semibold text-slate-900">7. Se o build falhar</h2>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+        <li>Abra o deploy com erro e leia o log (falta de dependência, versão do Node, etc.).</li>
+        <li>Em <strong>Settings → General</strong>, confira a versão do Node (o projeto BlogCMS recomenda Node 22+).</li>
+        <li>Confirme que não há ficheiros sensíveis em falta: o repositório deve incluir <code class="font-mono text-xs">package.json</code> na raiz.</li>
+      </ul>
+    </div>
+
+    <footer class="mt-10 border-t border-slate-100 pt-6">
+      <p class="text-sm text-slate-600">
+        <a
+          href="/admin/"
+          class="font-semibold text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+          >← Voltar à criação de site</a
+        >
+        ·
+        <a
+          href="/admin/dashboard/"
+          class="font-semibold text-slate-800 underline-offset-2 hover:underline"
+          >Ir ao painel</a
+        >
+      </p>
+    </footer>
+  </article>
+</AdminLayout>

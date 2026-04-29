@@ -28,15 +28,30 @@ const projects: ClientProject[] = Array.isArray(projectsFromStore) ? projectsFro
           A lista é carregada em tempo real no servidor (ficheiro do projeto em desenvolvimento; em produção na Vercel
           usa armazenamento gravável). Novos sites criados em <a class="font-medium text-slate-800 underline-offset-2 hover:underline" href="/admin/">/admin/</a> aparecem aqui após recarregar.
         </p>
+        <div class="mt-4">
+          <a
+            href="/admin/publicar-na-vercel/"
+            class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border-2 border-[var(--client-color-primary)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--client-color-primary)] shadow-sm transition hover:bg-[var(--client-color-primary)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/30 sm:w-auto"
+            aria-label="Abrir instruções completas para publicar o site do cliente na Vercel"
+          >
+            Veja como publicar seu site
+          </a>
+        </div>
       </div>
     </div>
   </div>
 
   <DashboardProjects client:load projects={projects} />
 
-  <p class="mt-10 text-sm text-slate-500">
+  <p class="mt-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
     <a class="font-medium text-slate-700 underline-offset-2 hover:underline" href="/admin/">
       Infra: GitHub &amp; Vercel
     </a>
+    <span class="text-slate-300" aria-hidden="true">·</span>
+    <a
+      class="font-medium text-[var(--client-color-primary)] underline-offset-2 hover:underline"
+      href="/admin/publicar-na-vercel/"
+      >Como publicar na Vercel</a
+    >
   </p>
 </AdminLayout>

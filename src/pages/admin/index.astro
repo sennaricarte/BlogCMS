@@ -35,6 +35,15 @@ const pageDescription =
           >CMS — artigos e conteúdo</a
         >
       </p>
+      <div class="mt-5">
+        <a
+          href="/admin/publicar-na-vercel/"
+          class="inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-lg border-2 border-[var(--client-color-primary)] bg-white px-4 py-3 text-sm font-semibold text-[var(--client-color-primary)] shadow-sm transition hover:bg-[var(--client-color-primary)]/10 focus:outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/30 sm:w-auto"
+          aria-label="Abrir o guia completo para publicar o site na Vercel"
+        >
+          Veja como publicar seu site
+        </a>
+      </div>
     </header>
 
     <form id="form-deploy" class="space-y-6" novalidate>
@@ -468,7 +477,7 @@ const pageDescription =
                   "Deploy concluído, mas o registo automático em 'Seus sites' falhou no servidor. " +
                     "Já guardei este site localmente neste navegador. GitHub: " +
                     (r0.githubRepositoryUrl || "—") +
-                    ". Próximo passo: abrir o arquivo DEPLOY-VERCEL.md no repositório e seguir o checklist." +
+                    ". Próximo passo: guia completo em /admin/publicar-na-vercel/ ou o ficheiro DEPLOY-VERCEL.md no repositório." +
                     detail,
                   false
                 );
@@ -476,7 +485,7 @@ const pageDescription =
                 setMsg(
                   "Feito. Repositório criado no GitHub: " +
                     (r0.githubRepositoryUrl || "—") +
-                    ". Agora abra DEPLOY-VERCEL.md no repo para publicar na Vercel com o passo a passo.",
+                    ". Guia no BlogCMS: /admin/publicar-na-vercel/ · No repositório: DEPLOY-VERCEL.md",
                   false,
                 );
               }
