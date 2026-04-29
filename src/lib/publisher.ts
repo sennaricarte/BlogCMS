@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,7 +123,39 @@ function shouldSkipRelativePath(relativePosix: string, isDirectory: boolean): bo
   return false;
 }
 
+const ASTRO_CONFIG_FILENAMES = [
+  "astro.config.mjs",
+  "astro.config.ts",
+  "astro.config.js",
+  "astro.config.mts",
+  "astro.config.cjs",
+] as const;
+
+function hasBlogcmsProjectRoot(dir: string): boolean {
+  if (!existsSync(join(dir, "package.json"))) return false;
+  return ASTRO_CONFIG_FILENAMES.some((f) => existsSync(join(dir, f)));
+}
+
+/**
+ * Raiz do repositório com o template. Em dev, `import.meta.url` está em `src/lib/` → `../..` basta.
+ * Em produção (Vercel), o bundle fica em `dist/server/chunks/` — é preciso subir até encontrar `package.json` + `astro.config.*`.
+ */
 function defaultTemplateRoot(): string {
+  const cwd = process.cwd();
+  if (hasBlogcmsProjectRoot(cwd)) {
+    return cwd;
+  }
+
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 20; i++) {
+    if (hasBlogcmsProjectRoot(dir)) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
   return join(dirname(fileURLToPath(import.meta.url)), "../..");
 }
 
