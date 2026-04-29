@@ -90,6 +90,15 @@ async function writeProjectsAtomic(
       }
     }
   } catch (e) {
+    // Fallback resiliente para cenários Windows/OneDrive com lock transitório:
+    // se a estratégia atômica falhar, tenta escrever diretamente no destino.
+    try {
+      await writeFile(finalPath, content, UTF8);
+      await unlink(tmp).catch(() => undefined);
+      return;
+    } catch {
+      // Continua para limpeza/propagação do erro original.
+    }
     try {
       await unlink(tmp).catch(() => undefined);
     } catch {
@@ -125,8 +134,9 @@ export async function writeProjectsData(
 export async function writeProjectsDataBestEffort(data: ProjectsFileShape): Promise<void> {
   const primary = getProjectsDataPathForWrite();
   const alt = fallbackPathFromThisModule();
+  const paths = Array.from(new Set([primary, alt]));
   let lastErr: unknown;
-  for (const p of [primary, alt]) {
+  for (const p of paths) {
     try {
       await writeProjectsData(data, p);
       return;
