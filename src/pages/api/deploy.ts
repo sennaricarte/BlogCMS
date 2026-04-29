@@ -7,7 +7,6 @@ import {
   isInvalidTokenError,
   type DeployProgressEvent,
 } from "../../lib/orchestrator";
-import { VercelApiError, VercelService } from "../../lib/vercel-service";
 import { addProjectFromSuccessfulDeploy } from "../../lib/project-manager";
 
 export const prerender = false;
@@ -61,7 +60,6 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const githubToken = body.githubToken?.trim();
-  const vercelToken = body.vercelToken?.trim();
   const cd = body.clientData;
   const repositoryName =
     (cd?.repositoryName?.trim() || body.repositoryName?.trim()) ?? "";
@@ -72,8 +70,8 @@ export const POST: APIRoute = async ({ request }) => {
   const githubOptions = cd?.github ?? body.github;
   const vercelOptions = cd?.vercel ?? body.vercel;
 
-  if (!githubToken || !vercelToken) {
-    return jsonError("Os tokens GitHub e Vercel são obrigatórios.", 400);
+  if (!githubToken) {
+    return jsonError("O token do GitHub é obrigatório.", 400);
   }
   if (!repositoryName) {
     return jsonError("Indica o nome do repositório (clientData.repositoryName ou repositoryName).", 400);
@@ -99,23 +97,6 @@ export const POST: APIRoute = async ({ request }) => {
     );
   }
 
-  try {
-    const vs = new VercelService({ token: vercelToken, teamId: vercelTeamId ?? null });
-    await vs.verifyConnection();
-  } catch (e) {
-    if (e instanceof VercelApiError && (e.status === 401 || e.status === 403)) {
-      return jsonError(
-        "O token da Vercel (ou a equipa indicada) foi recusado. Revisa a chave e o Team ID (401).",
-        401,
-        { field: "vercel" },
-      );
-    }
-    return jsonError(
-      e instanceof Error ? e.message : "Falha na validação do token Vercel.",
-      502,
-    );
-  }
-
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -134,7 +115,6 @@ export const POST: APIRoute = async ({ request }) => {
           {
             targetTokens: {
               githubToken,
-              vercelToken,
               vercelTeamId,
             },
             onProgress: (e: DeployProgressEvent) => {
@@ -187,7 +167,7 @@ export const POST: APIRoute = async ({ request }) => {
             type: "error" as const,
             httpStatus: 401,
             message:
-              "Credenciais recusadas durante o deploy. Revisa o token do GitHub e o da Vercel (401 Unauthorized).",
+              "Credenciais recusadas durante o deploy. Revisa o token do GitHub (401 Unauthorized).",
           });
         } else {
           line({ type: "error" as const, httpStatus: 500, message });

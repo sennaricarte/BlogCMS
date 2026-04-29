@@ -5,19 +5,19 @@ import defaultConfig from "../../data/site-config.json";
 /** Admin e tokens: servido no servidor; não gera HTML estático com segredos. */
 export const prerender = false;
 
-const pageTitle = "Gerar site (GitHub + Vercel)";
+const pageTitle = "Gerar site (GitHub)";
 const pageDescription =
-  "Indique tokens, dados de marca e SEO. O processamento corre no servidor; os PATs não ficam no HTML.";
+  "Indique token do GitHub e dados de marca/SEO. O processamento corre no servidor; o PAT não fica no HTML.";
 ---
 
 <BaseLayout title={pageTitle} description={pageDescription} noindex canonicalPath="/admin/">
   <div class="mx-auto max-w-2xl px-4 py-10 sm:px-6">
     <header class="mb-8 border-b border-slate-200 pb-6">
       <p class="text-sm font-medium uppercase tracking-wide text-[var(--client-color-primary)]">Opção B · Infra do cliente</p>
-      <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Painel de deploy</h1>
+      <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Painel de criação</h1>
       <p class="mt-2 text-sm text-slate-600">
-        Os tokens são enviados por HTTPS e só vivem no ambiente de servidor (API). Preenche os campos obrigatórios para
-        ativar o botão.
+        O token é enviado por HTTPS e só vive no ambiente de servidor (API). Preenche os campos obrigatórios para ativar
+        o botão.
       </p>
       <p class="mt-2 text-xs text-slate-500">
         <a href="/admin/settings/" class="text-[var(--client-color-primary)] underline-offset-2 hover:underline"
@@ -44,29 +44,6 @@ const pageDescription =
             autocomplete="off"
             required
             aria-required="true"
-            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
-          />
-        </div>
-        <div>
-          <label for="vercel-token" class="block text-sm font-medium text-slate-800">Vercel Token</label>
-          <input
-            id="vercel-token"
-            type="password"
-            name="vercelToken"
-            autocomplete="off"
-            required
-            aria-required="true"
-            class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
-          />
-        </div>
-        <div>
-          <label for="vercel-team" class="block text-sm font-medium text-slate-800">Vercel Team ID (opcional)</label>
-          <input
-            id="vercel-team"
-            type="text"
-            name="vercelTeamId"
-            autocomplete="off"
-            placeholder="team_…"
             class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
           />
         </div>
@@ -150,7 +127,7 @@ const pageDescription =
           </div>
         </div>
         <p class="text-xs text-slate-500" id="form-aguardar-tokens" aria-live="polite">
-          Preenche os tokens GitHub e Vercel para ativar o botão de geração.
+          Preenche o token do GitHub para ativar o botão de geração.
         </p>
         <div class="pt-1">
           <button
@@ -182,27 +159,6 @@ const pageDescription =
           <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
           <span>Template e ficheiros (SEO no JSON)</span>
         </li>
-        <li
-          data-pipeline="PROPAGATION_WAIT"
-          class="progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500"
-        >
-          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
-          <span>Aguardar propagação (8s)</span>
-        </li>
-        <li
-          data-pipeline="VERCEL_CONNECTED"
-          class="progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500"
-        >
-          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
-          <span>Projeto Vercel ligado</span>
-        </li>
-        <li
-          data-pipeline="DEPLOY_STARTED"
-          class="progress-step flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500"
-        >
-          <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
-          <span>Deploy de produção</span>
-        </li>
       </ol>
       <p id="progress-help" class="mt-2 text-xs text-slate-500">As etapas ficam a verde ao concluir; a cor de marca assinala a etapa ativa.</p>
     </section>
@@ -222,7 +178,7 @@ const pageDescription =
   }}
 >
   (function () {
-    var ORDER = ["REPO_CREATED", "FILES_PUSHED", "PROPAGATION_WAIT", "VERCEL_CONNECTED", "DEPLOY_STARTED"];
+    var ORDER = ["REPO_CREATED", "FILES_PUSHED"];
     var LOCAL_PROJECTS_KEY = "blogcms-dashboard-projects-cache";
     var ADMIN_INTEGRATION_STORAGE_KEY = "blogcms-admin-integration";
     var ADMIN_CMS_TARGET_KEY = "blogcms-cms-target";
@@ -235,8 +191,6 @@ const pageDescription =
     }
 
     var elGh = /** @type {HTMLInputElement | null} */ ($("github-token"));
-    var elV = /** @type {HTMLInputElement | null} */ ($("vercel-token"));
-    var elTeam = /** @type {HTMLInputElement | null} */ ($("vercel-team"));
     var elRepo = /** @type {HTMLInputElement | null} */ ($("repo-name"));
     var elNome = /** @type {HTMLInputElement | null} */ ($("nome-marca"));
     var elDesc = /** @type {HTMLTextAreaElement | null} */ ($("desc-seo"));
@@ -321,22 +275,15 @@ const pageDescription =
       }
     }
 
-    function toPublicSiteUrl(result) {
-      var dep = result && result.vercelDeployment && result.vercelDeployment.url ? String(result.vercelDeployment.url) : "";
-      if (dep) {
-        return /^https?:\/\//i.test(dep) ? dep : "https://" + dep.replace(/^\/+/, "");
-      }
-      // Não inventa domínio `<projeto>.vercel.app`: em equipas/aliases isso pode gerar DEPLOYMENT_NOT_FOUND.
-      return "https://vercel.com";
-    }
-
-    function cacheProjectFromDeploy(result, cfg, teamId) {
+    function cacheProjectFromDeploy(result, cfg) {
       if (!result) return;
       var now = new Date().toISOString();
-      var siteUrl = toPublicSiteUrl(result);
+      var siteUrl =
+        (cfg && cfg.siteUrl ? String(cfg.siteUrl).trim() : "") ||
+        "https://github.com";
       var entry = {
         id: "local-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8),
-        name: (cfg && cfg.nomeMarca ? String(cfg.nomeMarca).trim() : "") || result.vercelProjectName || "Novo site",
+        name: (cfg && cfg.nomeMarca ? String(cfg.nomeMarca).trim() : "") || "Novo site",
         vercelUrl: siteUrl,
         siteUrl: siteUrl,
         githubUrl: result.githubRepositoryUrl || "",
@@ -344,7 +291,7 @@ const pageDescription =
         vercelProjectId: result.vercelProjectId || "",
         vercelProjectName: result.vercelProjectName || "",
         vercelScope: result.vercelScope || "",
-        vercelTeamId: teamId || "",
+        vercelTeamId: "",
         githubRepoFullName: result.githubFullName || "",
       };
 
@@ -371,14 +318,12 @@ const pageDescription =
       safeWriteLocalProjects(next);
     }
 
-    function persistIntegrationAndCmsTarget(ghToken, vercelToken, teamId, result) {
+    function persistIntegrationAndCmsTarget(ghToken, result) {
       try {
         localStorage.setItem(
           ADMIN_INTEGRATION_STORAGE_KEY,
           JSON.stringify({
             GITHUB_PERSONAL_TOKEN: ghToken || "",
-            VERCEL_TOKEN: vercelToken || "",
-            ...(teamId ? { VERCEL_TEAM_ID: teamId } : {}),
           })
         );
       } catch {
@@ -401,7 +346,7 @@ const pageDescription =
     }
 
     function updateButton() {
-      var ok = !!(elGh && elV && elGh.value.trim() && elV.value.trim());
+      var ok = !!(elGh && elGh.value.trim());
       if (btn) {
         btn.disabled = !ok;
         btn.setAttribute("aria-disabled", ok ? "false" : "true");
@@ -409,19 +354,18 @@ const pageDescription =
       var hint = $("form-aguardar-tokens");
       if (hint) {
         hint.textContent = ok
-          ? "Tokens preenchidos — podes iniciar o deploy."
-          : "Preenche os tokens GitHub e Vercel para ativar o botão de geração.";
+          ? "Token preenchido — podes iniciar a criação."
+          : "Preenche o token GitHub para ativar o botão de geração.";
       }
     }
 
     if (elGh) elGh.addEventListener("input", updateButton);
-    if (elV) elV.addEventListener("input", updateButton);
     updateButton();
 
     if (btn) {
       btn.addEventListener("click", async function () {
-        if (!elGh || !elV || !elRepo || !elNome || !elDesc || !elSite || !elCorPrim || !elCorSec) return;
-        if (!elGh.value.trim() || !elV.value.trim()) return;
+        if (!elGh || !elRepo || !elNome || !elDesc || !elSite || !elCorPrim || !elCorSec) return;
+        if (!elGh.value.trim()) return;
         setMsg("");
         if (secProgress) secProgress.classList.remove("hidden");
         resetProgress();
@@ -448,18 +392,12 @@ const pageDescription =
 
         var body = {
           githubToken: elGh.value.trim(),
-          vercelToken: elV.value.trim(),
-          vercelTeamId: elTeam && elTeam.value.trim() ? elTeam.value.trim() : undefined,
           clientData: {
             repositoryName: elRepo.value.trim(),
             config: config,
             github: {
               private: true,
               description: "Site · " + config.nomeMarca,
-            },
-            vercel: {
-              vercelProjectName: elRepo.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-"),
-              teamId: elTeam && elTeam.value.trim() ? elTeam.value.trim() : undefined,
             },
           },
         };
@@ -510,22 +448,19 @@ const pageDescription =
               var r0 = o.result;
               persistIntegrationAndCmsTarget(
                 elGh && elGh.value ? elGh.value.trim() : "",
-                elV && elV.value ? elV.value.trim() : "",
-                elTeam && elTeam.value ? elTeam.value.trim() : "",
                 r0
               );
-              cacheProjectFromDeploy(r0, config, elTeam && elTeam.value.trim() ? elTeam.value.trim() : "");
+              cacheProjectFromDeploy(r0, config);
               if (o.projectsUpdate && o.projectsUpdate.status === "error") {
                 setMsg(
                   "Deploy concluído, mas o registo automático em 'Seus sites' falhou no servidor. " +
                     "Já guardei este site localmente neste navegador. GitHub: " +
                     (r0.githubRepositoryUrl || "—") +
-                    " | Vercel: " +
-                    (r0.vercelProjectName || "—"),
+                    ".",
                   false
                 );
               } else {
-                setMsg("Feito. GitHub: " + (r0.githubRepositoryUrl || "—") + " | Vercel: " + (r0.vercelProjectName || "—"), false);
+                setMsg("Feito. Repositório criado no GitHub: " + (r0.githubRepositoryUrl || "—"), false);
               }
               return true;
             }
@@ -555,7 +490,7 @@ const pageDescription =
         } finally {
           if (btn) {
             btn.disabled = false;
-            if (!elGh || !elV || !elGh.value.trim() || !elV.value.trim()) {
+            if (!elGh || !elGh.value.trim()) {
               btn.disabled = true;
             }
             updateButton();

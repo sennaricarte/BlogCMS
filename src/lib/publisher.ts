@@ -60,7 +60,24 @@ const IGNORED_FILE_NAMES = new Set([
 const TEMPLATE_EXCLUDED_PREFIXES = [
   "src/content/blog/",
   "src/content/pages/",
+  "scripts/",
 ];
+
+/**
+ * Arquivos úteis no repositório SaaS, mas desnecessários no template final do cliente.
+ * Mantemos apenas o que é necessário para executar e editar o CMS/site.
+ */
+const TEMPLATE_EXCLUDED_EXACT_FILES = new Set([
+  "vercel.json",
+  ".vscode/launch.json",
+  "public/tinymce/README.md",
+  "public/tinymce/CHANGELOG.md",
+  "public/tinymce/package.json",
+  "public/tinymce/bower.json",
+  "public/tinymce/composer.json",
+  "public/tinymce/SECURITY.md",
+  "public/tinymce/LICENSE.TXT",
+]);
 
 const BINARY_EXTENSIONS = new Set([
   ".png",
@@ -83,6 +100,9 @@ const BINARY_EXTENSIONS = new Set([
 ]);
 
 function shouldSkipRelativePath(relativePosix: string, isDirectory: boolean): boolean {
+  if (!isDirectory && TEMPLATE_EXCLUDED_EXACT_FILES.has(relativePosix)) {
+    return true;
+  }
   for (const prefix of TEMPLATE_EXCLUDED_PREFIXES) {
     if (relativePosix === prefix.slice(0, -1) || relativePosix.startsWith(prefix)) {
       return true;
