@@ -440,10 +440,13 @@ const pageDescription =
               return false;
             }
             if (o.type === "error") {
-              setMsg(
-                o.message + (o.httpStatus === 401 ? " (revisa o GitHub e a Vercel.)" : ""),
-                true
-              );
+              var hint =
+                o.httpStatus === 401
+                  ? " (revisa o token do GitHub.)"
+                  : o.httpStatus === 403
+                    ? " (revisa permissões da organização ou autorização SSO do token no GitHub.)"
+                    : "";
+              setMsg(o.message + hint, true);
               return true;
             }
             if (o.type === "complete" && o.result) {
@@ -457,11 +460,16 @@ const pageDescription =
               );
               cacheProjectFromDeploy(r0, config);
               if (o.projectsUpdate && o.projectsUpdate.status === "error") {
+                var detail =
+                  o.projectsUpdate && o.projectsUpdate.message
+                    ? " Detalhe técnico: " + String(o.projectsUpdate.message)
+                    : "";
                 setMsg(
                   "Deploy concluído, mas o registo automático em 'Seus sites' falhou no servidor. " +
                     "Já guardei este site localmente neste navegador. GitHub: " +
                     (r0.githubRepositoryUrl || "—") +
-                    ". Próximo passo: abrir o arquivo DEPLOY-VERCEL.md no repositório e seguir o checklist.",
+                    ". Próximo passo: abrir o arquivo DEPLOY-VERCEL.md no repositório e seguir o checklist." +
+                    detail,
                   false
                 );
               } else {

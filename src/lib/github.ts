@@ -101,6 +101,10 @@ export async function createRepository(
     if (isRepositoryNameAlreadyTakenError(error)) {
       throw new RepositoryAlreadyExistsError(repositoryName, { cause: error });
     }
+    // Preserva 401/403 para o chamador (UI pode distinguir token inválido vs SSO/org).
+    if (error instanceof RequestError && (error.status === 401 || error.status === 403)) {
+      throw error;
+    }
     const message = error instanceof Error ? error.message : "Unknown GitHub API error.";
     throw new Error(`Failed to create repository: ${message}`);
   }
