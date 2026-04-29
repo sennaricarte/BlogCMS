@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ClientConfig } from "./publisher";
@@ -77,10 +77,20 @@ async function writeProjectsAtomic(
   const tmp = `${finalPath}.tmp-${randomUUID()}`;
   try {
     await writeFile(tmp, content, UTF8);
-    await rename(tmp, finalPath);
+    try {
+      await rename(tmp, finalPath);
+    } catch (renameErr) {
+      const code = (renameErr as NodeJS.ErrnoException).code;
+      // Windows pode recusar rename sobre ficheiro já existente (EPERM/EEXIST).
+      if (code === "EPERM" || code === "EEXIST" || code === "EBUSY") {
+        await unlink(finalPath).catch(() => undefined);
+        await rename(tmp, finalPath);
+      } else {
+        throw renameErr;
+      }
+    }
   } catch (e) {
     try {
-      const { unlink } = await import("node:fs/promises");
       await unlink(tmp).catch(() => undefined);
     } catch {
       /* ignore */
