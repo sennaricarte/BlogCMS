@@ -44,6 +44,7 @@ const IGNORED_DIR_NAMES = new Set([
   ".astro",
   ".cursor",
   ".vscode",
+  ".vercel",
   "node_modules",
   "dist",
   "coverage",
