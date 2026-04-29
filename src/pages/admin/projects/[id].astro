@@ -3,7 +3,7 @@ export const prerender = false;
 
 import AdminLayout from "../../../layouts/AdminLayout.astro";
 import Icon from "../../../components/admin/Icon.astro";
-import data from "../../../data/projects.json";
+import { readProjectsData } from "../../../lib/project-manager";
 import { ADMIN_CMS_TARGET_KEY, getCmsTargetFromProject } from "../../../lib/admin-cms-target";
 import type { ClientProject } from "../../../lib/projects-data";
 import {
@@ -13,9 +13,8 @@ import {
 } from "../../../lib/vercel-project-admin-links";
 
 const rawId = Astro.params.id;
-const projects: ClientProject[] = Array.isArray((data as { projects?: ClientProject[] }).projects)
-  ? (data as { projects: ClientProject[] }).projects
-  : [];
+const { projects: projectsList } = await readProjectsData();
+const projects: ClientProject[] = Array.isArray(projectsList) ? projectsList : [];
 const project = rawId ? projects.find((p) => p.id === rawId) : undefined;
 
 if (!project) {

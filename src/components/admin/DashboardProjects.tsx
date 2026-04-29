@@ -106,17 +106,23 @@ function readLocalProjectsCache(): ClientProject[] {
     return parsed.filter((p): p is ClientProject => {
       if (!p || typeof p !== "object") return false;
       const x = p as Partial<ClientProject>;
-      return Boolean(
-        x.id &&
-        x.name &&
-        x.siteUrl &&
-        x.githubUrl &&
-        x.createdAt &&
-        x.vercelProjectId &&
-        x.vercelProjectName &&
-        x.vercelScope &&
-        x.githubRepoFullName,
+      const base =
+        Boolean(
+          x.id &&
+            x.name &&
+            x.siteUrl &&
+            x.githubUrl &&
+            x.createdAt &&
+            String(x.githubRepoFullName || "").trim(),
+        );
+      if (!base) return false;
+      const hasVercel = Boolean(
+        String(x.vercelProjectId || "").trim() && String(x.vercelProjectName || "").trim(),
       );
+      if (hasVercel) {
+        return Boolean(String(x.vercelScope || "").trim());
+      }
+      return true;
     }).map((p) => sanitizeCachedProjectUrl(p));
   } catch {
     return [];
