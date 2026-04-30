@@ -53,6 +53,7 @@ type ImportPost = {
   category?: string;
   draft?: boolean;
   featuredImageUrl?: string;
+  sourceUrl?: string;
 };
 
 async function blogPathExists(
@@ -75,7 +76,11 @@ async function blogPathExists(
 async function fetchFeaturedBuffer(url: string): Promise<Buffer | null> {
   try {
     const r = await fetch(url, {
-      headers: { "User-Agent": "BlogCMS-Import/1.0" },
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      },
       signal: AbortSignal.timeout(30_000),
     });
     if (!r.ok) return null;
@@ -98,10 +103,10 @@ async function uploadFeaturedToGithub(
 ): Promise<string | null> {
   const kind = detectImageKindFromBuffer(buf);
   if (!kind) return null;
-  const fileBase = `${slugifyFileName(slugBase)}-${Date.now().toString(36)}`;
+  const fileBase = `${slugifyFileName(slugBase)}-destaque`;
   const fileName = `${fileBase}.${kind.ext}`;
-  const repoPath = `src/assets/blog/${fileName}`;
-  const heroImage = `../../assets/blog/${fileName}`;
+  const repoPath = `public/assets/blog/${fileName}`;
+  const heroImage = `/assets/blog/${fileName}`;
   const message = `content(assets): imagem destacada ${fileName}`;
   try {
     await publisher.createOrUpdateFileBytes(owner, repo, repoPath, buf, message, { branch });
@@ -109,6 +114,79 @@ async function uploadFeaturedToGithub(
   } catch {
     return null;
   }
+}
+
+function resolveMaybeAbsoluteImageUrl(rawUrl: string, sourceUrl?: string): string | null {
+  const direct = toAbsoluteUrlOrNull(rawUrl);
+  if (direct) return direct;
+  const base = (sourceUrl || "").trim();
+  if (!base) return null;
+  try {
+    const u = new URL(rawUrl, base);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function uploadPostImageToGithub(
+  publisher: GithubPublisher,
+  owner: string,
+  repo: string,
+  branch: string,
+  slugBase: string,
+  index: number,
+  imageUrl: string,
+): Promise<string | null> {
+  const abs = toAbsoluteUrlOrNull(imageUrl);
+  if (!abs) return null;
+  const buf = await fetchFeaturedBuffer(abs);
+  if (!buf) return null;
+  const kind = detectImageKindFromBuffer(buf);
+  if (!kind) return null;
+  const safeSlug = slugifyFileName(slugBase);
+  const fileName = `${safeSlug}-${index}.${kind.ext}`;
+  const repoPath = `public/assets/blog/${fileName}`;
+  await publisher.createOrUpdateFileBytes(owner, repo, repoPath, buf, `content(assets): imagem ${fileName}`, { branch });
+  return `/assets/blog/${fileName}`;
+}
+
+async function localizeMarkdownImages(params: {
+  markdown: string;
+  sourceUrl?: string;
+  slugBase: string;
+  publisher: GithubPublisher;
+  owner: string;
+  repo: string;
+  branch: string;
+}): Promise<string> {
+  const { markdown, sourceUrl, slugBase, publisher, owner, repo, branch } = params;
+  const imageRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  const matches = Array.from(markdown.matchAll(imageRegex));
+  if (matches.length === 0) return markdown;
+
+  const cache = new Map<string, string>();
+  let imageIndex = 1;
+  let output = markdown;
+
+  for (const m of matches) {
+    const full = m[0];
+    const alt = m[1] || "";
+    const raw = (m[2] || "").trim();
+    const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
+    if (!abs) continue;
+    let local = cache.get(abs);
+    if (!local) {
+      local = await uploadPostImageToGithub(publisher, owner, repo, branch, slugBase, imageIndex, abs);
+      if (!local) continue;
+      cache.set(abs, local);
+      imageIndex += 1;
+    }
+    const escapedFull = full.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    output = output.replace(new RegExp(escapedFull, "g"), `![${alt}](${local})`);
+  }
+  return output;
 }
 
 async function uniqueBlogPath(
@@ -203,24 +281,31 @@ export const POST: APIRoute = async (context) => {
     const title = (p.title || "").trim() || slugIn;
     const description = (p.description || title).trim().slice(0, 160);
     const pubDate = (p.pubDate || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
-    const markdownBody = typeof p.markdownBody === "string" ? p.markdownBody : "";
+    const markdownBodyRaw = typeof p.markdownBody === "string" ? p.markdownBody : "";
+    const markdownBody = await localizeMarkdownImages({
+      markdown: markdownBodyRaw,
+      sourceUrl: p.sourceUrl,
+      slugBase: slugIn,
+      publisher,
+      owner,
+      repo,
+      branch,
+    });
 
     let heroImage = "../../assets/blog/hero-primeiro.svg";
-    const featUrl = toAbsoluteUrlOrNull(p.featuredImageUrl || "");
+    const featUrl = resolveMaybeAbsoluteImageUrl(p.featuredImageUrl || "", p.sourceUrl);
     if (featUrl) {
       const buf = await fetchFeaturedBuffer(featUrl);
       if (buf) {
         const localHero = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugIn, buf);
         if (localHero) {
           heroImage = localHero;
-        } else {
-          // Fallback: mantém imagem de destaque remota se o upload para o GitHub falhar.
-          heroImage = featUrl;
         }
-      } else {
-        // Fallback: URL válida, mas não foi possível baixar/converter buffer.
-        heroImage = featUrl;
       }
+    }
+    if (heroImage === "../../assets/blog/hero-primeiro.svg") {
+      const firstLocalMdImage = markdownBody.match(/!\[[^\]]*]\((\/assets\/blog\/[^)\s]+)\)/)?.[1];
+      if (firstLocalMdImage) heroImage = firstLocalMdImage;
     }
 
     const data: BlogFrontmatterInput = {

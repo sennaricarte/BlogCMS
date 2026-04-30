@@ -133,9 +133,17 @@ function resolveMaybeAbsoluteUrl(raw: string | undefined, baseUrl: string): stri
   }
 }
 
-function extractOgImageUrl(pageHtml: string, pageUrl: string): string | undefined {
-  const raw = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
-  return resolveMaybeAbsoluteUrl(raw, pageUrl);
+function extractMetaImageUrl(pageHtml: string, pageUrl: string): string | undefined {
+  const ogRaw = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+  if (ogRaw) return resolveMaybeAbsoluteUrl(ogRaw, pageUrl);
+  const twRaw = pageHtml.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+  if (twRaw) return resolveMaybeAbsoluteUrl(twRaw, pageUrl);
+  return undefined;
+}
+
+function extractFirstImageUrlFromHtml(fragmentHtml: string, baseUrl: string): string | undefined {
+  const raw = fragmentHtml.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1]?.trim();
+  return resolveMaybeAbsoluteUrl(raw, baseUrl);
 }
 
 async function fetchHtml(url: string): Promise<Response> {
@@ -323,7 +331,8 @@ export const POST: APIRoute = async (context) => {
   if (fragment) {
     const meta = extractMetaFromPage(html);
     const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(fragment));
-    const ogImage = extractOgImageUrl(html, res.url || url);
+    const featuredImage =
+      extractMetaImageUrl(html, res.url || url) || extractFirstImageUrlFromHtml(fragment, res.url || url);
     if (isSubstantialMarkdown(markdown)) {
       return json(
         {
@@ -334,7 +343,8 @@ export const POST: APIRoute = async (context) => {
             description: meta.description.slice(0, 160),
             pubDate: new Date().toISOString().slice(0, 10),
             markdown,
-            featuredImageUrl: ogImage,
+            featuredImageUrl: featuredImage,
+            sourceUrl: res.url || url,
           },
         },
         200,
@@ -399,6 +409,7 @@ export const POST: APIRoute = async (context) => {
           description: readerSingle.description,
           pubDate: readerSingle.pubDate,
           markdown: readerSingle.markdown,
+          sourceUrl: finalUrl,
         },
         message: "Conteúdo extraído em modo compatibilidade (renderização JavaScript).",
       },

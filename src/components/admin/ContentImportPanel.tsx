@@ -24,6 +24,7 @@ type WpApiPost = {
   pubDate: string;
   markdown: string;
   featuredImageUrl?: string;
+  sourceUrl?: string;
 };
 
 export type PreviewRow = {
@@ -35,6 +36,7 @@ export type PreviewRow = {
   pubDate: string;
   markdown: string;
   featuredImageUrl?: string;
+  sourceUrl?: string;
   sourceLabel: "WordPress" | "URL";
 };
 
@@ -119,6 +121,7 @@ export function ContentImportPanel() {
         pubDate: p.pubDate,
         markdown: p.markdown,
         featuredImageUrl: p.featuredImageUrl,
+        sourceUrl: p.sourceUrl,
         sourceLabel: "WordPress" as const,
       }));
       setRows(next);
@@ -162,6 +165,7 @@ export function ContentImportPanel() {
           pubDate: string;
           markdown: string;
           featuredImageUrl?: string;
+          sourceUrl?: string;
         };
         posts?: Array<{
           slug: string;
@@ -170,6 +174,7 @@ export function ContentImportPanel() {
           pubDate: string;
           markdown: string;
           featuredImageUrl?: string;
+          sourceUrl?: string;
         }>;
       };
       if (!res.ok || !j.ok) {
@@ -211,6 +216,7 @@ export function ContentImportPanel() {
           pubDate: p.pubDate,
           markdown: p.markdown,
           featuredImageUrl: p.featuredImageUrl,
+          sourceUrl: p.sourceUrl,
           sourceLabel: "URL",
         }));
         setRows((prev) => {
@@ -249,6 +255,7 @@ export function ContentImportPanel() {
           pubDate: p.pubDate,
           markdown: p.markdown,
           featuredImageUrl: p.featuredImageUrl,
+          sourceUrl: p.sourceUrl,
           sourceLabel: "URL",
         };
         if (resetBatch) return [row];
@@ -306,6 +313,7 @@ export function ContentImportPanel() {
             pubDate: string;
             markdown: string;
             featuredImageUrl?: string;
+            sourceUrl?: string;
           };
           posts?: Array<{
             slug: string;
@@ -352,6 +360,7 @@ export function ContentImportPanel() {
               pubDate: p.pubDate,
               markdown: p.markdown,
               featuredImageUrl: p.featuredImageUrl,
+              sourceUrl: p.sourceUrl,
               sourceLabel: "URL",
             });
           }
@@ -433,6 +442,7 @@ export function ContentImportPanel() {
             pubDate: string;
             markdown: string;
             featuredImageUrl?: string;
+            sourceUrl?: string;
           };
         };
         if (!res.ok || !j.ok || !j.post) {
@@ -453,6 +463,7 @@ export function ContentImportPanel() {
             pubDate: j.post!.pubDate,
             markdown: j.post!.markdown,
             featuredImageUrl: j.post!.featuredImageUrl,
+            sourceUrl: j.post!.sourceUrl,
             sourceLabel: "URL",
           },
         ]);
@@ -512,6 +523,7 @@ export function ContentImportPanel() {
             pubDate: string;
             markdown: string;
             featuredImageUrl?: string;
+            sourceUrl?: string;
           };
         };
         if (!res.ok || !j.ok || !j.post) {
@@ -532,6 +544,7 @@ export function ContentImportPanel() {
             pubDate: j.post!.pubDate,
             markdown: j.post!.markdown,
             featuredImageUrl: j.post!.featuredImageUrl,
+            sourceUrl: j.post!.sourceUrl,
             sourceLabel: "URL",
           },
         ]);
@@ -594,6 +607,7 @@ export function ContentImportPanel() {
             pubDate: r.pubDate,
             markdownBody: r.markdown,
             featuredImageUrl: r.featuredImageUrl,
+            sourceUrl: r.sourceUrl,
             draft: true,
           })),
         }),
