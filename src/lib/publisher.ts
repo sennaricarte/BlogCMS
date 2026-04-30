@@ -159,12 +159,29 @@ const CLIENT_PACKAGE_EXCLUDED_DEPENDENCIES = new Set([
   "@supabase/supabase-js",
   "turndown",
   "turndown-plugin-gfm",
+  "@astrojs/vercel",
+  "@tiptap/extension-image",
+  "@tiptap/extension-link",
+  "@tiptap/extension-table",
+  "@tiptap/extension-table-cell",
+  "@tiptap/extension-table-header",
+  "@tiptap/extension-table-row",
+  "@tiptap/extension-text-style",
+  "@tiptap/extension-underline",
+  "@tiptap/extension-youtube",
+  "@tiptap/pm",
+  "@tiptap/react",
+  "@tiptap/starter-kit",
+  "lucide-react",
+  "recharts",
 ]);
 
 const CLIENT_PACKAGE_EXCLUDED_DEV_DEPENDENCIES = new Set([
   "tsx",
   "dotenv",
   "@types/turndown",
+  "@types/leaflet",
+  "@types/qrcode",
 ]);
 
 /** Pasta na raiz do BlogCMS com o cÃ³digo-fonte Astro enviado aos repos dos clientes (sem `dist/`). */
