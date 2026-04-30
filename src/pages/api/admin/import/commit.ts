@@ -93,6 +93,12 @@ async function blogPathExists(
 function inferImageExt(contentType: string, buf: Buffer): string | null {
   const mime = (contentType || "").toLowerCase().split(";")[0].trim();
   if (mime && SUPPORTED_IMAGE_MIME_TO_EXT[mime]) return SUPPORTED_IMAGE_MIME_TO_EXT[mime];
+  if (mime.startsWith("image/")) {
+    const subtype = mime.slice("image/".length).trim();
+    if (subtype === "jpeg") return "jpg";
+    if (subtype === "svg+xml") return "svg";
+    if (/^[a-z0-9.+-]+$/i.test(subtype)) return subtype.replace(/\+/g, "-");
+  }
   const byBytes = detectImageKindFromBuffer(buf);
   return byBytes?.ext || null;
 }
@@ -177,7 +183,7 @@ function resolveMaybeAbsoluteImageUrl(rawUrl: string, sourceUrl?: string): strin
   }
 }
 
-async function uploadPostImageToGithub(
+async function uploadToGithubStorage(
   publisher: GithubPublisher,
   owner: string,
   repo: string,
@@ -232,7 +238,7 @@ async function localizeMarkdownImages(params: {
     if (!local) {
       const img = await fetchImageForImport(abs);
       if (!img) continue;
-      local = await uploadPostImageToGithub(publisher, owner, repo, branch, slugBase, imageIndex, img);
+      local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, imageIndex, img);
       if (!local) continue;
       cache.set(abs, local);
       imageIndex += 1;
@@ -371,12 +377,14 @@ export const POST: APIRoute = async (context) => {
         category: p.category?.trim() || undefined,
         draft: p.draft !== false,
       };
+      // Compatibilidade: mantém `heroImage` (schema Astro) e adiciona alias `featured`.
+      const textBase = serializeBlogMarkdown(markdownBody, data);
+      const text = textBase.replace(/^heroImage:\s*([^\n]+)$/m, "heroImage: $1\nfeatured: $1");
 
       const target = allowDuplicates
         ? await uniqueBlogPath(publisher, owner, repo, branch, slugIn)
         : { path: `${CMS_PATHS.blog}/${slugIn}.md`, slug: slugIn };
       const { path, slug } = target;
-      const text = serializeBlogMarkdown(markdownBody, data);
       await publisher.createOrUpdateFile(
         owner,
         repo,
