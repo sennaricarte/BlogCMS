@@ -16,6 +16,23 @@ function readLs<T>(key: string): T | null {
   }
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const result = r.result;
+      if (typeof result !== "string") {
+        reject(new Error("Falha ao ler ficheiro XML."));
+        return;
+      }
+      const i = result.indexOf("base64,");
+      resolve(i >= 0 ? result.slice(i + 7) : btoa(result));
+    };
+    r.onerror = () => reject(r.error || new Error("Falha ao ler ficheiro XML."));
+    r.readAsDataURL(file);
+  });
+}
+
 type WpApiPost = {
   sourceId: number;
   slug: string;
@@ -46,12 +63,18 @@ export type PreviewRow = {
   sourceLabel: "WordPress" | "URL";
 };
 
-type TabId = "wordpress" | "url";
+type TabId = "wordpress" | "xml" | "url";
 
 export function ContentImportPanel() {
   const URL_BATCH_SIZE = 20;
+  const XML_BATCH_SIZE = 20;
   const [tab, setTab] = useState<TabId>("wordpress");
   const [wpSiteUrl, setWpSiteUrl] = useState("");
+  const [wpXmlFileName, setWpXmlFileName] = useState("");
+  const [wpXmlBase64, setWpXmlBase64] = useState("");
+  const [wpXmlOffset, setWpXmlOffset] = useState(0);
+  const [wpXmlHasMore, setWpXmlHasMore] = useState(false);
+  const [wpXmlTotal, setWpXmlTotal] = useState(0);
   const [articleUrl, setArticleUrl] = useState("");
   const [urlOnlyArticles, setUrlOnlyArticles] = useState(true);
   const [rows, setRows] = useState<PreviewRow[]>([]);
@@ -137,6 +160,170 @@ export function ContentImportPanel() {
       setMessage({ text: `${next.length} artigo(s) carregado(s). Marca os que queres gravar no repositório.`, err: false });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Falha de rede.", err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSelectWpXmlFile = async (file: File | null) => {
+    if (!file) {
+      setWpXmlFileName("");
+      setWpXmlBase64("");
+      setWpXmlOffset(0);
+      setWpXmlHasMore(false);
+      setWpXmlTotal(0);
+      return;
+    }
+    try {
+      const b64 = await fileToBase64(file);
+      setWpXmlFileName(file.name);
+      setWpXmlBase64(b64);
+      setWpXmlOffset(0);
+      setWpXmlHasMore(false);
+      setWpXmlTotal(0);
+      setMessage({ text: `Arquivo XML carregado: ${file.name}`, err: false });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha ao ler XML.", err: true });
+    }
+  };
+
+  const fetchWordPressXmlBatch = async (resetBatch = true) => {
+    if (!wpXmlBase64) {
+      setMessage({ text: "Selecione um arquivo .xml primeiro.", err: true });
+      return;
+    }
+    setMessage(null);
+    setBusy(true);
+    try {
+      const offset = resetBatch ? 0 : wpXmlOffset;
+      const res = await fetch("/api/admin/import/wordpress-xml", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          xmlBase64: wpXmlBase64,
+          offset,
+          limit: XML_BATCH_SIZE,
+        }),
+      });
+      const j = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        posts?: WpApiPost[];
+        totalDiscovered?: number;
+        hasMore?: boolean;
+        nextOffset?: number;
+      };
+      if (!res.ok || !j.ok || !Array.isArray(j.posts)) {
+        setMessage({ text: j.error || `Erro HTTP ${res.status}`, err: true });
+        return;
+      }
+      const nextRows: PreviewRow[] = j.posts.map((p) => ({
+        id: `wpxml-${p.sourceId}-${Math.random().toString(36).slice(2, 7)}`,
+        selected: false,
+        slug: p.slug,
+        title: p.title,
+        description: p.description,
+        pubDate: p.pubDate,
+        markdown: p.markdown,
+        featuredImageUrl: p.featuredImageUrl,
+        sourceUrl: p.sourceUrl,
+        articleHtml: p.articleHtml,
+        category: p.category,
+        tags: p.tags,
+        sourceLabel: "WordPress",
+      }));
+      setRows((prev) => {
+        if (resetBatch) return nextRows;
+        const dedupe = new Set(prev.map((r) => r.slug));
+        const append = nextRows.filter((r) => !dedupe.has(r.slug));
+        return [...prev, ...append];
+      });
+      setWpXmlTotal(typeof j.totalDiscovered === "number" ? j.totalDiscovered : nextRows.length);
+      setWpXmlHasMore(Boolean(j.hasMore));
+      setWpXmlOffset(typeof j.nextOffset === "number" ? j.nextOffset : offset + nextRows.length);
+      setMessage({
+        text:
+          j.message ||
+          `${nextRows.length} post(s) XML carregado(s). ${Boolean(j.hasMore) ? "Pode carregar o próximo lote." : "Todos os lotes foram carregados."}`,
+        err: false,
+      });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha de rede no importador XML.", err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fetchAllWordPressXmlBatches = async () => {
+    if (!wpXmlBase64) {
+      setMessage({ text: "Selecione um arquivo .xml primeiro.", err: true });
+      return;
+    }
+    setMessage(null);
+    setBusy(true);
+    try {
+      let offset = 0;
+      let hasMore = true;
+      const allRows: PreviewRow[] = [];
+      const dedupe = new Set<string>();
+      let total = 0;
+      let safety = 0;
+      while (hasMore && safety < 120) {
+        safety += 1;
+        const res = await fetch("/api/admin/import/wordpress-xml", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            xmlBase64: wpXmlBase64,
+            offset,
+            limit: XML_BATCH_SIZE,
+          }),
+        });
+        const j = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          posts?: WpApiPost[];
+          totalDiscovered?: number;
+          hasMore?: boolean;
+          nextOffset?: number;
+        };
+        if (!res.ok || !j.ok || !Array.isArray(j.posts)) {
+          setMessage({ text: j.error || `Erro HTTP ${res.status}`, err: true });
+          return;
+        }
+        total = typeof j.totalDiscovered === "number" ? j.totalDiscovered : total;
+        for (const p of j.posts) {
+          if (dedupe.has(p.slug)) continue;
+          dedupe.add(p.slug);
+          allRows.push({
+            id: `wpxml-${p.sourceId}-${Math.random().toString(36).slice(2, 7)}`,
+            selected: false,
+            slug: p.slug,
+            title: p.title,
+            description: p.description,
+            pubDate: p.pubDate,
+            markdown: p.markdown,
+            featuredImageUrl: p.featuredImageUrl,
+            sourceUrl: p.sourceUrl,
+            articleHtml: p.articleHtml,
+            category: p.category,
+            tags: p.tags,
+            sourceLabel: "WordPress",
+          });
+        }
+        offset = typeof j.nextOffset === "number" ? j.nextOffset : offset + j.posts.length;
+        hasMore = Boolean(j.hasMore) && j.posts.length > 0;
+      }
+      setRows(allRows);
+      setWpXmlTotal(total || allRows.length);
+      setWpXmlHasMore(false);
+      setWpXmlOffset(offset);
+      setMessage({ text: `${allRows.length} post(s) do XML carregado(s) no total.`, err: false });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha de rede no processamento em lotes do XML.", err: true });
     } finally {
       setBusy(false);
     }
@@ -705,6 +892,17 @@ export function ContentImportPanel() {
         <button
           type="button"
           role="tab"
+          aria-selected={tab === "xml"}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+            tab === "xml" ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
+          }`}
+          onClick={() => setTab("xml")}
+        >
+          WordPress XML (WXR)
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={tab === "url"}
           className={`rounded-md px-4 py-2 text-sm font-medium transition ${
             tab === "url" ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
@@ -749,6 +947,65 @@ export function ContentImportPanel() {
               {busy ? "A carregar…" : "Buscar posts"}
             </button>
           </div>
+        </section>
+      )}
+
+      {tab === "xml" && (
+        <section aria-labelledby="imp-wpxml-heading" className="space-y-4">
+          <h2 id="imp-wpxml-heading" className="text-base font-semibold text-zinc-900">
+            Importar WordPress por XML (WXR)
+          </h2>
+          <p className="text-sm text-zinc-600">
+            Envie um arquivo de exportação <code className="rounded bg-zinc-100 px-1">.xml</code> do WordPress. O servidor
+            processa em lotes, converte conteúdo para Markdown e mantém os assets no GitHub do cliente.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="wp-xml-file" className="block text-sm font-medium text-zinc-700">
+                Arquivo XML do WordPress
+              </label>
+              <input
+                id="wp-xml-file"
+                type="file"
+                accept=".xml,text/xml,application/xml"
+                onChange={(e) => void onSelectWpXmlFile(e.target.files?.[0] || null)}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-zinc-800 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-900/10"
+              />
+              {wpXmlFileName && <p className="mt-1 text-xs text-zinc-600">Selecionado: {wpXmlFileName}</p>}
+            </div>
+            <button
+              type="button"
+              disabled={busy || !wpXmlBase64}
+              onClick={() => void fetchWordPressXmlBatch(true)}
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? "A processar…" : "Analisar XML"}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !wpXmlBase64 || !wpXmlHasMore}
+              onClick={() => void fetchWordPressXmlBatch(false)}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Carregar próximo lote de posts do XML"
+            >
+              {busy ? "A carregar…" : `Próximo lote (${XML_BATCH_SIZE})`}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !wpXmlBase64}
+              onClick={() => void fetchAllWordPressXmlBatches()}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Carregar todos os lotes do XML"
+            >
+              {busy ? "A carregar…" : "Carregar todos"}
+            </button>
+          </div>
+          {wpXmlTotal > 0 && (
+            <p className="text-xs text-zinc-600" role="status">
+              Descobertos {wpXmlTotal} post(s) no XML. Carregados na lista: {rows.length}.{" "}
+              {wpXmlHasMore ? "Há mais lotes disponíveis." : "Todos os lotes foram carregados."}
+            </p>
+          )}
         </section>
       )}
 

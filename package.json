@@ -16,6 +16,7 @@
     "test:deploy": "tsx scripts/test-deploy.ts"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.9",
     "@astrojs/react": "^5.0.4",
     "@astrojs/vercel": "^10.0.5",
     "@octokit/rest": "^22.0.1",
@@ -36,6 +37,7 @@
     "@tiptap/starter-kit": "^3.22.4",
     "astro": "^6.1.9",
     "cheerio": "^1.2.0",
+    "fast-xml-parser": "^5.7.2",
     "gray-matter": "^4.0.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.11.0",
@@ -47,7 +49,8 @@
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.4",
     "turndown": "^7.2.4",
-    "turndown-plugin-gfm": "^1.0.2"
+    "turndown-plugin-gfm": "^1.0.2",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.8",
