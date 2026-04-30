@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGitHubClient, createRepository, type CreateRepositoryResult } from "./github";
@@ -49,6 +49,8 @@ const IGNORED_DIR_NAMES = new Set([
   "node_modules",
   "dist",
   "coverage",
+  /** Snapshot de build para o NFT; não copiar para dentro de si próprio. */
+  "embedded-client-template",
 ]);
 
 const IGNORED_FILE_NAMES = new Set([
@@ -131,16 +133,94 @@ const ASTRO_CONFIG_FILENAMES = [
   "astro.config.cjs",
 ] as const;
 
+/** Pasta criada em `dist/server/` no build para o runtime serverless ler o template completo. */
+export const EMBEDDED_CLIENT_TEMPLATE_DIR_NAME = "embedded-client-template";
+
 function hasBlogcmsProjectRoot(dir: string): boolean {
   if (!existsSync(join(dir, "package.json"))) return false;
-  return ASTRO_CONFIG_FILENAMES.some((f) => existsSync(join(dir, f)));
+  if (!ASTRO_CONFIG_FILENAMES.some((f) => existsSync(join(dir, f)))) return false;
+  /**
+   * Na Vercel, `process.cwd()` costuma ser `/var/task` com `package.json` + `astro.config.*` da função,
+   * mas **sem** árvore `src/` — só o bundle em `server/`. Exigir o ficheiro de dados evita esse falso positivo.
+   */
+  if (!existsSync(join(dir, "src", "data", "site-config.json"))) return false;
+  return true;
+}
+
+function bundledEmbeddedTemplateRoot(): string | null {
+  const candidate = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    EMBEDDED_CLIENT_TEMPLATE_DIR_NAME,
+  );
+  return hasBlogcmsProjectRoot(candidate) ? candidate : null;
+}
+
+/**
+ * Grava `./embedded-client-template/` na raiz do repo (respeitando exclusões do template).
+ * Corre em `astro:build:start`: o adapter Vercel está no início da fila de integrações e faz `emptyDir`;
+ * a seguir esta cópia fica estável até ao NFT em `astro:build:done`.
+ */
+export async function embedClientTemplateAtProjectRoot(
+  log?: { warn: (msg: string) => void },
+): Promise<void> {
+  const sourceRoot = join(process.cwd());
+  if (!hasBlogcmsProjectRoot(sourceRoot)) {
+    log?.warn(
+      "[embed-client-template] cwd não é a raiz do BlogCMS (falta src/data/site-config.json); snapshot omitido.",
+    );
+    return;
+  }
+  const targetRoot = join(sourceRoot, EMBEDDED_CLIENT_TEMPLATE_DIR_NAME);
+  await rm(targetRoot, { recursive: true, force: true });
+
+  const rootAbs = sourceRoot;
+
+  async function walk(currentAbs: string): Promise<void> {
+    const rel = relative(rootAbs, currentAbs);
+    const relPosix = rel.split(sep).join("/");
+    if (relPosix !== "" && shouldSkipRelativePath(relPosix, (await stat(currentAbs)).isDirectory())) {
+      return;
+    }
+
+    const entries = await readdir(currentAbs, { withFileTypes: true });
+    for (const ent of entries) {
+      const full = join(currentAbs, ent.name);
+      const r = relative(rootAbs, full).split(sep).join("/");
+      if (ent.isDirectory()) {
+        if (!shouldSkipRelativePath(r, true)) {
+          await walk(full);
+        }
+        continue;
+      }
+      if (shouldSkipRelativePath(r, false)) continue;
+
+      const buffer = await readFile(full);
+      const dest = join(targetRoot, r);
+      await mkdir(dirname(dest), { recursive: true });
+      await writeFile(dest, buffer);
+    }
+  }
+
+  await walk(rootAbs);
+}
+
+/** Remove o snapshot gerado no build (já copiado pelo NFT). */
+export async function removeEmbeddedClientTemplateAtProjectRoot(): Promise<void> {
+  const targetRoot = join(process.cwd(), EMBEDDED_CLIENT_TEMPLATE_DIR_NAME);
+  await rm(targetRoot, { recursive: true, force: true });
 }
 
 /**
  * Raiz do repositório com o template. Em dev, `import.meta.url` está em `src/lib/` → `../..` basta.
- * Em produção (Vercel), o bundle fica em `dist/server/chunks/` — é preciso subir até encontrar `package.json` + `astro.config.*`.
+ * Em produção (Vercel), usa-se o snapshot `embedded-client-template/` empacotado com a função (NFT).
  */
 function defaultTemplateRoot(): string {
+  const bundled = bundledEmbeddedTemplateRoot();
+  if (bundled) {
+    return bundled;
+  }
+
   const cwd = process.cwd();
   if (hasBlogcmsProjectRoot(cwd)) {
     return cwd;

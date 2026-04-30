@@ -1,5 +1,7 @@
 # build output
 dist/
+# snapshot temporário para o NFT (BlogCMS → repo do cliente na Vercel)
+embedded-client-template/
 # generated types
 .astro/
 
