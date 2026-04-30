@@ -51,6 +51,7 @@ export function ContentImportPanel() {
   const [urlTotalDiscovered, setUrlTotalDiscovered] = useState(0);
   const [urlHasMore, setUrlHasMore] = useState(false);
   const [discoveredLinks, setDiscoveredLinks] = useState<string[]>([]);
+  const [selectedDiscoveredLinks, setSelectedDiscoveredLinks] = useState<string[]>([]);
   const [loadingAllBatches, setLoadingAllBatches] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; err: boolean } | null>(null);
@@ -74,11 +75,25 @@ export function ContentImportPanel() {
   const clearRows = useCallback(() => {
     setRows([]);
     setDiscoveredLinks([]);
+    setSelectedDiscoveredLinks([]);
     setUrlBatchOffset(0);
     setUrlTotalDiscovered(0);
     setUrlHasMore(false);
     setMessage(null);
   }, []);
+
+  const setDiscoveredSelected = useCallback((link: string, selected: boolean) => {
+    setSelectedDiscoveredLinks((prev) => {
+      const s = new Set(prev);
+      if (selected) s.add(link);
+      else s.delete(link);
+      return Array.from(s);
+    });
+  }, []);
+
+  const selectAllDiscovered = useCallback((selected: boolean) => {
+    setSelectedDiscoveredLinks(selected ? [...discoveredLinks] : []);
+  }, [discoveredLinks]);
 
   const fetchWordPress = async () => {
     setMessage(null);
@@ -167,6 +182,12 @@ export function ContentImportPanel() {
           const s = new Set([...prev, ...j.discoveredLinks!]);
           return Array.from(s);
         });
+        setSelectedDiscoveredLinks((prev) => {
+          if (resetBatch) return [];
+          const keep = new Set(prev);
+          for (const l of j.discoveredLinks) keep.add(l);
+          return Array.from(keep);
+        });
         setUrlTotalDiscovered(typeof j.totalDiscovered === "number" ? j.totalDiscovered : j.discoveredLinks.length);
         setUrlHasMore(Boolean(j.hasMore));
         setUrlBatchOffset(typeof j.nextOffset === "number" ? j.nextOffset : offset + j.discoveredLinks.length);
@@ -180,6 +201,7 @@ export function ContentImportPanel() {
       }
       if (Array.isArray(j.posts)) {
         setDiscoveredLinks([]);
+        setSelectedDiscoveredLinks([]);
         const next: PreviewRow[] = j.posts.map((p) => ({
           id: `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           selected: true,
@@ -216,6 +238,7 @@ export function ContentImportPanel() {
       const p = j.post;
       const id = `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setDiscoveredLinks([]);
+      setSelectedDiscoveredLinks([]);
       setRows((prev) => {
         const row: PreviewRow = {
           id,
@@ -306,6 +329,10 @@ export function ContentImportPanel() {
             const s = new Set([...prev, ...j.discoveredLinks!]);
             return Array.from(s);
           });
+          setSelectedDiscoveredLinks((prev) => {
+            const s = new Set([...prev, ...j.discoveredLinks!]);
+            return Array.from(s);
+          });
           const nextOffset = typeof j.nextOffset === "number" ? j.nextOffset : offset + j.discoveredLinks.length;
           hasMore = Boolean(j.hasMore) && nextOffset > offset;
           offset = nextOffset;
@@ -370,6 +397,164 @@ export function ContentImportPanel() {
     } finally {
       setBusy(false);
       setLoadingAllBatches(false);
+    }
+  };
+
+  const importSelectedDiscoveredLinks = async () => {
+    const targets = selectedDiscoveredLinks.filter(Boolean);
+    if (targets.length === 0) {
+      setMessage({ text: "Selecione pelo menos um link da lista para importar.", err: true });
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      let imported = 0;
+      const failed: string[] = [];
+      const dedupe = new Set(rows.map((r) => r.slug));
+      for (const link of targets) {
+        const res = await fetch("/api/admin/import/scrape", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            articleUrl: link,
+            onlyArticles: true,
+            offset: 0,
+            limit: 1,
+          }),
+        });
+        const j = (await res.json()) as {
+          ok?: boolean;
+          post?: {
+            slug: string;
+            title: string;
+            description: string;
+            pubDate: string;
+            markdown: string;
+            featuredImageUrl?: string;
+          };
+        };
+        if (!res.ok || !j.ok || !j.post) {
+          failed.push(link);
+          continue;
+        }
+        if (dedupe.has(j.post.slug)) continue;
+        dedupe.add(j.post.slug);
+        imported += 1;
+        setRows((prev) => [
+          ...prev,
+          {
+            id: `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            selected: true,
+            slug: j.post!.slug,
+            title: j.post!.title,
+            description: j.post!.description,
+            pubDate: j.post!.pubDate,
+            markdown: j.post!.markdown,
+            featuredImageUrl: j.post!.featuredImageUrl,
+            sourceLabel: "URL",
+          },
+        ]);
+      }
+      setSelectedDiscoveredLinks([]);
+      if (imported > 0) {
+        setMessage({
+          text:
+            failed.length > 0
+              ? `Importados ${imported} link(s). ${failed.length} falharam e podem precisar de nova tentativa.`
+              : `Importados ${imported} link(s) com sucesso.`,
+          err: false,
+        });
+      } else {
+        setMessage({
+          text: "Não foi possível extrair conteúdo dos links selecionados.",
+          err: true,
+        });
+      }
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha de rede ao importar links.", err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const importAllDiscoveredLinks = async () => {
+    if (discoveredLinks.length === 0) {
+      setMessage({ text: "Nenhum link encontrado para importar.", err: true });
+      return;
+    }
+    setSelectedDiscoveredLinks([...discoveredLinks]);
+    setBusy(true);
+    setMessage(null);
+    try {
+      let imported = 0;
+      const failed: string[] = [];
+      const dedupe = new Set(rows.map((r) => r.slug));
+      for (const link of discoveredLinks) {
+        const res = await fetch("/api/admin/import/scrape", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            articleUrl: link,
+            onlyArticles: true,
+            offset: 0,
+            limit: 1,
+          }),
+        });
+        const j = (await res.json()) as {
+          ok?: boolean;
+          post?: {
+            slug: string;
+            title: string;
+            description: string;
+            pubDate: string;
+            markdown: string;
+            featuredImageUrl?: string;
+          };
+        };
+        if (!res.ok || !j.ok || !j.post) {
+          failed.push(link);
+          continue;
+        }
+        if (dedupe.has(j.post.slug)) continue;
+        dedupe.add(j.post.slug);
+        imported += 1;
+        setRows((prev) => [
+          ...prev,
+          {
+            id: `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            selected: true,
+            slug: j.post!.slug,
+            title: j.post!.title,
+            description: j.post!.description,
+            pubDate: j.post!.pubDate,
+            markdown: j.post!.markdown,
+            featuredImageUrl: j.post!.featuredImageUrl,
+            sourceLabel: "URL",
+          },
+        ]);
+      }
+      setSelectedDiscoveredLinks([]);
+      if (imported > 0) {
+        setMessage({
+          text:
+            failed.length > 0
+              ? `Importados ${imported} link(s) de ${discoveredLinks.length}. ${failed.length} falharam e podem precisar de nova tentativa.`
+              : `Importados todos os ${imported} link(s) encontrados com sucesso.`,
+          err: false,
+        });
+      } else {
+        setMessage({
+          text: "Não foi possível extrair conteúdo dos links encontrados.",
+          err: true,
+        });
+      }
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha de rede ao importar todos os links.", err: true });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -601,13 +786,57 @@ export function ContentImportPanel() {
           )}
           {discoveredLinks.length > 0 && (
             <div className="rounded-lg border border-zinc-200 bg-white p-3">
-              <p className="mb-2 text-sm font-medium text-zinc-800">Links encontrados (importação individual)</p>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-zinc-800">Links encontrados (importação individual)</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy || discoveredLinks.length === 0}
+                    onClick={() => selectAllDiscovered(true)}
+                    className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    Selecionar todos
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || selectedDiscoveredLinks.length === 0}
+                    onClick={() => selectAllDiscovered(false)}
+                    className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    Limpar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || selectedDiscoveredLinks.length === 0}
+                    onClick={() => void importSelectedDiscoveredLinks()}
+                    className="rounded-md bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+                  >
+                    Importar selecionados ({selectedDiscoveredLinks.length})
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || discoveredLinks.length === 0}
+                    onClick={() => void importAllDiscoveredLinks()}
+                    className="rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+                  >
+                    Importar todos da lista ({discoveredLinks.length})
+                  </button>
+                </div>
+              </div>
               <ul className="space-y-2">
                 {discoveredLinks.slice(0, 80).map((link) => (
                   <li key={link} className="flex flex-col gap-2 rounded border border-zinc-100 p-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="truncate text-xs text-zinc-700" title={link}>
-                      {link}
-                    </span>
+                    <label className="flex min-w-0 flex-1 items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedDiscoveredLinks.includes(link)}
+                        onChange={(e) => setDiscoveredSelected(link, e.target.checked)}
+                        className="h-4 w-4 rounded border-zinc-300 text-zinc-900"
+                      />
+                      <span className="truncate text-xs text-zinc-700" title={link}>
+                        {link}
+                      </span>
+                    </label>
                     <button
                       type="button"
                       disabled={busy}
