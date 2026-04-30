@@ -141,8 +141,14 @@ function extractOgImageUrl(pageHtml: string, pageUrl: string): string | undefine
 async function fetchHtml(url: string): Promise<Response> {
   return fetch(url, {
     headers: {
-      Accept: "text/html,application/xhtml+xml",
-      "User-Agent": "BlogCMS-Import/1.0 (+https://github.com)",
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "Upgrade-Insecure-Requests": "1",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     },
     redirect: "follow",
     signal: AbortSignal.timeout(45_000),
@@ -154,7 +160,9 @@ async function fetchText(url: string): Promise<string | null> {
     const r = await fetch(url, {
       headers: {
         Accept: "application/xml,text/xml,text/plain,text/html",
-        "User-Agent": "BlogCMS-Import/1.0 (+https://github.com)",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
       },
       redirect: "follow",
       signal: AbortSignal.timeout(45_000),
@@ -364,77 +372,19 @@ export const POST: APIRoute = async (context) => {
     );
   }
   if (links.length > 0 && preferBatch) {
-    const candidates = await Promise.allSettled(
-      pagedLinks.map(async (link) => {
-        const pageRes = await fetchHtml(link);
-        if (!pageRes.ok) return null;
-        const pageHtml = await pageRes.text();
-        const article = extractArticleHtml(pageHtml);
-        if (!article) {
-          const reader = await extractViaReader(link);
-          if (!reader) return null;
-          return {
-            slug: slugFromUrl(link),
-            title: reader.title,
-            description: reader.description,
-            pubDate: reader.pubDate,
-            markdown: reader.markdown,
-            featuredImageUrl: undefined,
-          };
-        }
-        const meta = extractMetaFromPage(pageHtml);
-        const ogImage = extractOgImageUrl(pageHtml, link);
-        const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(article));
-        if (!isSubstantialMarkdown(markdown)) {
-          const reader = await extractViaReader(link);
-          if (!reader) return null;
-          return {
-            slug: slugFromUrl(link),
-            title: reader.title,
-            description: reader.description,
-            pubDate: reader.pubDate,
-            markdown: reader.markdown,
-            featuredImageUrl: ogImage,
-          };
-        }
-        return {
-          slug: slugFromUrl(link),
-          title: meta.title,
-          description: meta.description.slice(0, 160),
-          pubDate: new Date().toISOString().slice(0, 10),
-          markdown,
-          featuredImageUrl: ogImage,
-        };
-      }),
+    return json(
+      {
+        ok: true,
+        discoveredLinks: pagedLinks,
+        totalDiscovered: links.length,
+        hasMore,
+        nextOffset,
+        message:
+          "Página inicial/listagem detectada. Escolha os links abaixo e clique em «Importar» em cada artigo.",
+      },
+      200,
+      auth.responseHeaders,
     );
-
-    const posts: Array<{
-      slug: string;
-      title: string;
-      description: string;
-      pubDate: string;
-      markdown: string;
-      featuredImageUrl?: string;
-    }> = [];
-    for (const result of candidates) {
-      if (result.status === "fulfilled" && result.value) {
-        posts.push(result.value);
-      }
-    }
-    if (posts.length > 0) {
-      return json(
-        {
-          ok: true,
-          posts,
-          totalDiscovered: links.length,
-          hasMore,
-          nextOffset,
-          message: `Página de listagem detectada. Lote ${offset + 1}-${nextOffset} de ${links.length} URL(s) analisadas.`,
-        },
-        200,
-        auth.responseHeaders,
-      );
-    }
   }
 
   // Fallback para páginas que renderizam conteúdo via JS (SPA): leitor remoto (URL única).
@@ -457,7 +407,7 @@ export const POST: APIRoute = async (context) => {
     );
   }
 
-  // Se não for listagem ou não conseguiu em lote antes, tenta lote agora.
+  // Se não for listagem ou não conseguiu artigo claro, devolve links para importação individual.
   if (links.length === 0) {
     links = await discoverLinksFromSitemap(finalUrl, BATCH_LINK_LIMIT);
     if (onlyArticles) {
@@ -493,83 +443,15 @@ export const POST: APIRoute = async (context) => {
     );
   }
 
-  const candidates = await Promise.allSettled(
-    fallbackPagedLinks.map(async (link) => {
-      const pageRes = await fetchHtml(link);
-      if (!pageRes.ok) return null;
-      const pageHtml = await pageRes.text();
-      const article = extractArticleHtml(pageHtml);
-      if (!article) {
-        const reader = await extractViaReader(link);
-        if (!reader) return null;
-        return {
-          slug: slugFromUrl(link),
-          title: reader.title,
-          description: reader.description,
-          pubDate: reader.pubDate,
-          markdown: reader.markdown,
-          featuredImageUrl: undefined,
-        };
-      }
-      const meta = extractMetaFromPage(pageHtml);
-      const ogImage = extractOgImageUrl(pageHtml, link);
-      const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(article));
-      if (!isSubstantialMarkdown(markdown)) {
-        const reader = await extractViaReader(link);
-        if (!reader) return null;
-        return {
-          slug: slugFromUrl(link),
-          title: reader.title,
-          description: reader.description,
-          pubDate: reader.pubDate,
-          markdown: reader.markdown,
-          featuredImageUrl: ogImage,
-        };
-      }
-      return {
-        slug: slugFromUrl(link),
-        title: meta.title,
-        description: meta.description.slice(0, 160),
-        pubDate: new Date().toISOString().slice(0, 10),
-        markdown,
-        featuredImageUrl: ogImage,
-      };
-    }),
-  );
-
-  const posts: Array<{
-    slug: string;
-    title: string;
-    description: string;
-    pubDate: string;
-    markdown: string;
-    featuredImageUrl?: string;
-  }> = [];
-  for (const result of candidates) {
-    if (result.status === "fulfilled" && result.value) {
-      posts.push(result.value);
-    }
-  }
-
-  if (posts.length === 0) {
-    return json(
-      {
-        ok: false,
-        error: "Encontramos links na página, mas não conseguimos extrair artigos. Tenta colar a URL de um post específico.",
-      },
-      422,
-      auth.responseHeaders,
-    );
-  }
-
   return json(
     {
       ok: true,
-      posts,
+      discoveredLinks: fallbackPagedLinks,
       totalDiscovered: links.length,
       hasMore: fallbackHasMore,
       nextOffset: fallbackNextOffset,
-      message: `Página de listagem detectada. Lote ${offset + 1}-${fallbackNextOffset} de ${links.length} URL(s) analisadas.`,
+      message:
+        "Encontramos links de conteúdo nesta página. Escolha um link específico e use «Importar» para extrair o artigo.",
     },
     200,
     auth.responseHeaders,

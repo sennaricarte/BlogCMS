@@ -50,6 +50,7 @@ export function ContentImportPanel() {
   const [urlBatchOffset, setUrlBatchOffset] = useState(0);
   const [urlTotalDiscovered, setUrlTotalDiscovered] = useState(0);
   const [urlHasMore, setUrlHasMore] = useState(false);
+  const [discoveredLinks, setDiscoveredLinks] = useState<string[]>([]);
   const [loadingAllBatches, setLoadingAllBatches] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; err: boolean } | null>(null);
@@ -72,6 +73,7 @@ export function ContentImportPanel() {
 
   const clearRows = useCallback(() => {
     setRows([]);
+    setDiscoveredLinks([]);
     setUrlBatchOffset(0);
     setUrlTotalDiscovered(0);
     setUrlHasMore(false);
@@ -113,17 +115,18 @@ export function ContentImportPanel() {
     }
   };
 
-  const scrapeUrl = async (resetBatch = true) => {
+  const scrapeUrl = async (resetBatch = true, overrideUrl?: string) => {
     setMessage(null);
     setBusy(true);
     try {
+      const targetUrl = (overrideUrl ?? articleUrl).trim();
       const offset = resetBatch ? 0 : urlBatchOffset;
       const res = await fetch("/api/admin/import/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          articleUrl: articleUrl.trim(),
+          articleUrl: targetUrl,
           onlyArticles: urlOnlyArticles,
           offset,
           limit: URL_BATCH_SIZE,
@@ -136,6 +139,7 @@ export function ContentImportPanel() {
         totalDiscovered?: number;
         hasMore?: boolean;
         nextOffset?: number;
+        discoveredLinks?: string[];
         post?: {
           slug: string;
           title: string;
@@ -157,7 +161,25 @@ export function ContentImportPanel() {
         setMessage({ text: j.error || `Erro HTTP ${res.status}`, err: true });
         return;
       }
+      if (Array.isArray(j.discoveredLinks)) {
+        setDiscoveredLinks((prev) => {
+          if (resetBatch) return j.discoveredLinks ?? [];
+          const s = new Set([...prev, ...j.discoveredLinks!]);
+          return Array.from(s);
+        });
+        setUrlTotalDiscovered(typeof j.totalDiscovered === "number" ? j.totalDiscovered : j.discoveredLinks.length);
+        setUrlHasMore(Boolean(j.hasMore));
+        setUrlBatchOffset(typeof j.nextOffset === "number" ? j.nextOffset : offset + j.discoveredLinks.length);
+        setMessage({
+          text:
+            j.message ||
+            `${j.discoveredLinks.length} link(s) encontrado(s). Clique em «Importar» para extrair cada artigo.`,
+          err: false,
+        });
+        return;
+      }
       if (Array.isArray(j.posts)) {
+        setDiscoveredLinks([]);
         const next: PreviewRow[] = j.posts.map((p) => ({
           id: `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           selected: true,
@@ -193,6 +215,7 @@ export function ContentImportPanel() {
 
       const p = j.post;
       const id = `url-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setDiscoveredLinks([]);
       setRows((prev) => {
         const row: PreviewRow = {
           id,
@@ -252,6 +275,7 @@ export function ContentImportPanel() {
           totalDiscovered?: number;
           hasMore?: boolean;
           nextOffset?: number;
+          discoveredLinks?: string[];
           post?: {
             slug: string;
             title: string;
@@ -276,6 +300,16 @@ export function ContentImportPanel() {
 
         if (typeof j.totalDiscovered === "number") {
           totalDiscovered = j.totalDiscovered;
+        }
+        if (Array.isArray(j.discoveredLinks)) {
+          setDiscoveredLinks((prev) => {
+            const s = new Set([...prev, ...j.discoveredLinks!]);
+            return Array.from(s);
+          });
+          const nextOffset = typeof j.nextOffset === "number" ? j.nextOffset : offset + j.discoveredLinks.length;
+          hasMore = Boolean(j.hasMore) && nextOffset > offset;
+          offset = nextOffset;
+          continue;
         }
 
         if (Array.isArray(j.posts)) {
@@ -504,7 +538,8 @@ export function ContentImportPanel() {
           </h2>
           <p className="text-sm text-zinc-600">
             O servidor obtém o HTML, extrai <code className="rounded bg-zinc-100 px-1">&lt;article&gt;</code> ou{" "}
-            <code className="rounded bg-zinc-100 px-1">&lt;main&gt;</code>, converte para Markdown e pode usar{" "}
+            <code className="rounded bg-zinc-100 px-1">&lt;main&gt;</code> (com fallback por densidade de texto), remove
+            ruído (menu/rodapé/sidebar/script), converte para Markdown e pode usar{" "}
             <code className="rounded bg-zinc-100 px-1">og:image</code> como imagem de destaque.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -560,9 +595,31 @@ export function ContentImportPanel() {
           </label>
           {urlTotalDiscovered > 0 && (
             <p className="text-xs text-zinc-600" role="status">
-              Descobertos {urlTotalDiscovered} artigo(s). Carregados na lista: {rows.length}.{" "}
+              Descobertos {urlTotalDiscovered} link(s)/artigo(s). Carregados na lista: {rows.length}.{" "}
               {urlHasMore ? "Há mais lotes disponíveis." : "Todos os lotes foram carregados."}
             </p>
+          )}
+          {discoveredLinks.length > 0 && (
+            <div className="rounded-lg border border-zinc-200 bg-white p-3">
+              <p className="mb-2 text-sm font-medium text-zinc-800">Links encontrados (importação individual)</p>
+              <ul className="space-y-2">
+                {discoveredLinks.slice(0, 80).map((link) => (
+                  <li key={link} className="flex flex-col gap-2 rounded border border-zinc-100 p-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="truncate text-xs text-zinc-700" title={link}>
+                      {link}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void scrapeUrl(true, link)}
+                      className="inline-flex min-h-9 items-center justify-center rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                    >
+                      Importar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       )}

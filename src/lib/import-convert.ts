@@ -7,7 +7,10 @@ function scoreCandidateHtml(html: string): number {
   if (!text) return 0;
   const paragraphHits = (html.match(/<p[\s>]/gi) || []).length;
   const headingHits = (html.match(/<h[1-6][\s>]/gi) || []).length;
-  return text.length + paragraphHits * 80 + headingHits * 40;
+  const punctuation = (text.match(/[.!?;:,]/g) || []).length;
+  const htmlLen = Math.max(1, html.length);
+  const density = Math.min(1, text.length / htmlLen);
+  return text.length + paragraphHits * 90 + headingHits * 35 + punctuation * 3 + density * 400;
 }
 
 function stripHtmlToText(html: string): string {
@@ -22,6 +25,29 @@ function stripHtmlToText(html: string): string {
 /** Extrai HTML do candidato mais provável de corpo (article/main/post-content). */
 export function extractArticleHtml(fullPageHtml: string): string | null {
   const $ = cheerio.load(fullPageHtml, { decodeEntities: true });
+  $(
+    [
+      "script",
+      "style",
+      "noscript",
+      "template",
+      "nav",
+      "header",
+      "footer",
+      "aside",
+      "form",
+      ".sidebar",
+      ".menu",
+      ".breadcrumbs",
+      ".comments",
+      "#comments",
+      "[role='navigation']",
+      "[role='complementary']",
+      "[class*='ad-']",
+      "[class*='banner']",
+    ].join(","),
+  ).remove();
+
   const selectors = [
     "article",
     "main",
@@ -43,6 +69,32 @@ export function extractArticleHtml(fullPageHtml: string): string | null {
       if (score > bestScore) {
         bestScore = score;
         bestHtml = inner;
+      }
+    });
+  }
+
+  // Fallback mais flexível: procura contentores com maior densidade de texto.
+  if (!bestHtml) {
+    $("section, div").each((_, el) => {
+      const node = $(el);
+      const html = (node.html() || "").trim();
+      if (!html) return;
+      const txt = stripHtmlToText(html);
+      if (txt.length < 260) return;
+      const pHits = node.find("p").length;
+      if (pHits < 2) return;
+      const classId = `${node.attr("class") || ""} ${node.attr("id") || ""}`.toLowerCase();
+      if (
+        /(menu|nav|sidebar|footer|header|comment|widget|share|social|ads?|banner|related|author)/i.test(
+          classId,
+        )
+      ) {
+        return;
+      }
+      const score = scoreCandidateHtml(html);
+      if (score > bestScore) {
+        bestScore = score;
+        bestHtml = html;
       }
     });
   }
