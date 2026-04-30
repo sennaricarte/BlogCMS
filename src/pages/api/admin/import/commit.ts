@@ -281,6 +281,26 @@ function collectImageRefsFromHtml(articleHtml?: string, sourceUrl?: string): Arr
   }
 }
 
+function collectImageRefsFromHtmlRegex(articleHtml?: string, sourceUrl?: string): Array<{ raw: string; abs: string }> {
+  const html = (articleHtml || "").trim();
+  if (!html) return [];
+  const out: Array<{ raw: string; abs: string }> = [];
+  const srcRegex = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  for (const m of html.matchAll(srcRegex)) {
+    const raw = (m[1] || "").trim();
+    if (!raw) continue;
+    const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
+    if (!abs) continue;
+    out.push({ raw, abs });
+  }
+  return out;
+}
+
+async function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function extractOgOrTwitterImage(articleHtml?: string, sourceUrl?: string): string | null {
   const html = (articleHtml || "").trim();
   if (!html) return null;
@@ -309,9 +329,11 @@ async function processArticleAssets(params: {
   const warnings: string[] = [];
   let processedMarkdown = markdown;
 
-  // 1) Coleta URLs (corpo em Markdown + todas <img> do HTML + destaque) e processa em concorrência.
+  // 1) Coleta URLs (corpo em Markdown + todas <img> por regex/DOM + destaque) e processa em fila serial.
   const markdownRefs = collectImageRefsFromMarkdown(markdown, sourceUrl);
-  const htmlRefs = collectImageRefsFromHtml(articleHtml, sourceUrl);
+  const htmlRefsRegex = collectImageRefsFromHtmlRegex(articleHtml, sourceUrl);
+  const htmlRefsDom = collectImageRefsFromHtml(articleHtml, sourceUrl);
+  const htmlRefs = [...htmlRefsRegex, ...htmlRefsDom];
   const ogOrTw = extractOgOrTwitterImage(articleHtml, sourceUrl);
   // Prioridade para capa vinda do XML/WordPress (_thumbnail_id -> attachment_url).
   const featuredCandidate = resolveMaybeAbsoluteImageUrl(featuredImageUrl || "", sourceUrl) || ogOrTw;
@@ -326,22 +348,40 @@ async function processArticleAssets(params: {
   const indexByUrl = new Map<string, number>(allAssetUrls.map((u, i) => [u, i + 1]));
 
   const uploadedByUrl = new Map<string, string>();
-  const downloadTasks = allAssetUrls.map(async (assetUrl) => {
+  const tryUploadAsset = async (assetUrl: string): Promise<boolean> => {
     const img = await fetchImageForImport(assetUrl);
     if (!img) {
-      warnings.push(`<!-- Falha ao importar imagem: ${assetUrl} -->`);
-      return;
+      return false;
     }
     const idx = indexByUrl.get(assetUrl) || 1;
     const local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, idx, img);
     if (!local) {
-      // Não troca links quando upload falha.
-      warnings.push(`<!-- Falha ao importar imagem: ${assetUrl} -->`);
-      return;
+      return false;
     }
     uploadedByUrl.set(assetUrl, local);
-  });
-  await Promise.all(downloadTasks);
+    return true;
+  };
+
+  for (const assetUrl of allAssetUrls) {
+    const ok = await tryUploadAsset(assetUrl);
+    if (!ok) {
+      console.warn("[import-media] Falha no upload serial de imagem", { slugBase, assetUrl });
+    }
+    // Pequeno intervalo para reduzir erros de concorrência/rate limit no GitHub.
+    await sleep(180);
+  }
+
+  // 1.1) Verificação de integridade: se faltar imagem, tenta novamente antes de fechar Markdown.
+  const missingUrls = allAssetUrls.filter((u) => !uploadedByUrl.has(u));
+  for (const assetUrl of missingUrls) {
+    const ok = await tryUploadAsset(assetUrl);
+    if (!ok) {
+      warnings.push(`<!-- Falha ao importar imagem: ${assetUrl} -->`);
+      console.warn("[import-media] Falha após retry de imagem", { slugBase, assetUrl });
+    }
+    await sleep(180);
+  }
+
   const totalUploaded = uploadedByUrl.size;
   console.info("[import-media] Auditoria de assets por post", {
     slugBase,
