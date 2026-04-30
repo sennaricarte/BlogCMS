@@ -56,6 +56,8 @@ type ImportPost = {
   featuredImageUrl?: string;
   sourceUrl?: string;
   articleHtml?: string;
+  xmlAttachmentUrls?: string[];
+  xmlAttachmentFileNameByUrl?: Record<string, string>;
 };
 
 type DownloadedImage = {
@@ -193,9 +195,19 @@ async function uploadToGithubStorage(
   slugBase: string,
   index: number,
   img: DownloadedImage,
+  preferredFileName?: string,
 ): Promise<string | null> {
   const safeSlug = slugifyFileName(slugBase);
-  const fileName = `${safeSlug}-${index}.${img.ext}`;
+  const preferred = (preferredFileName || "").trim();
+  const preferredBase = preferred
+    .replace(/\.[^.]+$/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+  const baseName = preferredBase || `${safeSlug}-${index}`;
+  const fileName = `${baseName}.${img.ext}`;
   const repoPath = `public/assets/blog/${fileName}`;
   try {
     await publisher.createOrUpdateFileBytes(owner, repo, repoPath, img.buf, `content(assets): imagem ${fileName}`, { branch });
@@ -233,6 +245,9 @@ function normalizeMarkdownImageHtml(markdown: string, sourceUrl?: string): strin
     const abs = resolveMaybeAbsoluteImageUrl(srcRaw, sourceUrl) || srcRaw;
     return `![${alt}](${abs})`;
   });
+  // Remove links que envolvem imagens ([![...](...)](url) ou <a>![...]</a>).
+  out = out.replace(/\[(!\[[^\]]*\]\([^)]+\))\]\([^)]+\)/g, "$1");
+  out = out.replace(/<a\b[^>]*>\s*(!\[[^\]]*\]\([^)]+\))\s*<\/a>/gi, "$1");
   return out;
 }
 
@@ -357,13 +372,27 @@ async function processArticleAssets(params: {
   articleHtml?: string;
   sourceUrl?: string;
   featuredImageUrl?: string;
+  xmlAttachmentUrls?: string[];
+  xmlAttachmentFileNameByUrl?: Record<string, string>;
   slugBase: string;
   publisher: GithubPublisher;
   owner: string;
   repo: string;
   branch: string;
 }): Promise<{ markdown: string; featuredPath: string; warnings: string[] }> {
-  const { markdown, articleHtml, sourceUrl, featuredImageUrl, slugBase, publisher, owner, repo, branch } = params;
+  const {
+    markdown,
+    articleHtml,
+    sourceUrl,
+    featuredImageUrl,
+    xmlAttachmentUrls,
+    xmlAttachmentFileNameByUrl,
+    slugBase,
+    publisher,
+    owner,
+    repo,
+    branch,
+  } = params;
   const warnings: string[] = [];
   let processedMarkdown = normalizeMarkdownImageHtml(markdown, sourceUrl);
 
@@ -377,6 +406,7 @@ async function processArticleAssets(params: {
   const featuredCandidate = resolveMaybeAbsoluteImageUrl(featuredImageUrl || "", sourceUrl) || ogOrTw;
   const allAssetUrls = Array.from(
     new Set([
+      ...(Array.isArray(xmlAttachmentUrls) ? xmlAttachmentUrls : []),
       ...markdownRefs.map((r) => r.abs),
       ...htmlRefs.map((r) => r.abs),
       ...(featuredCandidate ? [featuredCandidate] : []),
@@ -392,7 +422,8 @@ async function processArticleAssets(params: {
       return false;
     }
     const idx = indexByUrl.get(assetUrl) || 1;
-    const local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, idx, img);
+    const preferredName = xmlAttachmentFileNameByUrl?.[assetUrl];
+    const local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, idx, img, preferredName);
     if (!local) {
       return false;
     }
@@ -562,6 +593,8 @@ export const POST: APIRoute = async (context) => {
         articleHtml: p.articleHtml,
         sourceUrl: p.sourceUrl,
         featuredImageUrl: p.featuredImageUrl,
+        xmlAttachmentUrls: p.xmlAttachmentUrls,
+        xmlAttachmentFileNameByUrl: p.xmlAttachmentFileNameByUrl,
         slugBase: slugIn,
         publisher,
         owner,

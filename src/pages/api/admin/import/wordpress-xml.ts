@@ -82,6 +82,25 @@ function extractFirstHttpUrl(text: string): string | undefined {
   return m?.[0]?.trim();
 }
 
+function extractAllHttpUrls(text: string): string[] {
+  const out = new Set<string>();
+  for (const m of (text || "").matchAll(/https?:\/\/[^\s"'<>]+/gi)) {
+    const u = (m[0] || "").trim();
+    if (u) out.add(u);
+  }
+  return Array.from(out);
+}
+
+function fileNameFromUrl(url: string): string | undefined {
+  try {
+    const u = new URL(url);
+    const last = u.pathname.split("/").filter(Boolean).pop() || "";
+    return last || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function resolveFeaturedUrlFromItem(item: WxrItem, attachmentById: Map<string, string>): string | undefined {
   const directAttachment = xmlString(item["wp:attachment_url"]);
   if (directAttachment) return directAttachment;
@@ -153,6 +172,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     const attachmentById = new Map<string, string>();
+    const attachmentFileNameByUrl = new Map<string, string>();
     for (const it of items) {
       const postType = xmlString(it["wp:post_type"]);
       if (postType !== "attachment") continue;
@@ -162,7 +182,11 @@ export const POST: APIRoute = async (context) => {
         extractFirstHttpUrl(xmlString(it.guid)) ||
         extractFirstHttpUrl(xmlString(it["content:encoded"])) ||
         "";
-      if (id && url) attachmentById.set(id, url);
+      if (id && url) {
+        attachmentById.set(id, url);
+        const fileName = fileNameFromUrl(url);
+        if (fileName) attachmentFileNameByUrl.set(url, fileName);
+      }
     }
 
     const postsOnly = items.filter((it) => xmlString(it["wp:post_type"]) === "post");
@@ -188,6 +212,16 @@ export const POST: APIRoute = async (context) => {
       const featuredImageUrl = resolveFeaturedUrlFromItem(p, attachmentById);
       const sourceUrl = xmlString(p.link) || undefined;
       const description = stripHtmlToText(excerptHtml || bodyHtml || title, 160);
+      const contentUrls = extractAllHttpUrls(bodyHtml);
+      const imageLikeUrls = contentUrls.filter((u) =>
+        /\.(png|jpe?g|webp|avif|gif|svg)(\?|#|$)/i.test(u),
+      );
+      const xmlAttachmentUrls = Array.from(
+        new Set([...(featuredImageUrl ? [featuredImageUrl] : []), ...imageLikeUrls]),
+      );
+      const xmlAttachmentFileNameByUrl = Object.fromEntries(
+        xmlAttachmentUrls.map((u) => [u, attachmentFileNameByUrl.get(u) || fileNameFromUrl(u) || "imagem"]),
+      );
       return {
         sourceId: Number(xmlString(p["wp:post_id"]) || offset + i + 1) || offset + i + 1,
         slug,
@@ -200,6 +234,8 @@ export const POST: APIRoute = async (context) => {
         sourceUrl,
         category,
         tags,
+        xmlAttachmentUrls,
+        xmlAttachmentFileNameByUrl,
       };
     });
 

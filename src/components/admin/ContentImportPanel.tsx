@@ -45,6 +45,8 @@ type WpApiPost = {
   articleHtml?: string;
   category?: string;
   tags?: string[];
+  xmlAttachmentUrls?: string[];
+  xmlAttachmentFileNameByUrl?: Record<string, string>;
 };
 
 export type PreviewRow = {
@@ -60,6 +62,8 @@ export type PreviewRow = {
   articleHtml?: string;
   category?: string;
   tags?: string[];
+  xmlAttachmentUrls?: string[];
+  xmlAttachmentFileNameByUrl?: Record<string, string>;
   sourceLabel: "WordPress" | "URL";
 };
 
@@ -154,6 +158,8 @@ export function ContentImportPanel() {
         articleHtml: p.articleHtml,
         category: p.category,
         tags: p.tags,
+        xmlAttachmentUrls: p.xmlAttachmentUrls,
+        xmlAttachmentFileNameByUrl: p.xmlAttachmentFileNameByUrl,
         sourceLabel: "WordPress" as const,
       }));
       setRows(next);
@@ -232,6 +238,8 @@ export function ContentImportPanel() {
         articleHtml: p.articleHtml,
         category: p.category,
         tags: p.tags,
+        xmlAttachmentUrls: p.xmlAttachmentUrls,
+        xmlAttachmentFileNameByUrl: p.xmlAttachmentFileNameByUrl,
         sourceLabel: "WordPress",
       }));
       setRows((prev) => {
@@ -817,6 +825,8 @@ export function ContentImportPanel() {
             articleHtml: r.articleHtml,
             category: r.category,
             tags: r.tags,
+            xmlAttachmentUrls: r.xmlAttachmentUrls,
+            xmlAttachmentFileNameByUrl: r.xmlAttachmentFileNameByUrl,
             draft: true,
           })),
         }),
