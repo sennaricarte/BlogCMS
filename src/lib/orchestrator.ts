@@ -16,7 +16,7 @@ function logPipelineStatus(status: DeployPipelineStatus): void {
 /** Textos para o UI (admin / stream de progresso). */
 export const DEPLOY_PROGRESS_UI = {
   github_creating_repo: "Criando Repositório no seu GitHub...",
-  github_injecting_template: "Injetando Template e SEO Config...",
+  github_injecting_template: "A copiar código-fonte Astro (template) e SEO…",
 } as const;
 
 export type DeployProgressCode =

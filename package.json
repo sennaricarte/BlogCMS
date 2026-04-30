@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "astro dev",
     "dev:clean": "node scripts/clean-vite-cache.mjs && astro dev",
+    "sync:template": "tsx scripts/sync-template-astro.ts",
+    "prebuild": "npm run sync:template",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",

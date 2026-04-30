@@ -5,13 +5,11 @@ import { defineConfig } from 'astro/config';
 import { rehypeLazyMarkdownImages } from './src/rehype/lazy-markdown-images.mjs';
 
 import tailwindcss from '@tailwindcss/vite';
-import { embedClientTemplateIntegration } from './src/integrations/embed-client-template.ts';
 
 // https://astro.build/config
 // Defina `site` (ou `SITE` no build) para URLs canônicas e Open Graph absolutas em produção.
 export default defineConfig({
-  /** Deve correr antes do adapter Vercel para o NFT apanhar `embedded-client-template`. */
-  integrations: [embedClientTemplateIntegration(), react()],
+  integrations: [react()],
   // site: 'https://seu-dominio.com',
   /**
    * Astro 6+ não usa `output: 'hybrid'`: o padrão `static` + adapter gera o site em grande parte
@@ -24,9 +22,9 @@ export default defineConfig({
   },
   vite: {
     /**
-     * Ficheiros extra a incluir na função serverless (NFT). O plugin grava esta árvore no `writeBundle` SSR.
+     * Código-fonte do template Astro (gerado por `npm run sync:template` / `prebuild`) para o publisher na Vercel.
      */
-    assetsInclude: ['embedded-client-template/**/*'],
+    assetsInclude: ['template-astro/**/*'],
     plugins: [tailwindcss()],
     /**
      * Uma única cópia de React evita "jsxDEV is not a function" (runtime JSX incoerente).

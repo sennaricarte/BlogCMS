@@ -49,8 +49,8 @@ const IGNORED_DIR_NAMES = new Set([
   "node_modules",
   "dist",
   "coverage",
-  /** Snapshot de build para o NFT; não copiar para dentro de si próprio. */
-  "embedded-client-template",
+  /** Cópia do template para o cliente; não incluir na própria cópia. */
+  "template-astro",
 ]);
 
 const IGNORED_FILE_NAMES = new Set([
@@ -133,8 +133,8 @@ const ASTRO_CONFIG_FILENAMES = [
   "astro.config.cjs",
 ] as const;
 
-/** Pasta criada em `dist/server/` no build para o runtime serverless ler o template completo. */
-export const EMBEDDED_CLIENT_TEMPLATE_DIR_NAME = "embedded-client-template";
+/** Pasta na raiz do BlogCMS com o código-fonte Astro enviado aos repos dos clientes (sem `dist/`). */
+export const CLIENT_ASTRO_TEMPLATE_DIR_NAME = "template-astro";
 
 function hasBlogcmsProjectRoot(dir: string): boolean {
   if (!existsSync(join(dir, "package.json"))) return false;
@@ -147,31 +147,31 @@ function hasBlogcmsProjectRoot(dir: string): boolean {
   return true;
 }
 
-function bundledEmbeddedTemplateRoot(): string | null {
+/** `template-astro/` empacotada ao lado de `chunks/` na função serverless (NFT). */
+function bundledTemplateAstroRoot(): string | null {
   const candidate = join(
     dirname(fileURLToPath(import.meta.url)),
     "..",
-    EMBEDDED_CLIENT_TEMPLATE_DIR_NAME,
+    CLIENT_ASTRO_TEMPLATE_DIR_NAME,
   );
   return hasBlogcmsProjectRoot(candidate) ? candidate : null;
 }
 
 /**
- * Grava `./embedded-client-template/` na raiz do repo (respeitando exclusões do template).
- * Corre em `astro:build:start`: o adapter Vercel está no início da fila de integrações e faz `emptyDir`;
- * a seguir esta cópia fica estável até ao NFT em `astro:build:done`.
+ * Gera `./template-astro/` a partir da raiz do BlogCMS (exclusões iguais ao push para o cliente).
+ * Não executa `npm run build`: só cópia de ficheiros-fonte. A Vercel do cliente faz o build.
  */
-export async function embedClientTemplateAtProjectRoot(
+export async function syncTemplateAstroToProjectRoot(
   log?: { warn: (msg: string) => void },
 ): Promise<void> {
   const sourceRoot = join(process.cwd());
   if (!hasBlogcmsProjectRoot(sourceRoot)) {
     log?.warn(
-      "[embed-client-template] cwd não é a raiz do BlogCMS (falta src/data/site-config.json); snapshot omitido.",
+      "[sync-template-astro] cwd não é a raiz do BlogCMS (falta src/data/site-config.json); cópia omitida.",
     );
     return;
   }
-  const targetRoot = join(sourceRoot, EMBEDDED_CLIENT_TEMPLATE_DIR_NAME);
+  const targetRoot = join(sourceRoot, CLIENT_ASTRO_TEMPLATE_DIR_NAME);
   await rm(targetRoot, { recursive: true, force: true });
 
   const rootAbs = sourceRoot;
@@ -205,38 +205,25 @@ export async function embedClientTemplateAtProjectRoot(
   await walk(rootAbs);
 }
 
-/** Remove o snapshot gerado no build (já copiado pelo NFT). */
-export async function removeEmbeddedClientTemplateAtProjectRoot(): Promise<void> {
-  const targetRoot = join(process.cwd(), EMBEDDED_CLIENT_TEMPLATE_DIR_NAME);
-  await rm(targetRoot, { recursive: true, force: true });
-}
-
 /**
- * Raiz do repositório com o template. Em dev, `import.meta.url` está em `src/lib/` → `../..` basta.
- * Em produção (Vercel), usa-se o snapshot `embedded-client-template/` empacotado com a função (NFT).
+ * Raiz do template Astro **fonte** enviado ao GitHub do cliente.
+ * Produção (Vercel): `template-astro/` incluída no bundle (NFT). Local: `./template-astro` após `npm run sync:template`.
  */
 function defaultTemplateRoot(): string {
-  const bundled = bundledEmbeddedTemplateRoot();
+  const bundled = bundledTemplateAstroRoot();
   if (bundled) {
     return bundled;
   }
 
-  const cwd = process.cwd();
-  if (hasBlogcmsProjectRoot(cwd)) {
-    return cwd;
+  const fromCwd = join(process.cwd(), CLIENT_ASTRO_TEMPLATE_DIR_NAME);
+  if (hasBlogcmsProjectRoot(fromCwd)) {
+    return fromCwd;
   }
 
-  let dir = dirname(fileURLToPath(import.meta.url));
-  for (let i = 0; i < 20; i++) {
-    if (hasBlogcmsProjectRoot(dir)) {
-      return dir;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-
-  return join(dirname(fileURLToPath(import.meta.url)), "../..");
+  throw new Error(
+    `Pasta "${CLIENT_ASTRO_TEMPLATE_DIR_NAME}" em falta ou incompleta na raiz do BlogCMS. ` +
+      `Execute "npm run sync:template" (ou "npm run build", que a corre no prebuild) antes de criar sites.`,
+  );
 }
 
 async function pathExists(p: string): Promise<boolean> {
@@ -256,8 +243,8 @@ export interface DeployToClientRepoOptions {
   description?: string;
   private?: boolean;
   /**
-   * Diretório com os arquivos do template (cópia do projeto).
-   * Predefinido: raiz do repositório atual, respeitando pastas ignoradas.
+   * Diretório com o código-fonte Astro do cliente.
+   * Predefinido: `./template-astro` na raiz do BlogCMS (gerado por `npm run sync:template`).
    */
   templateRoot?: string;
   /**
@@ -373,6 +360,24 @@ async function loadTemplateFiles(
   return filtered;
 }
 
+/** Garante que o que sobe para o GitHub do cliente é projeto Astro-fonte (não artefactos de build). */
+function assertClientRepoMandatoryFiles(files: Array<{ path: string }>): void {
+  const paths = new Set(files.map((f) => f.path));
+  if (!paths.has("package.json")) {
+    throw new Error(`Template: falta package.json na raiz (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
+  }
+  const hasAstroCfg = ASTRO_CONFIG_FILENAMES.some((f) => paths.has(f));
+  if (!hasAstroCfg) {
+    throw new Error(`Template: falta astro.config.(mjs|ts|…) na raiz (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
+  }
+  if (!Array.from(paths).some((p) => p.startsWith("src/"))) {
+    throw new Error(`Template: falta pasta src/ com ficheiros (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
+  }
+  if (!Array.from(paths).some((p) => p.startsWith("public/"))) {
+    throw new Error(`Template: falta pasta public/ com ficheiros (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
+  }
+}
+
 const BLOB_CONCURRENCY = 8;
 
 function detectAstroRootDirectory(
@@ -444,8 +449,9 @@ async function mapPool<T, R>(
 }
 
 /**
- * Cria um repositório no GitHub do usuário autenticado e envia o conteúdo do template
- * com `src/data/site-config.json` substituído por `clientConfig`.
+ * Cria um repositório no GitHub do usuário autenticado e envia o **código-fonte** do template Astro
+ * (pasta `template-astro/`), com `src/data/site-config.json` substituído por `clientConfig`.
+ * Não executa `npm run build`: o build do site do cliente fica a cargo da Vercel após o `git push`.
  *
  * O `options.token` é obrigatório (não lido de `process.env` nesta função).
  */
@@ -467,6 +473,7 @@ export async function deployToClientRepo(
     repoName: options.repoName.trim(),
     defaultBranch,
   });
+  assertClientRepoMandatoryFiles(files);
   const templateAudit = detectAstroRootDirectory(files);
   const octokit = createGitHubClient(token);
 
@@ -560,7 +567,7 @@ function buildVercelDeployGuide(
   const siteUrl = (clientConfig.siteUrl || "").trim() || "https://seu-dominio.com";
   return `# Deploy manual na Vercel
 
-Este projeto foi preparado para você publicar manualmente na Vercel, com total controle.
+Este repositório contém **código-fonte** Astro (não artefactos de build). A Vercel instala dependências e executa o build ao importar o projeto.
 
 ## 1) Importar o repositório
 

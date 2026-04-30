@@ -1,7 +1,7 @@
 # build output
 dist/
-# snapshot temporário para o NFT (BlogCMS → repo do cliente na Vercel)
-embedded-client-template/
+# cópia filtrada do template Astro para o publisher (gerada por npm run sync:template / prebuild)
+template-astro/
 # generated types
 .astro/
 
