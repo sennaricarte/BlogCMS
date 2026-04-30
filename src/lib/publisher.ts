@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGitHubClient, createRepository, type CreateRepositoryResult } from "./github";
+import { sleep, withGithubRetry } from "./github-publishing";
 import { vercelNewCloneUrl } from "./vercel-instant-deploy";
 
 /** Alinhado a `src/data/site-config.json` (identidade, menu, rodapé, SEO). */
@@ -452,7 +453,8 @@ function assertClientRepoMandatoryFiles(files: Array<{ path: string }>): void {
   }
 }
 
-const BLOB_CONCURRENCY = 8;
+/** Paralelismo moderado para reduzir picos que disparam o rate limit secundário do GitHub. */
+const BLOB_CONCURRENCY = 4;
 
 function detectAstroRootDirectory(
   files: Array<{ path: string }>,
@@ -544,7 +546,7 @@ export async function deployToClientRepo(
   const commitMessage = options.commitMessage?.trim() || "chore: deploy client template";
 
   const octokit = createGitHubClient(token);
-  const { data: me } = await octokit.users.getAuthenticated();
+  const { data: me } = await withGithubRetry(() => octokit.users.getAuthenticated(), { maxAttempts: 2 });
   const owner = me.login;
   if (!options.repoName?.trim()) {
     throw new Error("repoName é obrigatório.");
@@ -571,56 +573,74 @@ export async function deployToClientRepo(
   });
   options.onPipelineLog?.("REPO_CREATED");
 
+  /** Espaço após criar o repo para o GitHub processar o primeiro commit (README) e aliviar limites secundários. */
+  await sleep(2000);
+
   options.onPhase?.({ phase: "github_upload_template" });
 
   const repo = repository.name;
 
-  const { data: repoMeta } = await octokit.repos.get({ owner, repo });
+  const { data: repoMeta } = await withGithubRetry(() => octokit.repos.get({ owner, repo }), { maxAttempts: 3 });
   const branchName = repoMeta.default_branch || defaultBranch || "main";
 
-  const { data: defaultBranchData } = await octokit.repos.getBranch({
-    owner,
-    repo,
-    branch: branchName,
-  });
+  const { data: defaultBranchData } = await withGithubRetry(
+    () => octokit.repos.getBranch({ owner, repo, branch: branchName }),
+    { maxAttempts: 3 },
+  );
   const parentCommitSha = defaultBranchData.commit.sha;
 
   const shas = await mapPool(files, BLOB_CONCURRENCY, async (f) => {
-    const { data: blob } = await octokit.git.createBlob({
-      owner,
-      repo,
-      content:
-        f.encoding === "base64" ? f.buffer.toString("base64") : f.buffer.toString("utf-8"),
-      encoding: f.encoding,
-    });
+    const { data: blob } = await withGithubRetry(
+      () =>
+        octokit.git.createBlob({
+          owner,
+          repo,
+          content:
+            f.encoding === "base64" ? f.buffer.toString("base64") : f.buffer.toString("utf-8"),
+          encoding: f.encoding,
+        }),
+      { maxAttempts: 3 },
+    );
     return { path: f.path, sha: blob.sha };
   });
 
-  const { data: tree } = await octokit.git.createTree({
-    owner,
-    repo,
-    tree: shas.map(({ path, sha }) => ({
-      path,
-      mode: "100644" as const,
-      type: "blob" as const,
-      sha,
-    })),
-  });
+  const { data: tree } = await withGithubRetry(
+    () =>
+      octokit.git.createTree({
+        owner,
+        repo,
+        tree: shas.map(({ path, sha }) => ({
+          path,
+          mode: "100644" as const,
+          type: "blob" as const,
+          sha,
+        })),
+      }),
+    { maxAttempts: 3 },
+  );
 
-  const { data: commit } = await octokit.git.createCommit({
-    owner,
-    repo,
-    message: commitMessage,
-    tree: tree.sha,
-    parents: [parentCommitSha],
-  });
+  const { data: commit } = await withGithubRetry(
+    () =>
+      octokit.git.createCommit({
+        owner,
+        repo,
+        message: commitMessage,
+        tree: tree.sha,
+        parents: [parentCommitSha],
+      }),
+    { maxAttempts: 3 },
+  );
 
-  await octokit.git.updateRef({
-    owner,
-    repo,
-    ref: `heads/${branchName}`,
-    sha: commit.sha,
-  });
+  await withGithubRetry(
+    () =>
+      octokit.git.updateRef({
+        owner,
+        repo,
+        ref: `heads/${branchName}`,
+        sha: commit.sha,
+      }),
+    { maxAttempts: 3 },
+  );
   options.onPipelineLog?.("FILES_PUSHED");
 
   const htmlUrl = `${repository.htmlUrl}/tree/${branchName}`;

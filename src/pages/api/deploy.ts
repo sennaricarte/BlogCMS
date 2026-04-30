@@ -1,7 +1,8 @@
 import type { APIRoute } from "astro";
 import { RequestError } from "@octokit/request-error";
 import type { ClientConfig } from "../../lib/publisher";
-import { GithubPublisher } from "../../lib/github-service";
+import { GitHubPublishingPermissionError, mapGithubErrorToUserMessage } from "../../lib/github-publishing";
+import { GithubPublisher, RepositoryAlreadyExistsError } from "../../lib/github-service";
 import { deployNewSite, type DeployProgressEvent } from "../../lib/orchestrator";
 import { addProjectFromSuccessfulDeploy } from "../../lib/project-manager";
 
@@ -38,30 +39,6 @@ function jsonError(message: string, status: number, extra?: Record<string, strin
 }
 
 const NDJSON = "application/x-ndjson; charset=utf-8";
-
-/** GitHub 401/403 no fluxo de deploy (mensagem clara; não expor token). */
-function githubAuthErrorResponse(e: unknown): { httpStatus: number; message: string } | null {
-  if (!(e instanceof RequestError)) return null;
-  const status = e.status;
-  if (status !== 401 && status !== 403) return null;
-  const detail = (e.message || "").replace(/\s+/g, " ").trim().slice(0, 220);
-  if (status === 401) {
-    return {
-      httpStatus: 401,
-      message:
-        "O GitHub recusou o token (401). Confirme que o PAT não expirou, está completo e sem espaços a mais. " +
-        "Se for PAT fine-grained, confira os repositórios e permissões de escrita." +
-        (detail ? ` Detalhe: ${detail}` : ""),
-    };
-  }
-  return {
-    httpStatus: 403,
-    message:
-      "O GitHub recusou o pedido (403). Isto costuma ser política de organização ou SSO: autorize o token para a organização em GitHub → Settings → Applications, " +
-      "ou use um PAT clássico com escopo «repo» e acesso à org." +
-      (detail ? ` Detalhe: ${detail}` : ""),
-  };
-}
 
 /**
  * Opção B (infra do cliente): orquestração no servidor. Tokens vêm no corpo e não vão em logs.
@@ -104,17 +81,18 @@ export const POST: APIRoute = async ({ request }) => {
     const gh = new GithubPublisher({ token: githubToken });
     await gh.verifyConnection();
   } catch (e) {
-    if (e instanceof RequestError && (e.status === 401 || e.status === 403)) {
+    if (e instanceof GitHubPublishingPermissionError) {
+      return jsonError(e.message, e.httpStatus, { field: "github" });
+    }
+    if (e instanceof RequestError && e.status === 401) {
       return jsonError(
-        "O token do GitHub foi recusado (401). Revisa o PAT nas definições: escopos e expiração.",
+        "O token do GitHub foi recusado. Confirme o PAT, escopos e expiração.",
         401,
         { field: "github" },
       );
     }
-    return jsonError(
-      e instanceof Error ? e.message : "Falha na validação do token GitHub.",
-      502,
-    );
+    const mapped = mapGithubErrorToUserMessage(e);
+    return jsonError(mapped.message, mapped.httpStatus, { field: "github" });
   }
 
   const encoder = new TextEncoder();
@@ -181,16 +159,19 @@ export const POST: APIRoute = async ({ request }) => {
           projectsUpdate,
         });
       } catch (e) {
-        const message = e instanceof Error ? e.message : "Erro desconhecido no deploy.";
-        const ghAuth = githubAuthErrorResponse(e);
-        if (ghAuth) {
+        if (e instanceof RepositoryAlreadyExistsError) {
           line({
             type: "error" as const,
-            httpStatus: ghAuth.httpStatus,
-            message: ghAuth.message,
+            httpStatus: 422,
+            message: e.message,
           });
         } else {
-          line({ type: "error" as const, httpStatus: 500, message });
+          const mapped = mapGithubErrorToUserMessage(e);
+          line({
+            type: "error" as const,
+            httpStatus: mapped.httpStatus,
+            message: mapped.message,
+          });
         }
       } finally {
         controller.close();

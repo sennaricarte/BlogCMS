@@ -1,4 +1,5 @@
 import { createGitHubClient, RepositoryAlreadyExistsError } from "./github";
+import { validateGitHubPublishingToken } from "./github-publishing";
 import {
   createOrUpdateRepoFile,
   createOrUpdateRepoFileBytes,
@@ -41,12 +42,12 @@ export class GithubPublisher {
   }
 
   /**
-   * Valida o PAT com `GET /user` (não lê `process.env`).
+   * Valida o PAT (utilizador + API) antes de criar repositórios.
+   * 401/403 → `GitHubPublishingPermissionError` com mensagem para o painel.
    */
   async verifyConnection(): Promise<{ login: string }> {
     const octokit = createGitHubClient(this.token);
-    const { data } = await octokit.rest.users.getAuthenticated();
-    return { login: data.login };
+    return validateGitHubPublishingToken(octokit);
   }
 
   /**

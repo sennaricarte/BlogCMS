@@ -1,5 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import { RequestError } from "@octokit/request-error";
+import { withGithubRetry } from "./github-publishing";
 
 /** Lançada quando a API GitHub rejeita a criação com nome já usado (HTTP 422). */
 export class RepositoryAlreadyExistsError extends Error {
@@ -82,13 +83,17 @@ export async function createRepository(
   const octokit = createGitHubClient(token);
 
   try {
-    const { data } = await octokit.repos.createForAuthenticatedUser({
-      name: repositoryName,
-      description: input.description?.trim() || undefined,
-      private: input.private ?? true,
-      homepage: input.homepage?.trim() || undefined,
-      auto_init: input.autoInit !== false,
-    });
+    const { data } = await withGithubRetry(
+      () =>
+        octokit.repos.createForAuthenticatedUser({
+          name: repositoryName,
+          description: input.description?.trim() || undefined,
+          private: input.private ?? true,
+          homepage: input.homepage?.trim() || undefined,
+          auto_init: input.autoInit !== false,
+        }),
+      { maxAttempts: 3, operationLabel: "repos.createForAuthenticatedUser" },
+    );
 
     return {
       id: data.id,
