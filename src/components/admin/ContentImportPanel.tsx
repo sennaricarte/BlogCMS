@@ -64,14 +64,15 @@ export type PreviewRow = {
   tags?: string[];
   xmlAttachmentUrls?: string[];
   xmlAttachmentFileNameByUrl?: Record<string, string>;
-  sourceLabel: "WordPress" | "URL";
+  sourceLabel: "WordPress" | "URL" | "Lovable JSON";
 };
 
-type TabId = "wordpress" | "xml" | "url";
+type TabId = "wordpress" | "xml" | "json" | "url";
 
 export function ContentImportPanel() {
   const URL_BATCH_SIZE = 20;
   const XML_BATCH_SIZE = 20;
+  const JSON_BATCH_SIZE = 20;
   const [tab, setTab] = useState<TabId>("wordpress");
   const [wpSiteUrl, setWpSiteUrl] = useState("");
   const [wpXmlFileName, setWpXmlFileName] = useState("");
@@ -79,6 +80,11 @@ export function ContentImportPanel() {
   const [wpXmlOffset, setWpXmlOffset] = useState(0);
   const [wpXmlHasMore, setWpXmlHasMore] = useState(false);
   const [wpXmlTotal, setWpXmlTotal] = useState(0);
+  const [lovableJsonFileName, setLovableJsonFileName] = useState("");
+  const [lovableJsonBase64, setLovableJsonBase64] = useState("");
+  const [lovableJsonOffset, setLovableJsonOffset] = useState(0);
+  const [lovableJsonHasMore, setLovableJsonHasMore] = useState(false);
+  const [lovableJsonTotal, setLovableJsonTotal] = useState(0);
   const [articleUrl, setArticleUrl] = useState("");
   const [urlOnlyArticles, setUrlOnlyArticles] = useState(true);
   const [rows, setRows] = useState<PreviewRow[]>([]);
@@ -332,6 +338,174 @@ export function ContentImportPanel() {
       setMessage({ text: `${allRows.length} post(s) do XML carregado(s) no total.`, err: false });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Falha de rede no processamento em lotes do XML.", err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onSelectLovableJsonFile = async (file: File | null) => {
+    if (!file) {
+      setLovableJsonFileName("");
+      setLovableJsonBase64("");
+      setLovableJsonOffset(0);
+      setLovableJsonHasMore(false);
+      setLovableJsonTotal(0);
+      return;
+    }
+    try {
+      const b64 = await fileToBase64(file);
+      setLovableJsonFileName(file.name);
+      setLovableJsonBase64(b64);
+      setLovableJsonOffset(0);
+      setLovableJsonHasMore(false);
+      setLovableJsonTotal(0);
+      setMessage({ text: `Arquivo JSON carregado: ${file.name}`, err: false });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha ao ler JSON.", err: true });
+    }
+  };
+
+  const fetchLovableJsonBatch = async (resetBatch = true) => {
+    if (!lovableJsonBase64) {
+      setMessage({ text: "Selecione um arquivo .json primeiro.", err: true });
+      return;
+    }
+    setMessage(null);
+    setBusy(true);
+    try {
+      const offset = resetBatch ? 0 : lovableJsonOffset;
+      const res = await fetch("/api/admin/import/lovable-json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          jsonBase64: lovableJsonBase64,
+          offset,
+          limit: JSON_BATCH_SIZE,
+        }),
+      });
+      const j = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        posts?: WpApiPost[];
+        totalDiscovered?: number;
+        hasMore?: boolean;
+        nextOffset?: number;
+      };
+      if (!res.ok || !j.ok || !Array.isArray(j.posts)) {
+        setMessage({ text: j.error || `Erro HTTP ${res.status}`, err: true });
+        return;
+      }
+      const nextRows: PreviewRow[] = j.posts.map((p) => ({
+        id: `lovable-${p.sourceId}-${Math.random().toString(36).slice(2, 7)}`,
+        selected: false,
+        slug: p.slug,
+        title: p.title,
+        description: p.description,
+        pubDate: p.pubDate,
+        markdown: p.markdown,
+        featuredImageUrl: p.featuredImageUrl,
+        sourceUrl: p.sourceUrl,
+        articleHtml: p.articleHtml,
+        category: p.category,
+        tags: p.tags,
+        xmlAttachmentUrls: p.xmlAttachmentUrls,
+        xmlAttachmentFileNameByUrl: p.xmlAttachmentFileNameByUrl,
+        sourceLabel: "Lovable JSON",
+      }));
+      setRows((prev) => {
+        if (resetBatch) return nextRows;
+        const dedupe = new Set(prev.map((r) => r.slug));
+        const append = nextRows.filter((r) => !dedupe.has(r.slug));
+        return [...prev, ...append];
+      });
+      setLovableJsonTotal(typeof j.totalDiscovered === "number" ? j.totalDiscovered : nextRows.length);
+      setLovableJsonHasMore(Boolean(j.hasMore));
+      setLovableJsonOffset(typeof j.nextOffset === "number" ? j.nextOffset : offset + nextRows.length);
+      setMessage({
+        text:
+          j.message ||
+          `${nextRows.length} artigo(s) JSON carregado(s). ${Boolean(j.hasMore) ? "Pode carregar o próximo lote." : "Todos os lotes foram carregados."}`,
+        err: false,
+      });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha de rede no importador JSON.", err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fetchAllLovableJsonBatches = async () => {
+    if (!lovableJsonBase64) {
+      setMessage({ text: "Selecione um arquivo .json primeiro.", err: true });
+      return;
+    }
+    setMessage(null);
+    setBusy(true);
+    try {
+      let offset = 0;
+      let hasMore = true;
+      const allRows: PreviewRow[] = [];
+      const dedupe = new Set<string>();
+      let total = 0;
+      let safety = 0;
+      while (hasMore && safety < 120) {
+        safety += 1;
+        const res = await fetch("/api/admin/import/lovable-json", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            jsonBase64: lovableJsonBase64,
+            offset,
+            limit: JSON_BATCH_SIZE,
+          }),
+        });
+        const j = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          posts?: WpApiPost[];
+          totalDiscovered?: number;
+          hasMore?: boolean;
+          nextOffset?: number;
+        };
+        if (!res.ok || !j.ok || !Array.isArray(j.posts)) {
+          setMessage({ text: j.error || `Erro HTTP ${res.status}`, err: true });
+          return;
+        }
+        total = typeof j.totalDiscovered === "number" ? j.totalDiscovered : total;
+        for (const p of j.posts) {
+          if (dedupe.has(p.slug)) continue;
+          dedupe.add(p.slug);
+          allRows.push({
+            id: `lovable-${p.sourceId}-${Math.random().toString(36).slice(2, 7)}`,
+            selected: false,
+            slug: p.slug,
+            title: p.title,
+            description: p.description,
+            pubDate: p.pubDate,
+            markdown: p.markdown,
+            featuredImageUrl: p.featuredImageUrl,
+            sourceUrl: p.sourceUrl,
+            articleHtml: p.articleHtml,
+            category: p.category,
+            tags: p.tags,
+            xmlAttachmentUrls: p.xmlAttachmentUrls,
+            xmlAttachmentFileNameByUrl: p.xmlAttachmentFileNameByUrl,
+            sourceLabel: "Lovable JSON",
+          });
+        }
+        offset = typeof j.nextOffset === "number" ? j.nextOffset : offset + j.posts.length;
+        hasMore = Boolean(j.hasMore) && j.posts.length > 0;
+      }
+      setRows(allRows);
+      setLovableJsonTotal(total || allRows.length);
+      setLovableJsonHasMore(false);
+      setLovableJsonOffset(offset);
+      setMessage({ text: `${allRows.length} artigo(s) do JSON Lovable carregado(s) no total.`, err: false });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha de rede no processamento em lotes do JSON.", err: true });
     } finally {
       setBusy(false);
     }
@@ -909,6 +1083,17 @@ export function ContentImportPanel() {
           onClick={() => setTab("xml")}
         >
           WordPress XML (WXR)
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "json"}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+            tab === "json" ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-100"
+          }`}
+          onClick={() => setTab("json")}
+        >
+          JSON Lovable
         </button>
         <button
           type="button"
