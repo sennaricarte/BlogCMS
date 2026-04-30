@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 const K_INTEGR = "blogcms-admin-integration";
 const K_CMS = "blogcms-cms-target";
+const IMPORTER_UI_VERSION = "importador-ui 2026-04-30 · 775eb6c";
 
 type IntegrationLs = { GITHUB_PERSONAL_TOKEN?: string };
 type CmsTargetLs = { githubRepoFullName?: string; branch?: string };
@@ -1044,6 +1045,9 @@ export function ContentImportPanel() {
 
   return (
     <div className="space-y-8">
+      <p className="text-xs text-zinc-500" role="status" aria-label="Versão da interface do importador">
+        Versão do importador: <code className="rounded bg-zinc-100 px-1">{IMPORTER_UI_VERSION}</code>
+      </p>
       {!credsOk && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
           Para gravar no GitHub, define o token e o repositório em{" "}
