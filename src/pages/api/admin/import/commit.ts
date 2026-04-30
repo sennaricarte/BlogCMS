@@ -262,6 +262,25 @@ function collectImageRefsFromMarkdown(markdown: string, sourceUrl?: string): Arr
   return out;
 }
 
+function collectImageRefsFromHtml(articleHtml?: string, sourceUrl?: string): Array<{ raw: string; abs: string }> {
+  const html = (articleHtml || "").trim();
+  if (!html) return [];
+  try {
+    const $ = cheerio.load(html, { decodeEntities: true });
+    const out: Array<{ raw: string; abs: string }> = [];
+    $("img[src]").each((_, el) => {
+      const raw = ($(el).attr("src") || "").trim();
+      if (!raw) return;
+      const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
+      if (!abs) return;
+      out.push({ raw, abs });
+    });
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 function extractOgOrTwitterImage(articleHtml?: string, sourceUrl?: string): string | null {
   const html = (articleHtml || "").trim();
   if (!html) return null;
@@ -290,16 +309,20 @@ async function processArticleAssets(params: {
   const warnings: string[] = [];
   let processedMarkdown = markdown;
 
-  // 1) Coleta URLs (corpo + destaque) e processa em concorrência.
+  // 1) Coleta URLs (corpo em Markdown + todas <img> do HTML + destaque) e processa em concorrência.
   const markdownRefs = collectImageRefsFromMarkdown(markdown, sourceUrl);
+  const htmlRefs = collectImageRefsFromHtml(articleHtml, sourceUrl);
   const ogOrTw = extractOgOrTwitterImage(articleHtml, sourceUrl);
-  const featuredCandidate = ogOrTw || resolveMaybeAbsoluteImageUrl(featuredImageUrl || "", sourceUrl);
+  // Prioridade para capa vinda do XML/WordPress (_thumbnail_id -> attachment_url).
+  const featuredCandidate = resolveMaybeAbsoluteImageUrl(featuredImageUrl || "", sourceUrl) || ogOrTw;
   const allAssetUrls = Array.from(
     new Set([
       ...markdownRefs.map((r) => r.abs),
+      ...htmlRefs.map((r) => r.abs),
       ...(featuredCandidate ? [featuredCandidate] : []),
     ]),
   );
+  const totalDetected = allAssetUrls.length;
   const indexByUrl = new Map<string, number>(allAssetUrls.map((u, i) => [u, i + 1]));
 
   const uploadedByUrl = new Map<string, string>();
@@ -319,6 +342,13 @@ async function processArticleAssets(params: {
     uploadedByUrl.set(assetUrl, local);
   });
   await Promise.all(downloadTasks);
+  const totalUploaded = uploadedByUrl.size;
+  console.info("[import-media] Auditoria de assets por post", {
+    slugBase,
+    detected: totalDetected,
+    uploaded: totalUploaded,
+    failed: Math.max(0, totalDetected - totalUploaded),
+  });
 
   // 2) Reescreve Markdown apenas para assets confirmados no GitHub.
   for (const ref of markdownRefs) {
@@ -328,7 +358,7 @@ async function processArticleAssets(params: {
     processedMarkdown = processedMarkdown.replace(new RegExp(`(!\\[[^\\]]*\\]\\()${escapedRaw}(\\))`, "g"), `$1${local}$2`);
   }
 
-  // 3) Determina destaque com prioridade og/twitter -> featured explícito -> primeira imagem local -> fallback obrigatório.
+  // 3) Determina destaque com prioridade featured explícito -> og/twitter -> primeira imagem local -> fallback obrigatório.
   let featuredPath = "/assets/blog/destaque.jpg";
   if (featuredCandidate) {
     const localFeatured = uploadedByUrl.get(featuredCandidate);
