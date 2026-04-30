@@ -1,6 +1,6 @@
-/** Link «Deploy instantâneo» da Vercel (importa o repositório GitHub). */
-export function vercelNewCloneUrl(repositoryHttpsUrl: string): string {
+﻿/** Link de importação direta da Vercel para um repositório GitHub existente. */
+export function vercelNewImportUrl(repositoryHttpsUrl: string): string {
   const u = (repositoryHttpsUrl || "").trim();
   if (!u) return "https://vercel.com/new";
-  return `https://vercel.com/new/clone?repository-url=${encodeURIComponent(u)}`;
+  return `https://vercel.com/new/import?s=${encodeURIComponent(u)}`;
 }

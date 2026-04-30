@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Code2, ExternalLink, LayoutDashboard, Link2, MoreHorizontal, Plus, Search, Trash2, X, Zap } from "lucide-react";
 import { ADMIN_CMS_TARGET_KEY, getCmsTargetFromProject } from "../../lib/admin-cms-target";
 import { ADMIN_INTEGRATION_STORAGE_KEY } from "../../lib/admin-storage";
@@ -9,7 +9,7 @@ import {
   projectVercelSpeedInsightsUrl,
 } from "../../lib/vercel-project-admin-links";
 import { canonicalVercelProjectUrl, preferStableVercelProductionUrl } from "../../lib/vercel-public-url";
-import { vercelNewCloneUrl } from "../../lib/vercel-instant-deploy";
+import { vercelNewImportUrl } from "../../lib/vercel-instant-deploy";
 import { DashboardProjectGsc } from "./DashboardProjectGsc";
 
 const K = ADMIN_INTEGRATION_STORAGE_KEY;
@@ -55,20 +55,20 @@ function mapReadyState(ready: string): Pick<StatusRow, "label" | "badgeClass"> {
   ) {
     return { label: "Em build", badgeClass: "bg-amber-50 text-amber-900 ring-1 ring-amber-200/80" };
   }
-  if (u === "UNKNOWN" || u === "—") {
+  if (u === "UNKNOWN" || u === "â€”") {
     return { label: "Desconhecido", badgeClass: "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200" };
   }
   return { label: ready, badgeClass: "bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200" };
 }
 
-/** Grava o alvo no localStorage se o projeto tiver repo/Vercel válidos; nunca impede a navegação. */
+/** Grava o alvo no localStorage se o projeto tiver repo/Vercel vÃ¡lidos; nunca impede a navegaÃ§Ã£o. */
 function persistCmsTargetIfPossible(p: ClientProject) {
   const target = getCmsTargetFromProject(p);
   if (!target) return;
   try {
     localStorage.setItem(K_CMS, JSON.stringify(target));
   } catch {
-    /* Navegação ainda segue; a página do projeto avisa. */
+    /* NavegaÃ§Ã£o ainda segue; a pÃ¡gina do projeto avisa. */
   }
 }
 
@@ -80,7 +80,7 @@ function normalizeProjectKey(v: string): string {
   return (v || "").trim().toLowerCase();
 }
 
-/** Repositório criado só no GitHub: aguarda deploy na Vercel e confirmação da URL no painel. */
+/** RepositÃ³rio criado sÃ³ no GitHub: aguarda deploy na Vercel e confirmaÃ§Ã£o da URL no painel. */
 function isAwaitingVercelDeploy(p: ClientProject): boolean {
   if (p.awaitingVercelDeploy === false) return false;
   if (p.awaitingVercelDeploy === true) return true;
@@ -96,7 +96,7 @@ function sanitizeCachedProjectUrl(p: ClientProject): ClientProject {
   try {
     const u = new URL(raw);
     const host = u.hostname.toLowerCase();
-    // Migração de cache antigo: "<project>.vercel.app" gerado localmente para projetos de equipa.
+    // MigraÃ§Ã£o de cache antigo: "<project>.vercel.app" gerado localmente para projetos de equipa.
     if (host === `${name}.vercel.app`) {
       return { ...p, vercelUrl: "https://vercel.com", siteUrl: "https://vercel.com" };
     }
@@ -193,7 +193,7 @@ function resolveStatus(
     if (!hasVercelToken && hasUrl) {
       return { kind: "online" };
     }
-    return { kind: "line", text: "A verificar…", className: "text-slate-500" };
+    return { kind: "line", text: "A verificarâ€¦", className: "text-slate-500" };
   }
   if (s.label === "Pronto" || s.raw === "READY") {
     return { kind: "online" };
@@ -204,17 +204,17 @@ function resolveStatus(
   if (s.label === "Desconhecido") {
     return { kind: "line", text: "A sincronizar", className: "text-amber-800/90 font-medium" };
   }
-  if (s.label === "Sem ligação") {
+  if (s.label === "Sem ligaÃ§Ã£o") {
     return { kind: "line", text: "A configurar", className: "text-slate-500" };
   }
   if (s.label === "Erro" || s.label === "Rede" || s.label === "Cancelado") {
     if (hasUrl) {
-      // Se houver URL pública, não bloqueia o cartão como indisponível por falha pontual da API da Vercel.
+      // Se houver URL pÃºblica, nÃ£o bloqueia o cartÃ£o como indisponÃ­vel por falha pontual da API da Vercel.
       return { kind: "online" };
     }
     return {
       kind: "line",
-      text: "Indisponível",
+      text: "IndisponÃ­vel",
       className: "text-red-800 font-medium",
       detail: s.error,
     };
@@ -239,7 +239,7 @@ function resolveLiveSiteHref(project: ClientProject, statusRow?: StatusRow): str
   const dep = depRaw ? preferStableVercelProductionUrl(depRaw, projectName) : undefined;
   const raw = String(statusRow?.raw || "").toUpperCase();
   if (ready) return ready;
-  // Só usa URL do deploy quando o estado reportado é READY.
+  // SÃ³ usa URL do deploy quando o estado reportado Ã© READY.
   if (dep && raw === "READY") return dep;
   return stable;
 }
@@ -301,7 +301,7 @@ function CardQuickMenu({ project, siteHref, onDeleteProject }: CardMenuProps & {
         className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 hover:text-slate-900"
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={`Ações para ${project.name}`}
+        aria-label={`AÃ§Ãµes para ${project.name}`}
         onClick={() => setOpen((o) => !o)}
       >
         <MoreHorizontal className="h-4 w-4" />
@@ -331,7 +331,7 @@ function CardQuickMenu({ project, siteHref, onDeleteProject }: CardMenuProps & {
             onClick={close}
           >
             <Code2 className="h-3.5 w-3.5 opacity-60" />
-            Abrir repositório
+            Abrir repositÃ³rio
           </a>
           <a
             href={projectHubHref(project)}
@@ -447,17 +447,17 @@ export function DashboardProjects({ projects }: Props) {
 
   const onDeleteProject = useCallback(async (project: ClientProject, hardDelete = false) => {
     const ok = window.confirm(hardDelete
-      ? `Excluir "${project.name}" do painel E também apagar GitHub/Vercel?\n\nEsta ação é destrutiva e pode ser irreversível.`
-      : `Remover "${project.name}" do painel?\n\nEsta ação remove apenas o registo interno do BlogCMS. O repositório GitHub e o projeto Vercel NÃO serão apagados.`,
+      ? `Excluir "${project.name}" do painel E tambÃ©m apagar GitHub/Vercel?\n\nEsta aÃ§Ã£o Ã© destrutiva e pode ser irreversÃ­vel.`
+      : `Remover "${project.name}" do painel?\n\nEsta aÃ§Ã£o remove apenas o registo interno do BlogCMS. O repositÃ³rio GitHub e o projeto Vercel NÃƒO serÃ£o apagados.`,
     );
     if (!ok) return;
     if (hardDelete) {
-      const typed = window.prompt(`Digite EXCLUIR para confirmar a exclusão remota de "${project.name}"`);
+      const typed = window.prompt(`Digite EXCLUIR para confirmar a exclusÃ£o remota de "${project.name}"`);
       if ((typed || "").trim().toUpperCase() !== "EXCLUIR") return;
       const integCheck = readIntegration();
       if (!integCheck.githubToken || !integCheck.vercelToken) {
         const fallback = window.confirm(
-          "Tokens ausentes para exclusão remota. Deseja excluir apenas do painel?",
+          "Tokens ausentes para exclusÃ£o remota. Deseja excluir apenas do painel?",
         );
         if (!fallback) return;
         hardDelete = false;
@@ -512,22 +512,22 @@ export function DashboardProjects({ projects }: Props) {
           setHint(`Projeto "${project.name}" removido localmente do painel.`);
           return;
         }
-        setHint(j.error || "Projeto ocultado localmente, mas falhou a remoção no registo do servidor.");
+        setHint(j.error || "Projeto ocultado localmente, mas falhou a remoÃ§Ã£o no registo do servidor.");
         return;
       }
       if (hardDelete) {
         if (Array.isArray(j.remoteErrors) && j.remoteErrors.length > 0) {
           setHint(
-            `Projeto "${project.name}" removido do painel, com falhas na exclusão remota: ${j.remoteErrors.join(" | ")}`,
+            `Projeto "${project.name}" removido do painel, com falhas na exclusÃ£o remota: ${j.remoteErrors.join(" | ")}`,
           );
         } else {
-          setHint(`Projeto "${project.name}" removido do painel e excluído no GitHub/Vercel.`);
+          setHint(`Projeto "${project.name}" removido do painel e excluÃ­do no GitHub/Vercel.`);
         }
       } else {
         setHint(`Projeto "${project.name}" removido do painel.`);
       }
     } catch {
-      setHint("Projeto ocultado localmente. Não foi possível confirmar remoção no servidor.");
+      setHint("Projeto ocultado localmente. NÃ£o foi possÃ­vel confirmar remoÃ§Ã£o no servidor.");
     }
   }, [hiddenIds, hiddenKeys]);
 
@@ -540,7 +540,7 @@ export function DashboardProjects({ projects }: Props) {
   useEffect(() => {
     const { vercelToken, teamId } = readIntegration();
     if (!vercelToken) {
-      setHint("Configure o token da Vercel em Configurações para o estado de deploy em tempo real no cartão.");
+      setHint("Configure o token da Vercel em ConfiguraÃ§Ãµes para o estado de deploy em tempo real no cartÃ£o.");
       return;
     }
 
@@ -564,7 +564,7 @@ export function DashboardProjects({ projects }: Props) {
             };
           } else {
             next[p.id] = {
-              label: "Sem ligação",
+              label: "Sem ligaÃ§Ã£o",
               badgeClass: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-200",
               error: "preenche vercelProjectId",
             };
@@ -592,7 +592,7 @@ export function DashboardProjects({ projects }: Props) {
           };
           if (!r.ok || !j.ok) {
             const errTxt = String(j.error || "");
-            if (/project not found/i.test(errTxt) || /projeto n[oã]o encontrado/i.test(errTxt)) {
+            if (/project not found/i.test(errTxt) || /projeto n[oÃ£]o encontrado/i.test(errTxt)) {
               idsToHide.add(p.id);
               keysToHide.add(normalizeProjectKey(p.githubRepoFullName?.trim() || p.vercelProjectId?.trim() || p.id));
             }
@@ -657,7 +657,7 @@ export function DashboardProjects({ projects }: Props) {
           </div>
           <h2 className="mt-4 text-lg font-bold tracking-tight text-slate-900">Ainda sem sites</h2>
           <p className="mt-1.5 max-w-md text-sm text-slate-600">
-            Crie seu primeiro site com GitHub e Vercel. Depois, o resumo e os links de produção aparecem neste
+            Crie seu primeiro site com GitHub e Vercel. Depois, o resumo e os links de produÃ§Ã£o aparecem neste
             painel.
           </p>
           <div className="mt-6 flex w-full max-w-md flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
@@ -674,7 +674,7 @@ export function DashboardProjects({ projects }: Props) {
             <a
               href="/admin/publicar-na-vercel/"
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border-2 border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/25"
-              aria-label="Ver instruções para publicar o site na Vercel"
+              aria-label="Ver instruÃ§Ãµes para publicar o site na Vercel"
             >
               Veja como publicar seu site
             </a>
@@ -711,7 +711,7 @@ export function DashboardProjects({ projects }: Props) {
               name="site-name-filter"
               value={nameQuery}
               onChange={(e) => setNameQuery(e.target.value)}
-              placeholder="Filtrar pelo nome do projeto…"
+              placeholder="Filtrar pelo nome do projetoâ€¦"
               autoComplete="off"
               className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-10 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400/20"
               aria-label="Filtrar sites pelo nome do projeto"
@@ -764,7 +764,7 @@ export function DashboardProjects({ projects }: Props) {
           const st = resolveStatus(s, p, hasVercelToken);
           const awaiting = isAwaitingVercelDeploy(p);
           const siteHref = awaiting ? `${projectHubHref(p)}#url-producao` : resolveLiveSiteHref(p, s);
-          const vercelCloneHref = vercelNewCloneUrl(p.githubUrl);
+          const vercelCloneHref = vercelNewImportUrl(p.githubUrl);
           const created = (() => {
             try {
               return new Date(p.createdAt).toLocaleDateString("pt-BR", {
@@ -798,14 +798,14 @@ export function DashboardProjects({ projects }: Props) {
                       )}
                       title={s?.raw}
                     >
-                      {st.kind === "line" ? st.text : "—"}
+                      {st.kind === "line" ? st.text : "â€”"}
                     </span>
                   )}
                   <CardQuickMenu project={p} siteHref={siteHref} onDeleteProject={onDeleteProject} />
                 </div>
               </div>
 
-              {st.kind === "line" && st.detail && s?.label !== "Sem ligação" && (
+              {st.kind === "line" && st.detail && s?.label !== "Sem ligaÃ§Ã£o" && (
                 <p className="px-4 pt-1 text-xs text-slate-500">{st.detail}</p>
               )}
 
@@ -820,11 +820,11 @@ export function DashboardProjects({ projects }: Props) {
                   </span>
                   <span className="min-w-0">
                     <span className="block text-xs font-medium text-slate-500">
-                      {awaiting ? "Site público" : "Produção (Vercel)"}
+                      {awaiting ? "Site pÃºblico" : "ProduÃ§Ã£o (Vercel)"}
                     </span>
                     <span className="block truncate font-medium text-slate-900" title={siteHref}>
                       {awaiting
-                        ? "Confirme a URL após publicar na Vercel"
+                        ? "Confirme a URL apÃ³s publicar na Vercel"
                         : (() => {
                             try {
                               return new URL(siteHref).host;
@@ -845,7 +845,7 @@ export function DashboardProjects({ projects }: Props) {
                     <Code2 className="h-4 w-4" aria-hidden />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-xs font-medium text-slate-500">Código (GitHub)</span>
+                    <span className="block text-xs font-medium text-slate-500">CÃ³digo (GitHub)</span>
                     <span className="block truncate text-slate-800" title={p.githubUrl}>
                       {p.githubUrl.replace("https://github.com/", "")}
                     </span>
@@ -925,3 +925,4 @@ export function DashboardProjects({ projects }: Props) {
     </div>
   );
 }
+

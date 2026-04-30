@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Rocket } from "lucide-react";
-import { vercelNewCloneUrl } from "../../lib/vercel-instant-deploy";
+import { vercelNewImportUrl } from "../../lib/vercel-instant-deploy";
 
 type DeploySuccessDetail = {
   githubRepositoryUrl: string;
@@ -10,7 +10,7 @@ type DeploySuccessDetail = {
 const EVENT = "blogcms-deploy-github-success";
 
 /**
- * Painel pós-criação: repositório, deploy instantâneo na Vercel e link de clone.
+ * Painel pós-criação: repositório, deploy instantâneo na Vercel e link de importação.
  */
 export default function DeploySuccessPanel() {
   const [data, setData] = useState<DeploySuccessDetail | null>(null);
@@ -28,7 +28,7 @@ export default function DeploySuccessPanel() {
   if (!data) return null;
 
   const repo = data.githubRepositoryUrl.trim();
-  const cloneUrl = vercelNewCloneUrl(repo);
+  const importUrl = vercelNewImportUrl(repo);
 
   return (
     <section
@@ -53,30 +53,33 @@ export default function DeploySuccessPanel() {
           Abrir repositório no GitHub
         </a>
         <a
-          href={cloneUrl}
+          href={importUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex min-h-11 flex-[1.2] items-center justify-center gap-2 rounded-lg bg-[var(--client-color-primary)] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/40"
-          aria-label="Fazer deploy na Vercel — abre o assistente de importação"
+          aria-label="Fazer deploy na Vercel — abre a importação direta"
         >
           <Rocket className="h-4 w-4 shrink-0" aria-hidden />
           Fazer deploy na Vercel
         </a>
       </div>
+      <p className="mt-2 text-xs text-slate-600">
+        Se o repositório já estiver conectado, basta clicar em Import no dashboard da Vercel.
+      </p>
 
       <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Deploy instantâneo (clone)</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">Importação direta</h3>
         <p className="mt-1 text-xs text-slate-600">
           A Vercel pode importar o repositório diretamente. Copie o link se preferir abrir noutro separador:
         </p>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
           <code className="block min-w-0 flex-1 break-all rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] leading-snug text-slate-800">
-            {cloneUrl}
+            {importUrl}
           </code>
           <button
             type="button"
             className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
-            onClick={() => void navigator.clipboard.writeText(cloneUrl).catch(() => {})}
+            onClick={() => void navigator.clipboard.writeText(importUrl).catch(() => {})}
           >
             Copiar link
           </button>
@@ -94,3 +97,5 @@ export default function DeploySuccessPanel() {
     </section>
   );
 }
+
+

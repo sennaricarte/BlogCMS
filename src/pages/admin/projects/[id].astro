@@ -1,4 +1,4 @@
----
+﻿---
 export const prerender = false;
 
 import AdminLayout from "../../../layouts/AdminLayout.astro";
@@ -11,7 +11,7 @@ import {
   projectVercelDeploymentsUrl,
   projectVercelSpeedInsightsUrl,
 } from "../../../lib/vercel-project-admin-links";
-import { vercelNewCloneUrl } from "../../../lib/vercel-instant-deploy";
+import { vercelNewImportUrl } from "../../../lib/vercel-instant-deploy";
 
 const rawId = Astro.params.id;
 const { projects: projectsList } = await readProjectsData();
@@ -30,7 +30,7 @@ const cmsTargetJson = cmsTarget ? JSON.stringify(cmsTarget) : "";
 const publicUrl = projectPublicSiteUrl(project);
 const awaitingDeploy =
   project.awaitingVercelDeploy !== false && !String(project.vercelProjectId || "").trim();
-const vercelCloneUrl = vercelNewCloneUrl(project.githubUrl);
+const vercelCloneUrl = vercelNewImportUrl(project.githubUrl);
 const logsUrl = projectVercelDeploymentsUrl(project);
 const analyticsUrl = projectVercelSpeedInsightsUrl(project);
 /** Indicador estático até haver cálculo real (Lighthouse, Content API, etc.). */

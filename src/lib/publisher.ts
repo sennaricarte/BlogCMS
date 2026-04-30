@@ -1,12 +1,12 @@
-import { existsSync } from "node:fs";
+﻿import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGitHubClient, createRepository, type CreateRepositoryResult } from "./github";
 import { sleep, withGithubRetry } from "./github-publishing";
-import { vercelNewCloneUrl } from "./vercel-instant-deploy";
+import { vercelNewImportUrl } from "./vercel-instant-deploy";
 
-/** Alinhado a `src/data/site-config.json` (identidade, menu, rodapé, SEO). */
+/** Alinhado a `src/data/site-config.json` (identidade, menu, rodapÃ©, SEO). */
 export interface SiteConfig {
   nomeMarca: string;
   cores: {
@@ -15,21 +15,21 @@ export interface SiteConfig {
   };
   descricaoSeo: string;
   menuLinks: Array<{ label: string; href: string }>;
-  /** Links do rodapé (global). */
+  /** Links do rodapÃ© (global). */
   footerLinks?: Array<{ label: string; href: string }>;
-  /** Texto legal / copyright (HTML não permitido; texto simples). */
+  /** Texto legal / copyright (HTML nÃ£o permitido; texto simples). */
   footerText?: string;
-  /** Redes sociais (rótulo + URL). */
+  /** Redes sociais (rÃ³tulo + URL). */
   socialLinks?: Array<{ label: string; href: string }>;
   siteUrl: string;
   imagemCompartilhamento: string;
   /**
-   * Caminho público da logótipo no cabeçalho (ex. `/media/logo.png`).
-   * Vazio = mostrar só o nome da marca em texto.
+   * Caminho pÃºblico da logÃ³tipo no cabeÃ§alho (ex. `/media/logo.png`).
+   * Vazio = mostrar sÃ³ o nome da marca em texto.
    */
   headerLogoUrl?: string;
   /**
-   * Caminho público do favicon (ex. `/favicon.svg`, `/media/favicon.ico`).
+   * Caminho pÃºblico do favicon (ex. `/favicon.svg`, `/media/favicon.ico`).
    * Em falta, usa-se `/favicon.svg`.
    */
   faviconUrl?: string;
@@ -38,7 +38,7 @@ export interface SiteConfig {
 /** @deprecated Use `SiteConfig`; mantido para compatibilidade. */
 export type ClientConfig = SiteConfig;
 
-/** Sempre POSIX para comparar com `r` na árvore de ficheiros. */
+/** Sempre POSIX para comparar com `r` na Ã¡rvore de ficheiros. */
 const CONFIG_FILE_IN_TEMPLATE = "src/data/site-config.json";
 const DEPLOY_GUIDE_FILE_IN_TEMPLATE = "DEPLOY-VERCEL.md";
 const INSTRUCOES_DEPLOY_FILE = "instrucoes-deploy.md";
@@ -52,7 +52,7 @@ const IGNORED_DIR_NAMES = new Set([
   "node_modules",
   "dist",
   "coverage",
-  /** Cópia do template para o cliente; não incluir na própria cópia. */
+  /** CÃ³pia do template para o cliente; nÃ£o incluir na prÃ³pria cÃ³pia. */
   "template-astro",
 ]);
 
@@ -62,8 +62,8 @@ const IGNORED_FILE_NAMES = new Set([
 ]);
 
 /**
- * Conteúdo editorial é específico de cada cliente e não deve ser copiado
- * para novos repositórios criados a partir deste template SaaS.
+ * ConteÃºdo editorial Ã© especÃ­fico de cada cliente e nÃ£o deve ser copiado
+ * para novos repositÃ³rios criados a partir deste template SaaS.
  */
 const TEMPLATE_EXCLUDED_PREFIXES = [
   "src/content/blog/",
@@ -72,8 +72,8 @@ const TEMPLATE_EXCLUDED_PREFIXES = [
 ];
 
 /**
- * Arquivos úteis no repositório SaaS, mas desnecessários no template final do cliente.
- * Mantemos apenas o que é necessário para executar e editar o CMS/site.
+ * Arquivos Ãºteis no repositÃ³rio SaaS, mas desnecessÃ¡rios no template final do cliente.
+ * Mantemos apenas o que Ã© necessÃ¡rio para executar e editar o CMS/site.
  */
 const TEMPLATE_EXCLUDED_EXACT_FILES = new Set([
   "vercel.json",
@@ -136,21 +136,21 @@ const ASTRO_CONFIG_FILENAMES = [
   "astro.config.cjs",
 ] as const;
 
-/** Pasta na raiz do BlogCMS com o código-fonte Astro enviado aos repos dos clientes (sem `dist/`). */
+/** Pasta na raiz do BlogCMS com o cÃ³digo-fonte Astro enviado aos repos dos clientes (sem `dist/`). */
 export const CLIENT_ASTRO_TEMPLATE_DIR_NAME = "template-astro";
 
 function hasBlogcmsProjectRoot(dir: string): boolean {
   if (!existsSync(join(dir, "package.json"))) return false;
   if (!ASTRO_CONFIG_FILENAMES.some((f) => existsSync(join(dir, f)))) return false;
   /**
-   * Na Vercel, `process.cwd()` costuma ser `/var/task` com `package.json` + `astro.config.*` da função,
-   * mas **sem** árvore `src/` — só o bundle em `server/`. Exigir o ficheiro de dados evita esse falso positivo.
+   * Na Vercel, `process.cwd()` costuma ser `/var/task` com `package.json` + `astro.config.*` da funÃ§Ã£o,
+   * mas **sem** Ã¡rvore `src/` â€” sÃ³ o bundle em `server/`. Exigir o ficheiro de dados evita esse falso positivo.
    */
   if (!existsSync(join(dir, "src", "data", "site-config.json"))) return false;
   return true;
 }
 
-/** `template-astro/` empacotada ao lado de `chunks/` na função serverless (NFT). */
+/** `template-astro/` empacotada ao lado de `chunks/` na funÃ§Ã£o serverless (NFT). */
 function bundledTemplateAstroRoot(): string | null {
   const candidate = join(
     dirname(fileURLToPath(import.meta.url)),
@@ -161,8 +161,8 @@ function bundledTemplateAstroRoot(): string | null {
 }
 
 /**
- * Gera `./template-astro/` a partir da raiz do BlogCMS (exclusões iguais ao push para o cliente).
- * Não executa `npm run build`: só cópia de ficheiros-fonte. A Vercel do cliente faz o build.
+ * Gera `./template-astro/` a partir da raiz do BlogCMS (exclusÃµes iguais ao push para o cliente).
+ * NÃ£o executa `npm run build`: sÃ³ cÃ³pia de ficheiros-fonte. A Vercel do cliente faz o build.
  */
 export async function syncTemplateAstroToProjectRoot(
   log?: { warn: (msg: string) => void },
@@ -170,7 +170,7 @@ export async function syncTemplateAstroToProjectRoot(
   const sourceRoot = join(process.cwd());
   if (!hasBlogcmsProjectRoot(sourceRoot)) {
     log?.warn(
-      "[sync-template-astro] cwd não é a raiz do BlogCMS (falta src/data/site-config.json); cópia omitida.",
+      "[sync-template-astro] cwd nÃ£o Ã© a raiz do BlogCMS (falta src/data/site-config.json); cÃ³pia omitida.",
     );
     return;
   }
@@ -210,7 +210,7 @@ export async function syncTemplateAstroToProjectRoot(
 
 /**
  * Raiz do template Astro **fonte** enviado ao GitHub do cliente.
- * Produção (Vercel): `template-astro/` incluída no bundle (NFT). Local: `./template-astro` após `npm run sync:template`.
+ * ProduÃ§Ã£o (Vercel): `template-astro/` incluÃ­da no bundle (NFT). Local: `./template-astro` apÃ³s `npm run sync:template`.
  */
 function defaultTemplateRoot(): string {
   const bundled = bundledTemplateAstroRoot();
@@ -239,14 +239,14 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 export interface DeployToClientRepoOptions {
-  /** Nome do repositório (slug), ex.: "site-cliente-xyz". */
+  /** Nome do repositÃ³rio (slug), ex.: "site-cliente-xyz". */
   repoName: string;
-  /** PAT GitHub; obrigatório (não lido de `process.env` neste módulo). */
+  /** PAT GitHub; obrigatÃ³rio (nÃ£o lido de `process.env` neste mÃ³dulo). */
   token: string;
   description?: string;
   private?: boolean;
   /**
-   * Diretório com o código-fonte Astro do cliente.
+   * DiretÃ³rio com o cÃ³digo-fonte Astro do cliente.
    * Predefinido: `./template-astro` na raiz do BlogCMS (gerado por `npm run sync:template`).
    */
   templateRoot?: string;
@@ -261,11 +261,11 @@ export interface DeployToClientRepoOptions {
    */
   commitMessage?: string;
   /**
-   * Etapas internas: criar repositório vazio, depois enviar blobs do template.
+   * Etapas internas: criar repositÃ³rio vazio, depois enviar blobs do template.
    * Usado por `orchestrator` para progresso (UI).
    */
   onPhase?: (e: { phase: "github_create_repo" | "github_upload_template" }) => void;
-  /** Sinais de auditoria/UX consumidos por `orchestrator` (sem dados sensíveis). */
+  /** Sinais de auditoria/UX consumidos por `orchestrator` (sem dados sensÃ­veis). */
   onPipelineLog?: (status: "REPO_CREATED" | "FILES_PUSHED") => void;
 }
 
@@ -299,68 +299,68 @@ function isBinaryFile(path: string, buffer: Buffer): boolean {
   return slice.includes(0);
 }
 
-/** Percorre o template e devolve pares (caminho POSIX no repo, conteúdo). */
+/** Percorre o template e devolve pares (caminho POSIX no repo, conteÃºdo). */
 function buildInstrucoesDeployMarkdown(
   clientConfig: SiteConfig,
   options: { repoName: string; defaultBranch: string; repositoryHtmlUrl: string },
 ): string {
   const branch = options.defaultBranch || "main";
   const repoUrl = (options.repositoryHtmlUrl || "").trim();
-  const clone = vercelNewCloneUrl(repoUrl);
+  const clone = vercelNewImportUrl(repoUrl);
   const brand = (clientConfig.nomeMarca || "").trim() || options.repoName;
-  return `# Instruções — ligar este repositório à Vercel
+  return `# InstruÃ§Ãµes â€” ligar este repositÃ³rio Ã  Vercel
 
 Este ficheiro foi gerado automaticamente quando o projeto **${brand}** foi criado no GitHub.
 
 ## O que vai acontecer
 
-1. O código deste repositório é um projeto **Astro** em código-fonte.
-2. A **Vercel** vai instalar dependências e correr \`npm run build\` na cloud (não precisa de build local obrigatório).
+1. O cÃ³digo deste repositÃ³rio Ã© um projeto **Astro** em cÃ³digo-fonte.
+2. A **Vercel** vai instalar dependÃªncias e correr \`npm run build\` na cloud (nÃ£o precisa de build local obrigatÃ³rio).
 
-## Passo 1 — Conta na Vercel
+## Passo 1 â€” Conta na Vercel
 
-1. Aceda a [vercel.com](https://vercel.com) e inicie sessão (recomendado: mesmo e-mail ou GitHub que usou para criar este repositório).
+1. Aceda a [vercel.com](https://vercel.com) e inicie sessÃ£o (recomendado: mesmo e-mail ou GitHub que usou para criar este repositÃ³rio).
 
-## Passo 2 — Importar este repositório
+## Passo 2 â€” Importar este repositÃ³rio
 
-**Opção A — Deploy instantâneo (clone)**
+**OpÃ§Ã£o A â€” Deploy instantÃ¢neo (clone)**
 
-1. Abra o link (já com o URL do repositório):
+1. Abra o link (jÃ¡ com o URL do repositÃ³rio):
 
    **${clone}**
 
 2. Siga o assistente: confirme o nome do projeto na Vercel e clique em **Deploy**.
 
-**Opção B — Import manual**
+**OpÃ§Ã£o B â€” Import manual**
 
 1. Aceda a [vercel.com/new](https://vercel.com/new).
-2. Escolha **Import Git Repository** e selecione este repositório.
+2. Escolha **Import Git Repository** e selecione este repositÃ³rio.
 3. Branch principal: **${branch}**.
 
-## Passo 3 — Definições de build
+## Passo 3 â€” DefiniÃ§Ãµes de build
 
-- **Root Directory:** deixe vazio (a raiz do repositório), salvo se o \`package.json\` estiver noutra pasta.
+- **Root Directory:** deixe vazio (a raiz do repositÃ³rio), salvo se o \`package.json\` estiver noutra pasta.
 - **Build Command:** \`npm run build\`
 - **Install Command:** \`npm install\`
-- **Output Directory:** deixe o padrão (a Vercel deteta Astro).
+- **Output Directory:** deixe o padrÃ£o (a Vercel deteta Astro).
 
-## Passo 4 — Primeiro deploy
+## Passo 4 â€” Primeiro deploy
 
 1. Clique em **Deploy** e aguarde o fim do build.
-2. Se aparecer erro \`ENOENT\` / \`package.json\`, verifique **Project → Settings → General → Root Directory** (deve apontar para a pasta onde está o \`package.json\`).
+2. Se aparecer erro \`ENOENT\` / \`package.json\`, verifique **Project â†’ Settings â†’ General â†’ Root Directory** (deve apontar para a pasta onde estÃ¡ o \`package.json\`).
 
-## Passo 5 — Domínio
+## Passo 5 â€” DomÃ­nio
 
-1. Em **Settings → Domains**, adicione o seu domínio e configure o DNS conforme as instruções da Vercel.
+1. Em **Settings â†’ Domains**, adicione o seu domÃ­nio e configure o DNS conforme as instruÃ§Ãµes da Vercel.
 
-## Referência
+## ReferÃªncia
 
-- URL do repositório: ${repoUrl || "—"}
+- URL do repositÃ³rio: ${repoUrl || "â€”"}
 - Ficheiro complementar na raiz: \`DEPLOY-VERCEL.md\`
 
 ---
 
-Dúvidas: use os logs em **Deployments** na Vercel ou contacte quem lhe entregou o acesso ao BlogCMS.
+DÃºvidas: use os logs em **Deployments** na Vercel ou contacte quem lhe entregou o acesso ao BlogCMS.
 `;
 }
 
@@ -371,7 +371,7 @@ async function loadTemplateFiles(
 ): Promise<Array<{ path: string; buffer: Buffer; encoding: "utf-8" | "base64" }>> {
   const rootAbs = join(templateRoot);
   if (!(await pathExists(rootAbs))) {
-    throw new Error(`Diretório de template inexistente: ${rootAbs}`);
+    throw new Error(`DiretÃ³rio de template inexistente: ${rootAbs}`);
   }
 
   const out: Array<{ path: string; buffer: Buffer; encoding: "utf-8" | "base64" }> = [];
@@ -430,12 +430,12 @@ async function loadTemplateFiles(
   });
 
   if (filtered.length === 0) {
-    throw new Error("Nenhum arquivo encontrado no template. Verifique templateRoot e regras de exclusão.");
+    throw new Error("Nenhum arquivo encontrado no template. Verifique templateRoot e regras de exclusÃ£o.");
   }
   return filtered;
 }
 
-/** Garante que o que sobe para o GitHub do cliente é projeto Astro-fonte (não artefactos de build). */
+/** Garante que o que sobe para o GitHub do cliente Ã© projeto Astro-fonte (nÃ£o artefactos de build). */
 function assertClientRepoMandatoryFiles(files: Array<{ path: string }>): void {
   const paths = new Set(files.map((f) => f.path));
   if (!paths.has("package.json")) {
@@ -443,7 +443,7 @@ function assertClientRepoMandatoryFiles(files: Array<{ path: string }>): void {
   }
   const hasAstroCfg = ASTRO_CONFIG_FILENAMES.some((f) => paths.has(f));
   if (!hasAstroCfg) {
-    throw new Error(`Template: falta astro.config.(mjs|ts|…) na raiz (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
+    throw new Error(`Template: falta astro.config.(mjs|ts|â€¦) na raiz (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
   }
   if (!Array.from(paths).some((p) => p.startsWith("src/"))) {
     throw new Error(`Template: falta pasta src/ com ficheiros (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
@@ -453,7 +453,7 @@ function assertClientRepoMandatoryFiles(files: Array<{ path: string }>): void {
   }
 }
 
-/** Paralelismo moderado para reduzir picos que disparam o rate limit secundário do GitHub. */
+/** Paralelismo moderado para reduzir picos que disparam o rate limit secundÃ¡rio do GitHub. */
 const BLOB_CONCURRENCY = 4;
 
 function detectAstroRootDirectory(
@@ -497,7 +497,7 @@ function detectAstroRootDirectory(
     };
   }
 
-  // Fallback resiliente: não bloqueia criação por falso negativo de detecção.
+  // Fallback resiliente: nÃ£o bloqueia criaÃ§Ã£o por falso negativo de detecÃ§Ã£o.
   return {
     astroRootDirectory: ".",
     hasPackageJsonAtRoot: hasRootPkg,
@@ -525,11 +525,11 @@ async function mapPool<T, R>(
 }
 
 /**
- * Cria um repositório no GitHub do usuário autenticado e envia o **código-fonte** do template Astro
- * (pasta `template-astro/`), com `src/data/site-config.json` substituído por `clientConfig`.
- * Não executa `npm run build`: o build do site do cliente fica a cargo da Vercel após o `git push`.
+ * Cria um repositÃ³rio no GitHub do usuÃ¡rio autenticado e envia o **cÃ³digo-fonte** do template Astro
+ * (pasta `template-astro/`), com `src/data/site-config.json` substituÃ­do por `clientConfig`.
+ * NÃ£o executa `npm run build`: o build do site do cliente fica a cargo da Vercel apÃ³s o `git push`.
  *
- * O `options.token` é obrigatório (não lido de `process.env` nesta função).
+ * O `options.token` Ã© obrigatÃ³rio (nÃ£o lido de `process.env` nesta funÃ§Ã£o).
  */
 export async function deployToClientRepo(
   clientConfig: SiteConfig,
@@ -549,7 +549,7 @@ export async function deployToClientRepo(
   const { data: me } = await withGithubRetry(() => octokit.users.getAuthenticated(), { maxAttempts: 2 });
   const owner = me.login;
   if (!options.repoName?.trim()) {
-    throw new Error("repoName é obrigatório.");
+    throw new Error("repoName Ã© obrigatÃ³rio.");
   }
   const repoSlug = options.repoName.trim();
   const repositoryHtmlUrl = `https://github.com/${owner}/${repoSlug}`;
@@ -563,7 +563,7 @@ export async function deployToClientRepo(
   const templateAudit = detectAstroRootDirectory(files);
 
   options.onPhase?.({ phase: "github_create_repo" });
-  /** `auto_init: true` cria o primeiro commit (README); a API Git recusa blobs em repo sem histórico (409). */
+  /** `auto_init: true` cria o primeiro commit (README); a API Git recusa blobs em repo sem histÃ³rico (409). */
   const repository = await createRepository({
     token,
     name: repoSlug,
@@ -573,7 +573,7 @@ export async function deployToClientRepo(
   });
   options.onPipelineLog?.("REPO_CREATED");
 
-  /** Espaço após criar o repo para o GitHub processar o primeiro commit (README) e aliviar limites secundários. */
+  /** EspaÃ§o apÃ³s criar o repo para o GitHub processar o primeiro commit (README) e aliviar limites secundÃ¡rios. */
   await sleep(2000);
 
   options.onPhase?.({ phase: "github_upload_template" });
@@ -664,21 +664,21 @@ function buildVercelDeployGuide(
   const siteUrl = (clientConfig.siteUrl || "").trim() || "https://seu-dominio.com";
   return `# Deploy manual na Vercel
 
-Este repositório contém **código-fonte** Astro (não artefactos de build). A Vercel instala dependências e executa o build ao importar o projeto.
+Este repositÃ³rio contÃ©m **cÃ³digo-fonte** Astro (nÃ£o artefactos de build). A Vercel instala dependÃªncias e executa o build ao importar o projeto.
 
-## 1) Importar o repositório
+## 1) Importar o repositÃ³rio
 
 1. Acesse https://vercel.com/new
-2. Selecione o repositório \`${repoName}\` no seu GitHub.
+2. Selecione o repositÃ³rio \`${repoName}\` no seu GitHub.
 3. Confirme a branch principal: \`${branch}\`.
 
-## 2) Root Directory (obrigatório verificar)
+## 2) Root Directory (obrigatÃ³rio verificar)
 
-Na configuração do projeto na Vercel (**Settings → General → Root Directory** ou no assistente de importação):
+Na configuraÃ§Ã£o do projeto na Vercel (**Settings â†’ General â†’ Root Directory** ou no assistente de importaÃ§Ã£o):
 
-- Deixe **vazio** (raiz do repositório), a menos que o \`package.json\` esteja mesmo numa **subpasta** (monorepo).
-- **Não** use \`./\` nem caminhos relativos com \`../\`.
-- O ficheiro \`package.json\` tem de estar **na raiz do repositório** que está a importar (confirme no GitHub: página principal do repo → deve listar \`package.json\`).
+- Deixe **vazio** (raiz do repositÃ³rio), a menos que o \`package.json\` esteja mesmo numa **subpasta** (monorepo).
+- **NÃ£o** use \`./\` nem caminhos relativos com \`../\`.
+- O ficheiro \`package.json\` tem de estar **na raiz do repositÃ³rio** que estÃ¡ a importar (confirme no GitHub: pÃ¡gina principal do repo â†’ deve listar \`package.json\`).
 
 Se o Root Directory apontar para uma pasta sem \`package.json\`, o build falha com \`ENOENT ... package.json\`.
 
@@ -689,39 +689,40 @@ Use estes valores:
 - **Root Directory:** vazio (raiz)
 - Build Command: \`npm run build\`
 - Install Command: \`npm install\`
-- Output Directory: deixe em branco (padrão)
+- Output Directory: deixe em branco (padrÃ£o)
 
 ## 4) Environment Variables
 
-Se você não usa variáveis de ambiente customizadas, deixe vazio.
+Se vocÃª nÃ£o usa variÃ¡veis de ambiente customizadas, deixe vazio.
 
 Se for usar no futuro, adicione em:
 \`Vercel > Project > Settings > Environment Variables\`.
 
-## 5) Domínio
+## 5) DomÃ­nio
 
 Depois do primeiro deploy:
 
-1. Vá em \`Settings > Domains\`
-2. Adicione seu domínio principal
-3. Atualize DNS conforme instruções da Vercel
+1. VÃ¡ em \`Settings > Domains\`
+2. Adicione seu domÃ­nio principal
+3. Atualize DNS conforme instruÃ§Ãµes da Vercel
 
-## 6) Conferência final
+## 6) ConferÃªncia final
 
 - URL esperada do site: ${siteUrl}
 - Nome da marca configurado: ${brand}
-- SEO base já vem no arquivo \`src/data/site-config.json\`
+- SEO base jÃ¡ vem no arquivo \`src/data/site-config.json\`
 
-## 7) Erro «Could not read package.json» / ENOENT
+## 7) Erro Â«Could not read package.jsonÂ» / ENOENT
 
-Significa que a Vercel está a instalar na **pasta errada**. Corrija:
+Significa que a Vercel estÃ¡ a instalar na **pasta errada**. Corrija:
 
-1. **Project → Settings → General → Root Directory** → apague tudo e guarde (raiz do repo).
-2. Confirme no GitHub que o ramo \`${branch}\` tem \`package.json\` na **raiz** do repositório.
-3. Faça **Redeploy** do último commit.
+1. **Project â†’ Settings â†’ General â†’ Root Directory** â†’ apague tudo e guarde (raiz do repo).
+2. Confirme no GitHub que o ramo \`${branch}\` tem \`package.json\` na **raiz** do repositÃ³rio.
+3. FaÃ§a **Redeploy** do Ãºltimo commit.
 
 ---
 
 Se algo falhar no deploy, abra a aba **Deployments** na Vercel e copie o log de erro para suporte.
 `;
 }
+
