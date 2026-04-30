@@ -56,6 +56,23 @@ type ImportPost = {
   sourceUrl?: string;
 };
 
+type DownloadedImage = {
+  buf: Buffer;
+  ext: string;
+  contentType: string;
+  sourceUrl: string;
+};
+
+const SUPPORTED_IMAGE_MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/avif": "avif",
+  "image/gif": "gif",
+  "image/svg+xml": "svg",
+};
+
 async function blogPathExists(
   publisher: GithubPublisher,
   owner: string,
@@ -73,7 +90,14 @@ async function blogPathExists(
   }
 }
 
-async function fetchFeaturedBuffer(url: string): Promise<Buffer> {
+function inferImageExt(contentType: string, buf: Buffer): string | null {
+  const mime = (contentType || "").toLowerCase().split(";")[0].trim();
+  if (mime && SUPPORTED_IMAGE_MIME_TO_EXT[mime]) return SUPPORTED_IMAGE_MIME_TO_EXT[mime];
+  const byBytes = detectImageKindFromBuffer(buf);
+  return byBytes?.ext || null;
+}
+
+async function fetchImageForImport(url: string): Promise<DownloadedImage | null> {
   try {
     const r = await fetch(url, {
       headers: {
@@ -84,30 +108,31 @@ async function fetchFeaturedBuffer(url: string): Promise<Buffer> {
       signal: AbortSignal.timeout(30_000),
     });
     if (!r.ok) {
-      console.error("[import-media] Falha ao baixar imagem da origem", {
+      console.warn("[import-media] Falha ao baixar imagem da origem", {
         url,
         status: r.status,
         statusText: r.statusText,
       });
-      throw new Error(`Falha ao baixar imagem (${r.status})`);
+      return null;
     }
+    const contentType = (r.headers.get("content-type") || "").toLowerCase().trim();
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.length === 0 || buf.length > MAX_HERO_IMAGE_BYTES) {
-      console.error("[import-media] Imagem inválida por tamanho", { url, bytes: buf.length });
-      throw new Error("Imagem inválida por tamanho");
+      console.warn("[import-media] Imagem inválida por tamanho", { url, bytes: buf.length });
+      return null;
     }
-    if (!detectImageKindFromBuffer(buf)) {
-      console.error("[import-media] Formato de imagem não suportado", { url });
-      throw new Error("Formato de imagem não suportado");
+    const ext = inferImageExt(contentType, buf);
+    if (!ext) {
+      console.warn("[import-media] Formato de imagem não suportado", { url, contentType });
+      return null;
     }
-    return buf;
+    return { buf, ext, contentType, sourceUrl: url };
   } catch (e) {
-    if (e instanceof Error) {
-      console.error("[import-media] Erro no download da imagem", { url, message: e.message });
-    } else {
-      console.error("[import-media] Erro desconhecido no download da imagem", { url });
-    }
-    throw e instanceof Error ? e : new Error("Erro desconhecido ao baixar imagem");
+    console.warn("[import-media] Erro no download da imagem", {
+      url,
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return null;
   }
 }
 
@@ -117,26 +142,24 @@ async function uploadFeaturedToGithub(
   repo: string,
   branch: string,
   slugBase: string,
-  buf: Buffer,
-): Promise<string> {
-  const kind = detectImageKindFromBuffer(buf);
-  if (!kind) throw new Error("Formato de imagem de destaque não suportado");
+  img: DownloadedImage,
+): Promise<string | null> {
   const fileBase = `${slugifyFileName(slugBase)}-destaque`;
-  const fileName = `${fileBase}.${kind.ext}`;
+  const fileName = `${fileBase}.${img.ext}`;
   const repoPath = `public/assets/blog/${fileName}`;
   const heroImage = `/assets/blog/${fileName}`;
   const message = `content(assets): imagem destacada ${fileName}`;
   try {
-    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, buf, message, { branch });
+    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, img.buf, message, { branch });
     return heroImage;
   } catch (e) {
-    console.error("[import-media] Falha ao enviar imagem destacada para o GitHub", {
+    console.warn("[import-media] Falha ao enviar imagem destacada para o GitHub", {
       repo: `${owner}/${repo}`,
       branch,
       repoPath,
       error: e instanceof Error ? e.message : String(e),
     });
-    throw new Error("Falha ao enviar imagem destacada para o GitHub");
+    return null;
   }
 }
 
@@ -161,27 +184,22 @@ async function uploadPostImageToGithub(
   branch: string,
   slugBase: string,
   index: number,
-  imageUrl: string,
-): Promise<string> {
-  const abs = toAbsoluteUrlOrNull(imageUrl);
-  if (!abs) throw new Error("URL de imagem inválida");
-  const buf = await fetchFeaturedBuffer(abs);
-  const kind = detectImageKindFromBuffer(buf);
-  if (!kind) throw new Error("Formato de imagem não suportado");
+  img: DownloadedImage,
+): Promise<string | null> {
   const safeSlug = slugifyFileName(slugBase);
-  const fileName = `${safeSlug}-${index}.${kind.ext}`;
+  const fileName = `${safeSlug}-${index}.${img.ext}`;
   const repoPath = `public/assets/blog/${fileName}`;
   try {
-    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, buf, `content(assets): imagem ${fileName}`, { branch });
+    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, img.buf, `content(assets): imagem ${fileName}`, { branch });
   } catch (e) {
-    console.error("[import-media] Falha ao enviar imagem do corpo para o GitHub", {
-      sourceUrl: imageUrl,
+    console.warn("[import-media] Falha ao enviar imagem do corpo para o GitHub", {
+      sourceUrl: img.sourceUrl,
       repo: `${owner}/${repo}`,
       branch,
       repoPath,
       error: e instanceof Error ? e.message : String(e),
     });
-    throw new Error(`Falha ao enviar imagem do corpo (${fileName}) para o GitHub`);
+    return null;
   }
   return `/assets/blog/${fileName}`;
 }
@@ -209,12 +227,13 @@ async function localizeMarkdownImages(params: {
     const alt = m[1] || "";
     const raw = (m[2] || "").trim();
     const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
-    if (!abs) {
-      throw new Error(`Não foi possível resolver URL da imagem no Markdown: ${raw}`);
-    }
+    if (!abs) continue;
     let local = cache.get(abs);
     if (!local) {
-      local = await uploadPostImageToGithub(publisher, owner, repo, branch, slugBase, imageIndex, abs);
+      const img = await fetchImageForImport(abs);
+      if (!img) continue;
+      local = await uploadPostImageToGithub(publisher, owner, repo, branch, slugBase, imageIndex, img);
+      if (!local) continue;
       cache.set(abs, local);
       imageIndex += 1;
     }
@@ -331,9 +350,11 @@ export const POST: APIRoute = async (context) => {
       let heroImage = "../../assets/blog/hero-primeiro.svg";
       const featUrl = resolveMaybeAbsoluteImageUrl(p.featuredImageUrl || "", p.sourceUrl);
       if (featUrl) {
-        const buf = await fetchFeaturedBuffer(featUrl);
-        const localHero = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugIn, buf);
-        heroImage = localHero;
+        const featuredImage = await fetchImageForImport(featUrl);
+        if (featuredImage) {
+          const localHero = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugIn, featuredImage);
+          if (localHero) heroImage = localHero;
+        }
       }
       if (heroImage === "../../assets/blog/hero-primeiro.svg") {
         const firstLocalMdImage = markdownBody.match(/!\[[^\]]*]\((\/assets\/blog\/[^)\s]+)\)/)?.[1];

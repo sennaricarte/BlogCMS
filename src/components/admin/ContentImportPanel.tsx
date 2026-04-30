@@ -977,8 +977,8 @@ export function ContentImportPanel() {
             </table>
           </div>
           <p className="text-xs text-zinc-500">
-            Os ficheiros são criados como rascunho no GitHub; imagens de destaque remotas são enviadas para o armazenamento
-            Supabase quando configurado no servidor.
+            Os ficheiros são criados como rascunho no GitHub; as imagens importadas (corpo e destaque) são guardadas em
+            <code className="rounded bg-zinc-100 px-1">public/assets/blog</code> no repositório do cliente.
           </p>
         </section>
       )}

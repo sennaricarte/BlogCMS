@@ -15,6 +15,10 @@ export function detectImageKindFromBuffer(buf: Buffer): { ext: string } | null {
   }
   if (buf.length >= 12 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP")
     return { ext: "webp" };
+  if (buf.length >= 12 && buf.toString("ascii", 4, 8) === "ftyp") {
+    const brand = buf.toString("ascii", 8, 12);
+    if (brand === "avif" || brand === "avis") return { ext: "avif" };
+  }
   const head = buf.slice(0, Math.min(512, buf.length)).toString("utf8").trimStart();
   if (head.startsWith("<?xml") || /^<svg[\s>]/i.test(head)) return { ext: "svg" };
   return null;
