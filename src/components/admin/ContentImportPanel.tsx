@@ -26,6 +26,8 @@ type WpApiPost = {
   featuredImageUrl?: string;
   sourceUrl?: string;
   articleHtml?: string;
+  category?: string;
+  tags?: string[];
 };
 
 export type PreviewRow = {
@@ -39,6 +41,8 @@ export type PreviewRow = {
   featuredImageUrl?: string;
   sourceUrl?: string;
   articleHtml?: string;
+  category?: string;
+  tags?: string[];
   sourceLabel: "WordPress" | "URL";
 };
 
@@ -125,6 +129,8 @@ export function ContentImportPanel() {
         featuredImageUrl: p.featuredImageUrl,
         sourceUrl: p.sourceUrl,
         articleHtml: p.articleHtml,
+        category: p.category,
+        tags: p.tags,
         sourceLabel: "WordPress" as const,
       }));
       setRows(next);
@@ -622,6 +628,8 @@ export function ContentImportPanel() {
             featuredImageUrl: r.featuredImageUrl,
             sourceUrl: r.sourceUrl,
             articleHtml: r.articleHtml,
+            category: r.category,
+            tags: r.tags,
             draft: true,
           })),
         }),

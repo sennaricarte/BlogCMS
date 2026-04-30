@@ -4,6 +4,8 @@ export type WpRestPost = {
   slug: string;
   link?: string;
   date: string;
+  categories?: number[];
+  tags?: number[];
   title: { rendered: string };
   content: { rendered: string };
   excerpt?: { rendered: string };
@@ -19,8 +21,39 @@ export type WpRestPost = {
     "wp:featuredmedia"?: Array<{
       source_url?: string;
     }>;
+    "wp:term"?: Array<
+      Array<{
+        id?: number;
+        name?: string;
+        taxonomy?: string;
+      }>
+    >;
   };
 };
+
+function normalizeWpTermName(name: unknown): string | null {
+  if (typeof name !== "string") return null;
+  const t = name.trim();
+  return t ? t : null;
+}
+
+export function resolveWpTermNames(
+  post: WpRestPost,
+  taxonomy: "category" | "post_tag",
+): string[] {
+  const groups = post._embedded?.["wp:term"];
+  if (!Array.isArray(groups)) return [];
+  const names = new Set<string>();
+  for (const group of groups) {
+    if (!Array.isArray(group)) continue;
+    for (const term of group) {
+      if (!term || term.taxonomy !== taxonomy) continue;
+      const n = normalizeWpTermName(term.name);
+      if (n) names.add(n);
+    }
+  }
+  return Array.from(names);
+}
 
 function toPlainMetaString(v: unknown): string | undefined {
   if (typeof v === "string") {

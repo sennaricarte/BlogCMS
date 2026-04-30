@@ -1,7 +1,12 @@
 import type { APIRoute } from "astro";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
 import { articleHtmlToMarkdown } from "../../../../lib/import-convert";
-import { normalizeWpSiteUrl, resolveWpImportDescription, type WpRestPost } from "../../../../lib/wp-rest-types";
+import {
+  normalizeWpSiteUrl,
+  resolveWpImportDescription,
+  resolveWpTermNames,
+  type WpRestPost,
+} from "../../../../lib/wp-rest-types";
 
 export const prerender = false;
 
@@ -34,7 +39,7 @@ export const POST: APIRoute = async (context) => {
     );
   }
 
-  const apiUrl = `${base}/wp-json/wp/v2/posts?per_page=100&_embed=1`;
+  const apiUrl = `${base}/wp-json/wp/v2/posts?_embed=1&per_page=100`;
   let res: Response;
   try {
     res = await fetch(apiUrl, {
@@ -91,6 +96,8 @@ export const POST: APIRoute = async (context) => {
     const featured =
       p._embedded?.["wp:featuredmedia"]?.[0]?.source_url?.trim() ||
       undefined;
+    const categories = resolveWpTermNames(p, "category");
+    const tags = resolveWpTermNames(p, "post_tag");
 
     return {
       sourceId: p.id,
@@ -102,6 +109,8 @@ export const POST: APIRoute = async (context) => {
       featuredImageUrl: featured,
       sourceUrl: typeof p.link === "string" ? p.link.trim() || undefined : undefined,
       articleHtml: bodyHtml,
+      category: categories[0] || undefined,
+      tags,
     };
   });
 
