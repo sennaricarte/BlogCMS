@@ -48,12 +48,38 @@ type WxrItem = Record<string, unknown>;
 function xmlString(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" || typeof value === "boolean") return String(value).trim();
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const s = xmlString(entry);
+      if (s) return s;
+    }
+    return "";
+  }
   if (value && typeof value === "object") {
     const obj = value as Record<string, unknown>;
-    const nested = obj["#text"] ?? obj["__text"] ?? obj["text"] ?? obj["$text"] ?? obj["_text"] ?? obj["cdata"];
-    if (typeof nested === "string") return nested.trim();
+    const nested =
+      obj["#text"] ??
+      obj["__text"] ??
+      obj["text"] ??
+      obj["$text"] ??
+      obj["_text"] ??
+      obj["cdata"] ??
+      obj["#cdata-section"] ??
+      obj["__cdata"];
+    const s = xmlString(nested);
+    if (s) return s;
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      const nestedValue = xmlString(v);
+      if (nestedValue) return nestedValue;
+    }
   }
   return "";
+}
+
+function extractFirstHttpUrl(text: string): string | undefined {
+  const m = (text || "").match(/https?:\/\/[^\s"'<>]+/i);
+  return m?.[0]?.trim();
 }
 
 function resolveFeaturedUrlFromItem(item: WxrItem, attachmentById: Map<string, string>): string | undefined {
@@ -64,6 +90,12 @@ function resolveFeaturedUrlFromItem(item: WxrItem, attachmentById: Map<string, s
   const thumbMeta = metas.find((m) => xmlString(m["wp:meta_key"]) === "_thumbnail_id");
   const thumbId = xmlString(thumbMeta?.["wp:meta_value"]);
   if (thumbId && attachmentById.has(thumbId)) return attachmentById.get(thumbId);
+
+  // Fallback extra: alguns exports trazem URL em guid/content no próprio item.
+  const guidUrl = extractFirstHttpUrl(xmlString(item.guid));
+  if (guidUrl) return guidUrl;
+  const contentUrl = extractFirstHttpUrl(xmlString(item["content:encoded"]));
+  if (contentUrl) return contentUrl;
   return undefined;
 }
 
@@ -125,7 +157,11 @@ export const POST: APIRoute = async (context) => {
       const postType = xmlString(it["wp:post_type"]);
       if (postType !== "attachment") continue;
       const id = xmlString(it["wp:post_id"]);
-      const url = xmlString(it["wp:attachment_url"]);
+      const url =
+        xmlString(it["wp:attachment_url"]) ||
+        extractFirstHttpUrl(xmlString(it.guid)) ||
+        extractFirstHttpUrl(xmlString(it["content:encoded"])) ||
+        "";
       if (id && url) attachmentById.set(id, url);
     }
 
