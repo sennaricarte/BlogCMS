@@ -212,6 +212,44 @@ async function uploadToGithubStorage(
   return `/assets/blog/${fileName}`;
 }
 
+function normalizeLocalAssetPath(path: string): string {
+  const p = (path || "").trim();
+  if (!p) return p;
+  const noPublic = p.replace(/^\/?public\//i, "/");
+  if (noPublic.startsWith("/assets/")) return noPublic;
+  if (noPublic.startsWith("assets/")) return `/${noPublic}`;
+  return noPublic.startsWith("/") ? noPublic : `/${noPublic}`;
+}
+
+function normalizeMarkdownImageHtml(markdown: string, sourceUrl?: string): string {
+  let out = markdown || "";
+  // Remove wrapper <figure> mantendo conteúdo interno.
+  out = out.replace(/<figure[^>]*>([\s\S]*?)<\/figure>/gi, "$1");
+  // Converte <img ...> em sintaxe Markdown limpa.
+  out = out.replace(/<img\b[^>]*>/gi, (tag) => {
+    const srcRaw = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1]?.trim() || "";
+    if (!srcRaw) return "";
+    const alt = (tag.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1] || "").trim();
+    const abs = resolveMaybeAbsoluteImageUrl(srcRaw, sourceUrl) || srcRaw;
+    return `![${alt}](${abs})`;
+  });
+  return out;
+}
+
+function replaceImageReferenceInMarkdown(markdown: string, raw: string, abs: string, localPath: string): string {
+  const escapedRaw = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedAbs = abs.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const local = normalizeLocalAssetPath(localPath);
+  let out = markdown;
+  // Substitui markdown image syntax por URL original (raw ou absoluta).
+  out = out.replace(new RegExp(`(!\\[[^\\]]*\\]\\()${escapedRaw}(\\))`, "g"), `$1${local}$2`);
+  out = out.replace(new RegExp(`(!\\[[^\\]]*\\]\\()${escapedAbs}(\\))`, "g"), `$1${local}$2`);
+  // Substitui HTML img src remanescente.
+  out = out.replace(new RegExp(`(<img\\b[^>]*\\bsrc\\s*=\\s*["'])${escapedRaw}(["'][^>]*>)`, "gi"), `$1${local}$2`);
+  out = out.replace(new RegExp(`(<img\\b[^>]*\\bsrc\\s*=\\s*["'])${escapedAbs}(["'][^>]*>)`, "gi"), `$1${local}$2`);
+  return out;
+}
+
 async function localizeMarkdownImages(params: {
   markdown: string;
   sourceUrl?: string;
@@ -327,7 +365,7 @@ async function processArticleAssets(params: {
 }): Promise<{ markdown: string; featuredPath: string; warnings: string[] }> {
   const { markdown, articleHtml, sourceUrl, featuredImageUrl, slugBase, publisher, owner, repo, branch } = params;
   const warnings: string[] = [];
-  let processedMarkdown = markdown;
+  let processedMarkdown = normalizeMarkdownImageHtml(markdown, sourceUrl);
 
   // 1) Coleta URLs (corpo em Markdown + todas <img> por regex/DOM + destaque) e processa em fila serial.
   const markdownRefs = collectImageRefsFromMarkdown(markdown, sourceUrl);
@@ -394,8 +432,7 @@ async function processArticleAssets(params: {
   for (const ref of markdownRefs) {
     const local = uploadedByUrl.get(ref.abs);
     if (!local) continue;
-    const escapedRaw = ref.raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    processedMarkdown = processedMarkdown.replace(new RegExp(`(!\\[[^\\]]*\\]\\()${escapedRaw}(\\))`, "g"), `$1${local}$2`);
+    processedMarkdown = replaceImageReferenceInMarkdown(processedMarkdown, ref.raw, ref.abs, local);
   }
 
   // 3) Determina destaque com prioridade featured explícito -> og/twitter -> primeira imagem local -> fallback obrigatório.
@@ -403,13 +440,13 @@ async function processArticleAssets(params: {
   if (featuredCandidate) {
     const localFeatured = uploadedByUrl.get(featuredCandidate);
     if (localFeatured) {
-      featuredPath = localFeatured;
+      featuredPath = normalizeLocalAssetPath(localFeatured);
     } else {
       // Tenta rota dedicada de destaque (nome semântico) se o asset foi baixado mas upload numerado não foi usado.
       const img = await fetchImageForImport(featuredCandidate);
       if (img) {
         const uploadedFeatured = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugBase, img);
-        if (uploadedFeatured) featuredPath = uploadedFeatured;
+        if (uploadedFeatured) featuredPath = normalizeLocalAssetPath(uploadedFeatured);
       }
     }
   }
@@ -423,7 +460,7 @@ async function processArticleAssets(params: {
     processedMarkdown = `${processedMarkdown.trim()}\n\n${warnings.join("\n")}\n`;
   }
 
-  return { markdown: processedMarkdown, featuredPath, warnings };
+  return { markdown: processedMarkdown, featuredPath: normalizeLocalAssetPath(featuredPath), warnings };
 }
 
 async function uniqueBlogPath(
@@ -546,7 +583,14 @@ export const POST: APIRoute = async (context) => {
       };
       // Compatibilidade: mantém `heroImage` (schema Astro) e adiciona alias `featured`.
       const textBase = serializeBlogMarkdown(markdownBody, data);
-      const text = textBase.replace(/^heroImage:\s*([^\n]+)$/m, "heroImage: $1\nfeatured: $1");
+      const text = textBase.replace(
+        /^heroImage:\s*([^\n]+)$/m,
+        (_m, heroRaw: string) => {
+          const heroValue = String(heroRaw || "").trim().replace(/^['"]|['"]$/g, "");
+          const localHero = normalizeLocalAssetPath(heroValue);
+          return `heroImage: "${localHero}"\nfeatured: "${localHero}"`;
+        },
+      );
 
       const target = allowDuplicates
         ? await uniqueBlogPath(publisher, owner, repo, branch, slugIn)
