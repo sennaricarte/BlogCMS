@@ -68,6 +68,11 @@ const IGNORED_FILE_NAMES = new Set([
 const TEMPLATE_EXCLUDED_PREFIXES = [
   "src/content/blog/",
   "src/content/pages/",
+  "src/pages/admin/",
+  "src/pages/api/",
+  "src/components/admin/",
+  "src/lib/import-",
+  "src/lib/html-to-markdown.ts",
   "scripts/",
 ];
 
@@ -78,6 +83,15 @@ const TEMPLATE_EXCLUDED_PREFIXES = [
 const TEMPLATE_EXCLUDED_EXACT_FILES = new Set([
   "vercel.json",
   ".vscode/launch.json",
+  "src/middleware.ts",
+  "src/lib/publisher.ts",
+  "src/lib/github.ts",
+  "src/lib/github-publishing.ts",
+  "src/lib/supabase.ts",
+  "src/lib/supabase-service.ts",
+  "src/lib/supabase-server-auth.ts",
+  "src/lib/docs-paste.ts",
+  "src/lib/html-preprocess-turndown.ts",
   "public/tinymce/README.md",
   "public/tinymce/CHANGELOG.md",
   "public/tinymce/package.json",
@@ -140,11 +154,17 @@ const CLIENT_REQUIRED_ASTRO_CONFIG = "astro.config.mjs";
 
 const CLIENT_PACKAGE_EXCLUDED_DEPENDENCIES = new Set([
   "cheerio",
+  "@octokit/rest",
+  "@supabase/ssr",
+  "@supabase/supabase-js",
+  "turndown",
+  "turndown-plugin-gfm",
 ]);
 
 const CLIENT_PACKAGE_EXCLUDED_DEV_DEPENDENCIES = new Set([
   "tsx",
   "dotenv",
+  "@types/turndown",
 ]);
 
 /** Pasta na raiz do BlogCMS com o cÃ³digo-fonte Astro enviado aos repos dos clientes (sem `dist/`). */
@@ -214,6 +234,8 @@ export async function syncTemplateAstroToProjectRoot(
       await mkdir(dirname(dest), { recursive: true });
       if (r === "package.json") {
         await writeFile(dest, sanitizeClientPackageJsonBuffer(buffer));
+      } else if (r === CLIENT_REQUIRED_ASTRO_CONFIG) {
+        await writeFile(dest, sanitizeClientAstroConfigBuffer(buffer));
       } else {
         await writeFile(dest, buffer);
       }
@@ -419,6 +441,15 @@ async function loadTemplateFiles(
         });
         continue;
       }
+      if (r === CLIENT_REQUIRED_ASTRO_CONFIG) {
+        const buffer = await readFile(full);
+        out.push({
+          path: r,
+          buffer: sanitizeClientAstroConfigBuffer(buffer),
+          encoding: "utf-8",
+        });
+        continue;
+      }
 
       if (r === CONFIG_FILE_IN_TEMPLATE) {
         const body = JSON.stringify(clientConfig, null, 2) + "\n";
@@ -510,6 +541,23 @@ function sanitizeClientPackageJsonBuffer(buffer: Buffer): Buffer {
   }
 
   return Buffer.from(`${JSON.stringify(parsed, null, 2)}\n`, "utf-8");
+}
+
+function sanitizeClientAstroConfigBuffer(buffer: Buffer): Buffer {
+  let text = buffer.toString("utf-8");
+  text = text.replace(/^\s*import\s+vercel\s+from\s+['"]@astrojs\/vercel['"];\r?\n/m, "");
+  text = text.replace(/^\s*adapter:\s*vercel\(\),\r?\n/m, "");
+  text = text.replace(/^\s*assetsInclude:\s*\[[^\]]*\],\r?\n/m, "");
+  text = text.replace(/^\s*['"]@supabase\/ssr['"],\r?\n/gm, "");
+  text = text.replace(/^\s*['"]turndown['"],\r?\n/gm, "");
+  text = text.replace(/^\s*['"]turndown-plugin-gfm['"],\r?\n/gm, "");
+  if (!/^\s*output:\s*['"]static['"],\r?$/m.test(text)) {
+    text = text.replace(
+      /export default defineConfig\(\{\r?\n/,
+      "export default defineConfig({\n  output: 'static',\n",
+    );
+  }
+  return Buffer.from(text, "utf-8");
 }
 
 /** Paralelismo moderado para reduzir picos que disparam o rate limit secundÃ¡rio do GitHub. */
