@@ -101,6 +101,7 @@ export const POST: APIRoute = async (context) => {
       markdown,
       featuredImageUrl: featured,
       sourceUrl: typeof p.link === "string" ? p.link.trim() || undefined : undefined,
+      articleHtml: bodyHtml,
     };
   });
 

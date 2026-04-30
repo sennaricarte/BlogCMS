@@ -25,6 +25,7 @@ type WpApiPost = {
   markdown: string;
   featuredImageUrl?: string;
   sourceUrl?: string;
+  articleHtml?: string;
 };
 
 export type PreviewRow = {
@@ -37,6 +38,7 @@ export type PreviewRow = {
   markdown: string;
   featuredImageUrl?: string;
   sourceUrl?: string;
+  articleHtml?: string;
   sourceLabel: "WordPress" | "URL";
 };
 
@@ -122,6 +124,7 @@ export function ContentImportPanel() {
         markdown: p.markdown,
         featuredImageUrl: p.featuredImageUrl,
         sourceUrl: p.sourceUrl,
+        articleHtml: p.articleHtml,
         sourceLabel: "WordPress" as const,
       }));
       setRows(next);
@@ -166,6 +169,7 @@ export function ContentImportPanel() {
           markdown: string;
           featuredImageUrl?: string;
           sourceUrl?: string;
+          articleHtml?: string;
         };
         posts?: Array<{
           slug: string;
@@ -175,6 +179,7 @@ export function ContentImportPanel() {
           markdown: string;
           featuredImageUrl?: string;
           sourceUrl?: string;
+          articleHtml?: string;
         }>;
       };
       if (!res.ok || !j.ok) {
@@ -217,6 +222,7 @@ export function ContentImportPanel() {
           markdown: p.markdown,
           featuredImageUrl: p.featuredImageUrl,
           sourceUrl: p.sourceUrl,
+          articleHtml: p.articleHtml,
           sourceLabel: "URL",
         }));
         setRows((prev) => {
@@ -256,6 +262,7 @@ export function ContentImportPanel() {
           markdown: p.markdown,
           featuredImageUrl: p.featuredImageUrl,
           sourceUrl: p.sourceUrl,
+          articleHtml: p.articleHtml,
           sourceLabel: "URL",
         };
         if (resetBatch) return [row];
@@ -314,6 +321,7 @@ export function ContentImportPanel() {
             markdown: string;
             featuredImageUrl?: string;
             sourceUrl?: string;
+            articleHtml?: string;
           };
           posts?: Array<{
             slug: string;
@@ -361,6 +369,7 @@ export function ContentImportPanel() {
               markdown: p.markdown,
               featuredImageUrl: p.featuredImageUrl,
               sourceUrl: p.sourceUrl,
+              articleHtml: p.articleHtml,
               sourceLabel: "URL",
             });
           }
@@ -443,6 +452,7 @@ export function ContentImportPanel() {
             markdown: string;
             featuredImageUrl?: string;
             sourceUrl?: string;
+            articleHtml?: string;
           };
         };
         if (!res.ok || !j.ok || !j.post) {
@@ -464,6 +474,7 @@ export function ContentImportPanel() {
             markdown: j.post!.markdown,
             featuredImageUrl: j.post!.featuredImageUrl,
             sourceUrl: j.post!.sourceUrl,
+            articleHtml: j.post!.articleHtml,
             sourceLabel: "URL",
           },
         ]);
@@ -524,6 +535,7 @@ export function ContentImportPanel() {
             markdown: string;
             featuredImageUrl?: string;
             sourceUrl?: string;
+            articleHtml?: string;
           };
         };
         if (!res.ok || !j.ok || !j.post) {
@@ -545,6 +557,7 @@ export function ContentImportPanel() {
             markdown: j.post!.markdown,
             featuredImageUrl: j.post!.featuredImageUrl,
             sourceUrl: j.post!.sourceUrl,
+            articleHtml: j.post!.articleHtml,
             sourceLabel: "URL",
           },
         ]);
@@ -608,6 +621,7 @@ export function ContentImportPanel() {
             markdownBody: r.markdown,
             featuredImageUrl: r.featuredImageUrl,
             sourceUrl: r.sourceUrl,
+            articleHtml: r.articleHtml,
             draft: true,
           })),
         }),

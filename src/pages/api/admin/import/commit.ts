@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { RequestError } from "@octokit/request-error";
 import { Buffer } from "node:buffer";
+import * as cheerio from "cheerio";
 import { serializeBlogMarkdown, type BlogFrontmatterInput } from "../../../../lib/cms-matter";
 import { CMS_PATHS } from "../../../../lib/cms-paths";
 import { GithubPublisher } from "../../../../lib/github-service";
@@ -54,6 +55,7 @@ type ImportPost = {
   draft?: boolean;
   featuredImageUrl?: string;
   sourceUrl?: string;
+  articleHtml?: string;
 };
 
 type DownloadedImage = {
@@ -249,6 +251,91 @@ async function localizeMarkdownImages(params: {
   return output;
 }
 
+function collectImageUrlsFromMarkdown(markdown: string, sourceUrl?: string): string[] {
+  const imageRegex = /!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  const out = new Set<string>();
+  for (const m of markdown.matchAll(imageRegex)) {
+    const raw = (m[1] || "").trim();
+    const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
+    if (abs) out.add(abs);
+  }
+  return Array.from(out);
+}
+
+function extractOgOrTwitterImage(articleHtml?: string, sourceUrl?: string): string | null {
+  const html = (articleHtml || "").trim();
+  if (!html) return null;
+  try {
+    const $ = cheerio.load(html, { decodeEntities: true });
+    const og = $('meta[property="og:image"]').attr("content")?.trim();
+    const tw = $('meta[name="twitter:image"]').attr("content")?.trim();
+    return resolveMaybeAbsoluteImageUrl(og || tw || "", sourceUrl);
+  } catch {
+    return null;
+  }
+}
+
+async function processArticleAssets(params: {
+  markdown: string;
+  articleHtml?: string;
+  sourceUrl?: string;
+  featuredImageUrl?: string;
+  slugBase: string;
+  publisher: GithubPublisher;
+  owner: string;
+  repo: string;
+  branch: string;
+}): Promise<{ markdown: string; featuredPath: string; warnings: string[] }> {
+  const { markdown, articleHtml, sourceUrl, featuredImageUrl, slugBase, publisher, owner, repo, branch } = params;
+  const warnings: string[] = [];
+  let processedMarkdown = markdown;
+
+  // 1) Processa imagens do Markdown e só troca link após confirmar upload no GitHub.
+  const markdownUrls = collectImageUrlsFromMarkdown(markdown, sourceUrl);
+  for (const absUrl of markdownUrls) {
+    const img = await fetchImageForImport(absUrl);
+    if (!img) {
+      warnings.push(`<!-- Falha ao importar imagem: ${absUrl} -->`);
+      continue;
+    }
+    const idx = Math.max(1, collectImageUrlsFromMarkdown(processedMarkdown, sourceUrl).indexOf(absUrl) + 1);
+    const local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, idx, img);
+    if (!local) {
+      warnings.push(`<!-- Falha ao importar imagem: ${absUrl} -->`);
+      continue;
+    }
+    const escaped = absUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    processedMarkdown = processedMarkdown.replace(new RegExp(`(!\\[[^\\]]*\\]\\()${escaped}(\\))`, "g"), `$1${local}$2`);
+  }
+
+  // 2) Determina destaque: prioridade og/twitter (HTML) -> featured explícito -> primeira imagem local -> fallback obrigatório.
+  const ogOrTw = extractOgOrTwitterImage(articleHtml, sourceUrl);
+  const featuredCandidate = ogOrTw || resolveMaybeAbsoluteImageUrl(featuredImageUrl || "", sourceUrl);
+  let featuredPath = "/assets/blog/destaque.jpg";
+
+  if (featuredCandidate) {
+    const img = await fetchImageForImport(featuredCandidate);
+    if (img) {
+      const local = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugBase, img);
+      if (local) featuredPath = local;
+      else warnings.push(`<!-- Falha ao importar imagem: ${featuredCandidate} -->`);
+    } else {
+      warnings.push(`<!-- Falha ao importar imagem: ${featuredCandidate} -->`);
+    }
+  }
+
+  if (featuredPath === "/assets/blog/destaque.jpg") {
+    const firstLocalMdImage = processedMarkdown.match(/!\[[^\]]*]\((\/assets\/blog\/[^)\s]+)\)/)?.[1];
+    if (firstLocalMdImage) featuredPath = firstLocalMdImage;
+  }
+
+  if (warnings.length > 0) {
+    processedMarkdown = `${processedMarkdown.trim()}\n\n${warnings.join("\n")}\n`;
+  }
+
+  return { markdown: processedMarkdown, featuredPath, warnings };
+}
+
 async function uniqueBlogPath(
   publisher: GithubPublisher,
   owner: string,
@@ -343,29 +430,19 @@ export const POST: APIRoute = async (context) => {
       const description = (p.description || title).trim().slice(0, 160);
       const pubDate = (p.pubDate || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
       const markdownBodyRaw = typeof p.markdownBody === "string" ? p.markdownBody : "";
-      const markdownBody = await localizeMarkdownImages({
+      const processedAssets = await processArticleAssets({
         markdown: markdownBodyRaw,
+        articleHtml: p.articleHtml,
         sourceUrl: p.sourceUrl,
+        featuredImageUrl: p.featuredImageUrl,
         slugBase: slugIn,
         publisher,
         owner,
         repo,
         branch,
       });
-
-      let heroImage = "../../assets/blog/hero-primeiro.svg";
-      const featUrl = resolveMaybeAbsoluteImageUrl(p.featuredImageUrl || "", p.sourceUrl);
-      if (featUrl) {
-        const featuredImage = await fetchImageForImport(featUrl);
-        if (featuredImage) {
-          const localHero = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugIn, featuredImage);
-          if (localHero) heroImage = localHero;
-        }
-      }
-      if (heroImage === "../../assets/blog/hero-primeiro.svg") {
-        const firstLocalMdImage = markdownBody.match(/!\[[^\]]*]\((\/assets\/blog\/[^)\s]+)\)/)?.[1];
-        if (firstLocalMdImage) heroImage = firstLocalMdImage;
-      }
+      const markdownBody = processedAssets.markdown;
+      const heroImage = processedAssets.featuredPath;
 
       const data: BlogFrontmatterInput = {
         title,
