@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import * as cheerio from "cheerio";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
 import {
   articleHtmlToMarkdown,
@@ -134,9 +135,10 @@ function resolveMaybeAbsoluteUrl(raw: string | undefined, baseUrl: string): stri
 }
 
 function extractMetaImageUrl(pageHtml: string, pageUrl: string): string | undefined {
-  const ogRaw = pageHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+  const $ = cheerio.load(pageHtml, { decodeEntities: true });
+  const ogRaw = $('meta[property="og:image"]').attr("content")?.trim();
   if (ogRaw) return resolveMaybeAbsoluteUrl(ogRaw, pageUrl);
-  const twRaw = pageHtml.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim();
+  const twRaw = $('meta[name="twitter:image"]').attr("content")?.trim();
   if (twRaw) return resolveMaybeAbsoluteUrl(twRaw, pageUrl);
   return undefined;
 }

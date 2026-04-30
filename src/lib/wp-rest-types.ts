@@ -2,6 +2,7 @@
 export type WpRestPost = {
   id: number;
   slug: string;
+  link?: string;
   date: string;
   title: { rendered: string };
   content: { rendered: string };
