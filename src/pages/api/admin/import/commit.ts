@@ -251,15 +251,15 @@ async function localizeMarkdownImages(params: {
   return output;
 }
 
-function collectImageUrlsFromMarkdown(markdown: string, sourceUrl?: string): string[] {
+function collectImageRefsFromMarkdown(markdown: string, sourceUrl?: string): Array<{ raw: string; abs: string }> {
   const imageRegex = /!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-  const out = new Set<string>();
+  const out: Array<{ raw: string; abs: string }> = [];
   for (const m of markdown.matchAll(imageRegex)) {
     const raw = (m[1] || "").trim();
     const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
-    if (abs) out.add(abs);
+    if (raw && abs) out.push({ raw, abs });
   }
-  return Array.from(out);
+  return out;
 }
 
 function extractOgOrTwitterImage(articleHtml?: string, sourceUrl?: string): string | null {
@@ -290,37 +290,57 @@ async function processArticleAssets(params: {
   const warnings: string[] = [];
   let processedMarkdown = markdown;
 
-  // 1) Processa imagens do Markdown e só troca link após confirmar upload no GitHub.
-  const markdownUrls = collectImageUrlsFromMarkdown(markdown, sourceUrl);
-  for (const absUrl of markdownUrls) {
-    const img = await fetchImageForImport(absUrl);
-    if (!img) {
-      warnings.push(`<!-- Falha ao importar imagem: ${absUrl} -->`);
-      continue;
-    }
-    const idx = Math.max(1, collectImageUrlsFromMarkdown(processedMarkdown, sourceUrl).indexOf(absUrl) + 1);
-    const local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, idx, img);
-    if (!local) {
-      warnings.push(`<!-- Falha ao importar imagem: ${absUrl} -->`);
-      continue;
-    }
-    const escaped = absUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    processedMarkdown = processedMarkdown.replace(new RegExp(`(!\\[[^\\]]*\\]\\()${escaped}(\\))`, "g"), `$1${local}$2`);
-  }
-
-  // 2) Determina destaque: prioridade og/twitter (HTML) -> featured explícito -> primeira imagem local -> fallback obrigatório.
+  // 1) Coleta URLs (corpo + destaque) e processa em concorrência.
+  const markdownRefs = collectImageRefsFromMarkdown(markdown, sourceUrl);
   const ogOrTw = extractOgOrTwitterImage(articleHtml, sourceUrl);
   const featuredCandidate = ogOrTw || resolveMaybeAbsoluteImageUrl(featuredImageUrl || "", sourceUrl);
-  let featuredPath = "/assets/blog/destaque.jpg";
+  const allAssetUrls = Array.from(
+    new Set([
+      ...markdownRefs.map((r) => r.abs),
+      ...(featuredCandidate ? [featuredCandidate] : []),
+    ]),
+  );
+  const indexByUrl = new Map<string, number>(allAssetUrls.map((u, i) => [u, i + 1]));
 
+  const uploadedByUrl = new Map<string, string>();
+  const downloadTasks = allAssetUrls.map(async (assetUrl) => {
+    const img = await fetchImageForImport(assetUrl);
+    if (!img) {
+      warnings.push(`<!-- Falha ao importar imagem: ${assetUrl} -->`);
+      return;
+    }
+    const idx = indexByUrl.get(assetUrl) || 1;
+    const local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, idx, img);
+    if (!local) {
+      // Não troca links quando upload falha.
+      warnings.push(`<!-- Falha ao importar imagem: ${assetUrl} -->`);
+      return;
+    }
+    uploadedByUrl.set(assetUrl, local);
+  });
+  await Promise.all(downloadTasks);
+
+  // 2) Reescreve Markdown apenas para assets confirmados no GitHub.
+  for (const ref of markdownRefs) {
+    const local = uploadedByUrl.get(ref.abs);
+    if (!local) continue;
+    const escapedRaw = ref.raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    processedMarkdown = processedMarkdown.replace(new RegExp(`(!\\[[^\\]]*\\]\\()${escapedRaw}(\\))`, "g"), `$1${local}$2`);
+  }
+
+  // 3) Determina destaque com prioridade og/twitter -> featured explícito -> primeira imagem local -> fallback obrigatório.
+  let featuredPath = "/assets/blog/destaque.jpg";
   if (featuredCandidate) {
-    const img = await fetchImageForImport(featuredCandidate);
-    if (img) {
-      const local = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugBase, img);
-      if (local) featuredPath = local;
-      else warnings.push(`<!-- Falha ao importar imagem: ${featuredCandidate} -->`);
+    const localFeatured = uploadedByUrl.get(featuredCandidate);
+    if (localFeatured) {
+      featuredPath = localFeatured;
     } else {
-      warnings.push(`<!-- Falha ao importar imagem: ${featuredCandidate} -->`);
+      // Tenta rota dedicada de destaque (nome semântico) se o asset foi baixado mas upload numerado não foi usado.
+      const img = await fetchImageForImport(featuredCandidate);
+      if (img) {
+        const uploadedFeatured = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugBase, img);
+        if (uploadedFeatured) featuredPath = uploadedFeatured;
+      }
     }
   }
 

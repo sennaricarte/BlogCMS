@@ -45,13 +45,24 @@ function stripHtmlToText(html: string, maxLen: number): string {
 
 type WxrItem = Record<string, unknown>;
 
+function xmlString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value).trim();
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const nested = obj["#text"] ?? obj["__text"] ?? obj["text"] ?? obj["$text"] ?? obj["_text"] ?? obj["cdata"];
+    if (typeof nested === "string") return nested.trim();
+  }
+  return "";
+}
+
 function resolveFeaturedUrlFromItem(item: WxrItem, attachmentById: Map<string, string>): string | undefined {
-  const directAttachment = typeof item["wp:attachment_url"] === "string" ? (item["wp:attachment_url"] as string).trim() : "";
+  const directAttachment = xmlString(item["wp:attachment_url"]);
   if (directAttachment) return directAttachment;
 
   const metas = arr(item["wp:postmeta"] as WxrItem | WxrItem[] | undefined);
-  const thumbMeta = metas.find((m) => String(m["wp:meta_key"] || "") === "_thumbnail_id");
-  const thumbId = String(thumbMeta?.["wp:meta_value"] || "").trim();
+  const thumbMeta = metas.find((m) => xmlString(m["wp:meta_key"]) === "_thumbnail_id");
+  const thumbId = xmlString(thumbMeta?.["wp:meta_value"]);
   if (thumbId && attachmentById.has(thumbId)) return attachmentById.get(thumbId);
   return undefined;
 }
@@ -111,27 +122,27 @@ export const POST: APIRoute = async (context) => {
 
     const attachmentById = new Map<string, string>();
     for (const it of items) {
-      const postType = String(it["wp:post_type"] || "").trim();
+      const postType = xmlString(it["wp:post_type"]);
       if (postType !== "attachment") continue;
-      const id = String(it["wp:post_id"] || "").trim();
-      const url = String(it["wp:attachment_url"] || "").trim();
+      const id = xmlString(it["wp:post_id"]);
+      const url = xmlString(it["wp:attachment_url"]);
       if (id && url) attachmentById.set(id, url);
     }
 
-    const postsOnly = items.filter((it) => String(it["wp:post_type"] || "").trim() === "post");
+    const postsOnly = items.filter((it) => xmlString(it["wp:post_type"]) === "post");
     const totalDiscovered = postsOnly.length;
     const selected = postsOnly.slice(offset, offset + limit);
     const hasMore = offset + selected.length < totalDiscovered;
     const nextOffset = offset + selected.length;
 
     const posts = selected.map((p, i) => {
-      const title = String(p.title || "").trim() || `post-${offset + i + 1}`;
-      const bodyHtml = String(p["content:encoded"] || "").trim();
-      const excerptHtml = String(p["excerpt:encoded"] || "").trim();
+      const title = xmlString(p.title) || `post-${offset + i + 1}`;
+      const bodyHtml = xmlString(p["content:encoded"]);
+      const excerptHtml = xmlString(p["excerpt:encoded"]);
       const markdown = articleHtmlToMarkdown(bodyHtml);
-      const slugRaw = String(p["wp:post_name"] || "").trim();
+      const slugRaw = xmlString(p["wp:post_name"]);
       const slug = slugify(slugRaw || title);
-      const pubRaw = String(p["wp:post_date"] || p.pubDate || "").trim();
+      const pubRaw = xmlString(p["wp:post_date"]) || xmlString(p.pubDate);
       const pubParsed = pubRaw ? new Date(pubRaw) : null;
       const pubDate =
         pubParsed && !Number.isNaN(pubParsed.getTime())
@@ -139,10 +150,10 @@ export const POST: APIRoute = async (context) => {
           : new Date().toISOString().slice(0, 10);
       const { category, tags } = resolveTerms(p);
       const featuredImageUrl = resolveFeaturedUrlFromItem(p, attachmentById);
-      const sourceUrl = String(p.link || "").trim() || undefined;
+      const sourceUrl = xmlString(p.link) || undefined;
       const description = stripHtmlToText(excerptHtml || bodyHtml || title, 160);
       return {
-        sourceId: Number(String(p["wp:post_id"] || offset + i + 1)) || offset + i + 1,
+        sourceId: Number(xmlString(p["wp:post_id"]) || offset + i + 1) || offset + i + 1,
         slug,
         title,
         description,
