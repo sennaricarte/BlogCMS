@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGitHubClient, createRepository, type CreateRepositoryResult } from "./github";
+import { vercelNewCloneUrl } from "./vercel-instant-deploy";
 
 /** Alinhado a `src/data/site-config.json` (identidade, menu, rodapé, SEO). */
 export interface SiteConfig {
@@ -39,6 +40,7 @@ export type ClientConfig = SiteConfig;
 /** Sempre POSIX para comparar com `r` na árvore de ficheiros. */
 const CONFIG_FILE_IN_TEMPLATE = "src/data/site-config.json";
 const DEPLOY_GUIDE_FILE_IN_TEMPLATE = "DEPLOY-VERCEL.md";
+const INSTRUCOES_DEPLOY_FILE = "instrucoes-deploy.md";
 
 const IGNORED_DIR_NAMES = new Set([
   ".git",
@@ -297,10 +299,74 @@ function isBinaryFile(path: string, buffer: Buffer): boolean {
 }
 
 /** Percorre o template e devolve pares (caminho POSIX no repo, conteúdo). */
+function buildInstrucoesDeployMarkdown(
+  clientConfig: SiteConfig,
+  options: { repoName: string; defaultBranch: string; repositoryHtmlUrl: string },
+): string {
+  const branch = options.defaultBranch || "main";
+  const repoUrl = (options.repositoryHtmlUrl || "").trim();
+  const clone = vercelNewCloneUrl(repoUrl);
+  const brand = (clientConfig.nomeMarca || "").trim() || options.repoName;
+  return `# Instruções — ligar este repositório à Vercel
+
+Este ficheiro foi gerado automaticamente quando o projeto **${brand}** foi criado no GitHub.
+
+## O que vai acontecer
+
+1. O código deste repositório é um projeto **Astro** em código-fonte.
+2. A **Vercel** vai instalar dependências e correr \`npm run build\` na cloud (não precisa de build local obrigatório).
+
+## Passo 1 — Conta na Vercel
+
+1. Aceda a [vercel.com](https://vercel.com) e inicie sessão (recomendado: mesmo e-mail ou GitHub que usou para criar este repositório).
+
+## Passo 2 — Importar este repositório
+
+**Opção A — Deploy instantâneo (clone)**
+
+1. Abra o link (já com o URL do repositório):
+
+   **${clone}**
+
+2. Siga o assistente: confirme o nome do projeto na Vercel e clique em **Deploy**.
+
+**Opção B — Import manual**
+
+1. Aceda a [vercel.com/new](https://vercel.com/new).
+2. Escolha **Import Git Repository** e selecione este repositório.
+3. Branch principal: **${branch}**.
+
+## Passo 3 — Definições de build
+
+- **Root Directory:** deixe vazio (a raiz do repositório), salvo se o \`package.json\` estiver noutra pasta.
+- **Build Command:** \`npm run build\`
+- **Install Command:** \`npm install\`
+- **Output Directory:** deixe o padrão (a Vercel deteta Astro).
+
+## Passo 4 — Primeiro deploy
+
+1. Clique em **Deploy** e aguarde o fim do build.
+2. Se aparecer erro \`ENOENT\` / \`package.json\`, verifique **Project → Settings → General → Root Directory** (deve apontar para a pasta onde está o \`package.json\`).
+
+## Passo 5 — Domínio
+
+1. Em **Settings → Domains**, adicione o seu domínio e configure o DNS conforme as instruções da Vercel.
+
+## Referência
+
+- URL do repositório: ${repoUrl || "—"}
+- Ficheiro complementar na raiz: \`DEPLOY-VERCEL.md\`
+
+---
+
+Dúvidas: use os logs em **Deployments** na Vercel ou contacte quem lhe entregou o acesso ao BlogCMS.
+`;
+}
+
 async function loadTemplateFiles(
   templateRoot: string,
   clientConfig: SiteConfig,
-  options: { repoName: string; defaultBranch: string },
+  options: { repoName: string; defaultBranch: string; repositoryHtmlUrl: string },
 ): Promise<Array<{ path: string; buffer: Buffer; encoding: "utf-8" | "base64" }>> {
   const rootAbs = join(templateRoot);
   if (!(await pathExists(rootAbs))) {
@@ -347,10 +413,18 @@ async function loadTemplateFiles(
   await walk(rootAbs);
   const deployGuide = buildVercelDeployGuide(clientConfig, options.repoName, options.defaultBranch);
   const deployGuideBuffer = Buffer.from(deployGuide, "utf-8");
-  const filtered = out.filter((f) => f.path !== DEPLOY_GUIDE_FILE_IN_TEMPLATE);
+  const filtered = out.filter(
+    (f) => f.path !== DEPLOY_GUIDE_FILE_IN_TEMPLATE && f.path !== INSTRUCOES_DEPLOY_FILE,
+  );
   filtered.push({
     path: DEPLOY_GUIDE_FILE_IN_TEMPLATE,
     buffer: deployGuideBuffer,
+    encoding: "utf-8",
+  });
+  const instrBody = buildInstrucoesDeployMarkdown(clientConfig, options);
+  filtered.push({
+    path: INSTRUCOES_DEPLOY_FILE,
+    buffer: Buffer.from(instrBody, "utf-8"),
     encoding: "utf-8",
   });
 
@@ -469,25 +543,28 @@ export async function deployToClientRepo(
   const defaultBranch = options.defaultBranch?.trim() || "main";
   const commitMessage = options.commitMessage?.trim() || "chore: deploy client template";
 
-  const files = await loadTemplateFiles(templateRoot, clientConfig, {
-    repoName: options.repoName.trim(),
-    defaultBranch,
-  });
-  assertClientRepoMandatoryFiles(files);
-  const templateAudit = detectAstroRootDirectory(files);
   const octokit = createGitHubClient(token);
-
   const { data: me } = await octokit.users.getAuthenticated();
   const owner = me.login;
   if (!options.repoName?.trim()) {
     throw new Error("repoName é obrigatório.");
   }
+  const repoSlug = options.repoName.trim();
+  const repositoryHtmlUrl = `https://github.com/${owner}/${repoSlug}`;
+
+  const files = await loadTemplateFiles(templateRoot, clientConfig, {
+    repoName: repoSlug,
+    defaultBranch,
+    repositoryHtmlUrl,
+  });
+  assertClientRepoMandatoryFiles(files);
+  const templateAudit = detectAstroRootDirectory(files);
 
   options.onPhase?.({ phase: "github_create_repo" });
   /** `auto_init: true` cria o primeiro commit (README); a API Git recusa blobs em repo sem histórico (409). */
   const repository = await createRepository({
     token,
-    name: options.repoName.trim(),
+    name: repoSlug,
     description: options.description,
     private: options.private ?? true,
     autoInit: true,

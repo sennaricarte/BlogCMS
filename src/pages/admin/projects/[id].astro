@@ -11,6 +11,7 @@ import {
   projectVercelDeploymentsUrl,
   projectVercelSpeedInsightsUrl,
 } from "../../../lib/vercel-project-admin-links";
+import { vercelNewCloneUrl } from "../../../lib/vercel-instant-deploy";
 
 const rawId = Astro.params.id;
 const { projects: projectsList } = await readProjectsData();
@@ -27,6 +28,9 @@ const canonicalPath = `/admin/projects/${project.id}/`;
 const cmsTarget = getCmsTargetFromProject(project);
 const cmsTargetJson = cmsTarget ? JSON.stringify(cmsTarget) : "";
 const publicUrl = projectPublicSiteUrl(project);
+const awaitingDeploy =
+  project.awaitingVercelDeploy !== false && !String(project.vercelProjectId || "").trim();
+const vercelCloneUrl = vercelNewCloneUrl(project.githubUrl);
 const logsUrl = projectVercelDeploymentsUrl(project);
 const analyticsUrl = projectVercelSpeedInsightsUrl(project);
 /** Indicador estático até haver cálculo real (Lighthouse, Content API, etc.). */
@@ -85,6 +89,19 @@ const seoTextClass =
     <p class="mt-1.5 text-sm text-slate-600">
       Este ecrã define o alvo do CMS: GitHub e Vercel passam a ser os destinos ao editares conteúdo noutros separadores.
     </p>
+    {
+      awaitingDeploy && (
+        <p
+          class="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-sm text-amber-950"
+          role="status"
+        >
+          <span class="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+          <span>
+            Estado: <strong>Aguardando deploy</strong> — publique na Vercel e confirme a URL de produção abaixo.
+          </span>
+        </p>
+      )
+    }
     <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
       <div>
         <dt class="text-xs font-medium text-slate-500">Repositório (GitHub)</dt>
@@ -107,6 +124,58 @@ const seoTextClass =
       </div>
     </dl>
   </div>
+
+  {
+    awaitingDeploy && (
+      <section
+        id="url-producao"
+        class="mb-6 rounded-2xl border-2 border-[var(--client-color-primary)]/25 bg-white px-5 py-5 shadow-sm sm:px-6"
+        aria-labelledby="heading-url-producao"
+      >
+        <h2 id="heading-url-producao" class="text-lg font-bold text-slate-900">
+          Publicar na Vercel e confirmar URL
+        </h2>
+        <p class="mt-2 text-sm text-slate-600">
+          Depois do primeiro deploy bem-sucedido na Vercel, indique aqui a URL final do site (ex.:{" "}
+          <code class="rounded bg-slate-100 px-1 font-mono text-xs">https://o-seu-site.vercel.app</code>). O painel
+          passará a mostrar o estado como publicado.
+        </p>
+        <p class="mt-3">
+          <a
+            href={vercelCloneUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--client-color-primary)] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+          >
+            Fazer deploy na Vercel
+          </a>
+        </p>
+        <form id="form-confirm-live-url" class="mt-5 space-y-3">
+          <div>
+            <label for="live-site-url" class="block text-sm font-medium text-slate-800">
+              URL final do site (produção)
+            </label>
+            <input
+              id="live-site-url"
+              name="liveSiteUrl"
+              type="url"
+              required
+              placeholder="https://…"
+              class="mt-1.5 w-full max-w-xl rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+              autocomplete="off"
+            />
+          </div>
+          <button
+            type="submit"
+            class="inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
+          >
+            Guardar URL e concluir
+          </button>
+          <p id="confirm-live-url-msg" class="hidden text-sm" role="status" aria-live="polite" />
+        </form>
+      </section>
+    )
+  }
 
   <section
     class="mb-6 rounded-2xl border border-slate-200/80 bg-white px-5 py-5 shadow-sm sm:px-6"
@@ -264,4 +333,43 @@ const seoTextClass =
       rel="noopener noreferrer"
     >Ver logs de deploy</a> na Vercel (repositório e projeto já associados a este registo).
   </p>
+
+  {
+    awaitingDeploy && (
+      <script is:inline define:vars={{ projectId: project.id }}>
+        (function () {
+          var form = document.getElementById("form-confirm-live-url");
+          var input = document.getElementById("live-site-url");
+          var msg = document.getElementById("confirm-live-url-msg");
+          if (!form || !input || !msg) return;
+          form.addEventListener("submit", async function (ev) {
+            ev.preventDefault();
+            var url = (input.value || "").trim();
+            if (!url) return;
+            msg.classList.remove("hidden", "text-red-800", "text-emerald-800");
+            msg.textContent = "A guardar…";
+            try {
+              var res = await fetch("/api/admin/projects/confirm-live-url", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: projectId, liveSiteUrl: url }),
+              });
+              var j = await res.json();
+              if (!res.ok || !j.ok) {
+                msg.classList.add("text-red-800");
+                msg.textContent = j.error || "Não foi possível guardar.";
+                return;
+              }
+              msg.classList.add("text-emerald-800");
+              msg.textContent = "Guardado. A recarregar…";
+              window.location.reload();
+            } catch (e) {
+              msg.classList.add("text-red-800");
+              msg.textContent = "Erro de rede.";
+            }
+          });
+        })();
+      </script>
+    )
+  }
 </AdminLayout>

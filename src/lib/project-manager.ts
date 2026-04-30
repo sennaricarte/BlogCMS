@@ -201,6 +201,8 @@ export function buildClientProjectFromDeploy(args: {
     depUrl || siteFromConfig || "https://vercel.com";
   const publicUrl = preferStableVercelProductionUrl(rawPublic, result.vercelProjectName);
 
+  const hasVercel = Boolean(String(result.vercelProjectId || "").trim());
+
   return {
     id: randomUUID(),
     name,
@@ -213,6 +215,8 @@ export function buildClientProjectFromDeploy(args: {
     vercelScope: result.vercelScope,
     vercelTeamId: (vercelTeamId ?? "").trim(),
     githubRepoFullName: result.githubFullName,
+    /** Fluxo só GitHub: o cliente publica na Vercel; até confirmar URL fica «Aguardando deploy». */
+    awaitingVercelDeploy: !hasVercel,
   };
 }
 
@@ -257,6 +261,57 @@ export async function addProjectFromSuccessfulDeploy(input: {
   });
   await upsertProjectInRegistry(entry);
   return entry;
+}
+
+function normalizeLiveSiteUrl(raw: string): string {
+  const t = raw.trim();
+  if (!t) {
+    throw new Error("Indique a URL pública do site.");
+  }
+  const withProto = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  let u: URL;
+  try {
+    u = new URL(withProto);
+  } catch {
+    throw new Error("URL inválida.");
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") {
+    throw new Error("URL inválida: use http ou https.");
+  }
+  return u.href.replace(/\/+$/, "") || u.origin;
+}
+
+/**
+ * Após o deploy manual na Vercel: grava a URL de produção e marca o projeto como publicado no painel.
+ */
+export async function confirmProjectLiveSiteUrl(input: {
+  id: string;
+  liveSiteUrl: string;
+}): Promise<ClientProject> {
+  const id = input.id?.trim();
+  if (!id) {
+    throw new Error("Indique o id do projeto.");
+  }
+  const url = normalizeLiveSiteUrl(input.liveSiteUrl);
+
+  return withFileLock(async () => {
+    const data = await readProjectsData();
+    const idx = data.projects.findIndex((p) => p.id === id);
+    if (idx < 0) {
+      throw new Error("Projeto não encontrado.");
+    }
+    const prev = data.projects[idx]!;
+    const next: ClientProject = {
+      ...prev,
+      siteUrl: url,
+      vercelUrl: url,
+      awaitingVercelDeploy: false,
+    };
+    const projects = [...data.projects];
+    projects[idx] = next;
+    await writeProjectsDataBestEffort({ projects });
+    return next;
+  });
 }
 
 /**

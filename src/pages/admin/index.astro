@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import DeploySuccessPanel from "../../components/admin/DeploySuccessPanel.tsx";
 import defaultConfig from "../../data/site-config.json";
 
 /** Admin e tokens: servido no servidor; não gera HTML estático com segredos. */
@@ -21,8 +22,9 @@ const pageDescription =
       </p>
       <p class="mt-2 rounded-lg border border-emerald-200/80 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900">
         Experiência assistida: após criar o repositório, o cliente recebe um guia
-        <code class="rounded bg-emerald-100/80 px-1 font-mono">DEPLOY-VERCEL.md</code>
-        com instruções claras para configurar e publicar na Vercel.
+        <code class="rounded bg-emerald-100/80 px-1 font-mono">DEPLOY-VERCEL.md</code> e{" "}
+        <code class="rounded bg-emerald-100/80 px-1 font-mono">instrucoes-deploy.md</code>
+        no repositório do cliente.
       </p>
       <p class="mt-2 text-xs text-slate-500">
         <a href="/admin/settings/" class="text-[var(--client-color-primary)] underline-offset-2 hover:underline"
@@ -183,6 +185,8 @@ const pageDescription =
       aria-live="polite"
       class="mt-6 hidden min-h-[2rem] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
     />
+
+    <DeploySuccessPanel client:load />
   </div>
 </BaseLayout>
 
@@ -307,6 +311,7 @@ const pageDescription =
         vercelScope: result.vercelScope || "",
         vercelTeamId: "",
         githubRepoFullName: result.githubFullName || "",
+        awaitingVercelDeploy: !(result.vercelProjectId && String(result.vercelProjectId).trim()),
       };
 
       var list = safeReadLocalProjects();
@@ -468,26 +473,29 @@ const pageDescription =
                 r0
               );
               cacheProjectFromDeploy(r0, config);
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("blogcms-deploy-github-success", {
+                    detail: {
+                      githubRepositoryUrl: r0.githubRepositoryUrl || "",
+                      githubTreeUrl: r0.githubTreeUrl || "",
+                    },
+                  }),
+                );
+              } catch (e) {}
               if (o.projectsUpdate && o.projectsUpdate.status === "error") {
                 var detail =
                   o.projectsUpdate && o.projectsUpdate.message
                     ? " Detalhe técnico: " + String(o.projectsUpdate.message)
                     : "";
                 setMsg(
-                  "Deploy concluído, mas o registo automático em 'Seus sites' falhou no servidor. " +
-                    "Já guardei este site localmente neste navegador. GitHub: " +
-                    (r0.githubRepositoryUrl || "—") +
-                    ". Próximo passo: guia completo em /admin/publicar-na-vercel/ ou o ficheiro DEPLOY-VERCEL.md no repositório." +
+                  "Registo em «Seus sites» falhou no servidor; o site ficou guardado neste navegador. " +
+                    "Use o painel abaixo para abrir o GitHub e fazer deploy na Vercel." +
                     detail,
                   false
                 );
               } else {
-                setMsg(
-                  "Feito. Repositório criado no GitHub: " +
-                    (r0.githubRepositoryUrl || "—") +
-                    ". Guia no BlogCMS: /admin/publicar-na-vercel/ · No repositório: DEPLOY-VERCEL.md",
-                  false,
-                );
+                setMsg("Repositório criado. Use os botões abaixo para abrir o GitHub e publicar na Vercel.", false);
               }
               return true;
             }

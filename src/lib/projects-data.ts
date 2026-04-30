@@ -16,6 +16,11 @@ export type ClientProject = {
   vercelScope: string;
   vercelTeamId: string;
   githubRepoFullName: string;
+  /**
+   * Quando true: o repositório GitHub existe mas o site ainda não foi publicado na Vercel
+   * ou a URL de produção não foi confirmada no painel.
+   */
+  awaitingVercelDeploy?: boolean;
   vercelLogsUrl?: string;
   /** URL manual do Speed Insights, se a automática `…/speed-insights` não servir. */
   vercelSpeedInsightsUrl?: string;

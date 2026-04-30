@@ -9,6 +9,7 @@ import {
   projectVercelSpeedInsightsUrl,
 } from "../../lib/vercel-project-admin-links";
 import { canonicalVercelProjectUrl, preferStableVercelProductionUrl } from "../../lib/vercel-public-url";
+import { vercelNewCloneUrl } from "../../lib/vercel-instant-deploy";
 import { DashboardProjectGsc } from "./DashboardProjectGsc";
 
 const K = ADMIN_INTEGRATION_STORAGE_KEY;
@@ -77,6 +78,14 @@ function projectHubHref(p: ClientProject) {
 
 function normalizeProjectKey(v: string): string {
   return (v || "").trim().toLowerCase();
+}
+
+/** Repositório criado só no GitHub: aguarda deploy na Vercel e confirmação da URL no painel. */
+function isAwaitingVercelDeploy(p: ClientProject): boolean {
+  if (p.awaitingVercelDeploy === false) return false;
+  if (p.awaitingVercelDeploy === true) return true;
+  if (String(p.vercelProjectId || "").trim()) return false;
+  return true;
 }
 
 function sanitizeCachedProjectUrl(p: ClientProject): ClientProject {
@@ -162,15 +171,25 @@ function writeDeletedCaches(keys: Set<string>, ids: Set<string>) {
   }
 }
 
-type StatusDisplay = { kind: "online" } | { kind: "line"; text: string; className: string; detail?: string };
+type StatusDisplay =
+  | { kind: "online" }
+  | { kind: "awaiting" }
+  | { kind: "line"; text: string; className: string; detail?: string };
 
 function resolveStatus(
   s: StatusRow | undefined,
   p: ClientProject,
   hasVercelToken: boolean,
 ): StatusDisplay {
+  if (isAwaitingVercelDeploy(p)) {
+    return { kind: "awaiting" };
+  }
   const hasUrl = Boolean((p.vercelUrl || p.siteUrl || "").trim());
+  const hasVp = Boolean(String(p.vercelProjectId || "").trim());
   if (!s) {
+    if (!hasVp && hasUrl) {
+      return { kind: "line", text: "URL confirmada", className: "text-sky-800 font-medium" };
+    }
     if (!hasVercelToken && hasUrl) {
       return { kind: "online" };
     }
@@ -235,6 +254,17 @@ function OnlineStatusBadge() {
         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
       </span>
       No ar
+    </span>
+  );
+}
+
+function AwaitingDeployStatusBadge() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200/90 bg-amber-50/95 pl-1.5 pr-2.5 py-0.5 text-xs font-medium text-amber-950 shadow-sm ring-1 ring-amber-200/40">
+      <span className="relative flex h-2 w-2" aria-hidden>
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+      </span>
+      Aguardando deploy
     </span>
   );
 }
@@ -520,11 +550,25 @@ export function DashboardProjects({ projects }: Props) {
       const keysToHide = new Set<string>();
       for (const p of allProjects) {
         if (!p.vercelProjectId?.trim()) {
-          next[p.id] = {
-            label: "Sem ligação",
-            badgeClass: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-200",
-            error: "preenche vercelProjectId",
-          };
+          if (isAwaitingVercelDeploy(p)) {
+            next[p.id] = {
+              label: "Aguardando deploy",
+              badgeClass: "bg-amber-50 text-amber-900 ring-1 ring-amber-200/80",
+              raw: "AWAITING_VERCEL",
+            };
+          } else if ((p.vercelUrl || p.siteUrl || "").trim()) {
+            next[p.id] = {
+              label: "URL confirmada",
+              badgeClass: "bg-sky-50 text-sky-900 ring-1 ring-sky-200/80",
+              raw: "MANUAL_URL",
+            };
+          } else {
+            next[p.id] = {
+              label: "Sem ligação",
+              badgeClass: "bg-zinc-100 text-zinc-500 ring-1 ring-zinc-200",
+              error: "preenche vercelProjectId",
+            };
+          }
           continue;
         }
         try {
@@ -718,7 +762,9 @@ export function DashboardProjects({ projects }: Props) {
         {filteredProjects.map((p) => {
           const s = status[p.id];
           const st = resolveStatus(s, p, hasVercelToken);
-          const siteHref = resolveLiveSiteHref(p, s);
+          const awaiting = isAwaitingVercelDeploy(p);
+          const siteHref = awaiting ? `${projectHubHref(p)}#url-producao` : resolveLiveSiteHref(p, s);
+          const vercelCloneHref = vercelNewCloneUrl(p.githubUrl);
           const created = (() => {
             try {
               return new Date(p.createdAt).toLocaleDateString("pt-BR", {
@@ -743,6 +789,8 @@ export function DashboardProjects({ projects }: Props) {
                 <div className="flex shrink-0 items-center gap-1.5">
                   {st.kind === "online" ? (
                     <OnlineStatusBadge />
+                  ) : st.kind === "awaiting" ? (
+                    <AwaitingDeployStatusBadge />
                   ) : (
                     <span
                       className={["max-w-[9rem] truncate text-left text-xs", st.kind === "line" ? st.className : ""].join(
@@ -764,23 +812,26 @@ export function DashboardProjects({ projects }: Props) {
               <div className="flex flex-1 flex-col space-y-3 px-4 py-4 text-sm">
                 <a
                   href={siteHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  {...(awaiting ? {} : { target: "_blank", rel: "noopener noreferrer" })}
                   className="group/link flex min-h-9 items-center gap-2.5 rounded-lg border border-slate-200/80 bg-white px-3 py-2 text-slate-800 transition hover:border-slate-300 hover:bg-slate-50/80"
                 >
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200/80 bg-slate-50 text-slate-700 group-hover/link:border-slate-300 group-hover/link:bg-white">
                     <Link2 className="h-4 w-4" aria-hidden />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-xs font-medium text-slate-500">Produção (Vercel)</span>
+                    <span className="block text-xs font-medium text-slate-500">
+                      {awaiting ? "Site público" : "Produção (Vercel)"}
+                    </span>
                     <span className="block truncate font-medium text-slate-900" title={siteHref}>
-                      {(() => {
-                        try {
-                          return new URL(siteHref).host;
-                        } catch {
-                          return siteHref;
-                        }
-                      })()}
+                      {awaiting
+                        ? "Confirme a URL após publicar na Vercel"
+                        : (() => {
+                            try {
+                              return new URL(siteHref).host;
+                            } catch {
+                              return siteHref;
+                            }
+                          })()}
                     </span>
                   </span>
                 </a>
@@ -808,33 +859,62 @@ export function DashboardProjects({ projects }: Props) {
 
               <div className="mt-auto border-t border-slate-100 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <a
-                    href={siteHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/20"
-                    aria-label={`Ver site no ar: ${p.name}`}
-                  >
-                    <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-                    Ver site no ar
-                  </a>
-                  <a
-                    href={projectHubHref(p)}
-                    onClick={(ev) => {
-                      persistCmsTargetIfPossible(p);
-                      // Para projetos ainda não persistidos no projects.json do servidor,
-                      // abre o CMS diretamente em vez da rota /admin/projects/[id].
-                      if (p.id.startsWith("local-")) {
-                        ev.preventDefault();
-                        window.location.href = "/admin/posts/";
-                      }
-                    }}
-                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
-                    aria-label={`Gerenciar o site: ${p.name}`}
-                  >
-                    <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                    Gerenciar site
-                  </a>
+                  {awaiting ? (
+                    <>
+                      <a
+                        href={vercelCloneHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--client-color-primary)] px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--client-color-primary)]/35"
+                        aria-label={`Fazer deploy na Vercel: ${p.name}`}
+                      >
+                        <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+                        Fazer deploy na Vercel
+                      </a>
+                      <a
+                        href={`${projectHubHref(p)}#url-producao`}
+                        onClick={(ev) => {
+                          persistCmsTargetIfPossible(p);
+                          if (p.id.startsWith("local-")) {
+                            ev.preventDefault();
+                            window.location.href = "/admin/posts/";
+                          }
+                        }}
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/20"
+                        aria-label={`Confirmar URL do site: ${p.name}`}
+                      >
+                        Confirmar URL do site
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <a
+                        href={siteHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/20"
+                        aria-label={`Ver site no ar: ${p.name}`}
+                      >
+                        <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+                        Ver site no ar
+                      </a>
+                      <a
+                        href={projectHubHref(p)}
+                        onClick={(ev) => {
+                          persistCmsTargetIfPossible(p);
+                          if (p.id.startsWith("local-")) {
+                            ev.preventDefault();
+                            window.location.href = "/admin/posts/";
+                          }
+                        }}
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
+                        aria-label={`Gerenciar o site: ${p.name}`}
+                      >
+                        <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                        Gerenciar site
+                      </a>
+                    </>
+                  )}
                 </div>
               </div>
             </li>
