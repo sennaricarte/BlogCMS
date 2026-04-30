@@ -136,6 +136,17 @@ const ASTRO_CONFIG_FILENAMES = [
   "astro.config.cjs",
 ] as const;
 
+const CLIENT_REQUIRED_ASTRO_CONFIG = "astro.config.mjs";
+
+const CLIENT_PACKAGE_EXCLUDED_DEPENDENCIES = new Set([
+  "cheerio",
+]);
+
+const CLIENT_PACKAGE_EXCLUDED_DEV_DEPENDENCIES = new Set([
+  "tsx",
+  "dotenv",
+]);
+
 /** Pasta na raiz do BlogCMS com o cÃ³digo-fonte Astro enviado aos repos dos clientes (sem `dist/`). */
 export const CLIENT_ASTRO_TEMPLATE_DIR_NAME = "template-astro";
 
@@ -201,7 +212,11 @@ export async function syncTemplateAstroToProjectRoot(
       const buffer = await readFile(full);
       const dest = join(targetRoot, r);
       await mkdir(dirname(dest), { recursive: true });
-      await writeFile(dest, buffer);
+      if (r === "package.json") {
+        await writeFile(dest, sanitizeClientPackageJsonBuffer(buffer));
+      } else {
+        await writeFile(dest, buffer);
+      }
     }
   }
 
@@ -395,6 +410,16 @@ async function loadTemplateFiles(
       }
       if (shouldSkipRelativePath(r, false)) continue;
 
+      if (r === "package.json") {
+        const buffer = await readFile(full);
+        out.push({
+          path: r,
+          buffer: sanitizeClientPackageJsonBuffer(buffer),
+          encoding: "utf-8",
+        });
+        continue;
+      }
+
       if (r === CONFIG_FILE_IN_TEMPLATE) {
         const body = JSON.stringify(clientConfig, null, 2) + "\n";
         out.push({ path: r, buffer: Buffer.from(body, "utf-8"), encoding: "utf-8" });
@@ -441,9 +466,10 @@ function assertClientRepoMandatoryFiles(files: Array<{ path: string }>): void {
   if (!paths.has("package.json")) {
     throw new Error(`Template: falta package.json na raiz (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
   }
-  const hasAstroCfg = ASTRO_CONFIG_FILENAMES.some((f) => paths.has(f));
-  if (!hasAstroCfg) {
-    throw new Error(`Template: falta astro.config.(mjs|ts|â€¦) na raiz (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
+  if (!paths.has(CLIENT_REQUIRED_ASTRO_CONFIG)) {
+    throw new Error(
+      `Template: falta ${CLIENT_REQUIRED_ASTRO_CONFIG} na raiz (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`,
+    );
   }
   if (!Array.from(paths).some((p) => p.startsWith("src/"))) {
     throw new Error(`Template: falta pasta src/ com ficheiros (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
@@ -451,6 +477,39 @@ function assertClientRepoMandatoryFiles(files: Array<{ path: string }>): void {
   if (!Array.from(paths).some((p) => p.startsWith("public/"))) {
     throw new Error(`Template: falta pasta public/ com ficheiros (pasta ${CLIENT_ASTRO_TEMPLATE_DIR_NAME}).`);
   }
+}
+
+function sanitizeClientPackageJsonBuffer(buffer: Buffer): Buffer {
+  const parsed = JSON.parse(buffer.toString("utf-8")) as {
+    scripts?: Record<string, string>;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+
+  parsed.scripts = {
+    dev: "astro dev",
+    build: "astro build",
+    preview: "astro preview",
+    astro: "astro",
+  };
+
+  const deps = { ...(parsed.dependencies || {}) };
+  for (const name of CLIENT_PACKAGE_EXCLUDED_DEPENDENCIES) {
+    delete deps[name];
+  }
+  parsed.dependencies = deps;
+
+  const devDeps = { ...(parsed.devDependencies || {}) };
+  for (const name of CLIENT_PACKAGE_EXCLUDED_DEV_DEPENDENCIES) {
+    delete devDeps[name];
+  }
+  if (Object.keys(devDeps).length === 0) {
+    delete parsed.devDependencies;
+  } else {
+    parsed.devDependencies = devDeps;
+  }
+
+  return Buffer.from(`${JSON.stringify(parsed, null, 2)}\n`, "utf-8");
 }
 
 /** Paralelismo moderado para reduzir picos que disparam o rate limit secundÃ¡rio do GitHub. */
