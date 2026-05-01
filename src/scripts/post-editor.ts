@@ -522,6 +522,8 @@ async function loadRemote() {
     queueMicrotask(notifyTipTap);
     setTimeout(notifyTipTap, 120);
     setTimeout(notifyTipTap, 380);
+    setTimeout(notifyTipTap, 900);
+    setTimeout(notifyTipTap, 2200);
   }
   setMsg("", false);
   syncSeoTitleCount();

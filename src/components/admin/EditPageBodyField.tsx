@@ -42,6 +42,25 @@ export function EditPageBodyField({ initialMarkdown }: Props) {
     return () => window.removeEventListener(SYNC_EVENT, onExternal as EventListener);
   }, []);
 
+  /** Igual a `EditPostBodyField`: evitar corpo vazio se o evento GitHub disparar antes da hidratação. */
+  useEffect(() => {
+    const h = document.getElementById("p-body") as HTMLInputElement | null;
+    if (!h) return;
+
+    const adoptFromHiddenIfNeeded = () => {
+      const domVal = h.value;
+      setMd((prev) => {
+        if (domVal === prev) return prev;
+        queueMicrotask(() => setEditorKey((k) => k + 1));
+        return domVal;
+      });
+    };
+
+    adoptFromHiddenIfNeeded();
+    const timeouts = [30, 120, 350, 800, 2000].map((ms) => window.setTimeout(adoptFromHiddenIfNeeded, ms));
+    return () => timeouts.forEach(clearTimeout);
+  }, []);
+
   return (
     <div className="w-full min-w-0" data-editor="tiptap">
       <Editor key={editorKey} initialMarkdown={md} onChange={onChange} markdownDebounceMs={0} />
