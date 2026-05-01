@@ -78,6 +78,24 @@ const SUPPORTED_IMAGE_MIME_TO_EXT: Record<string, string> = {
   "image/svg+xml": "svg",
 };
 
+/** SHA do `blog/{slug}.md` no ramo, ou `null` se não existir (404). */
+async function getBlogMarkdownShaIfExists(
+  publisher: GithubPublisher,
+  owner: string,
+  repo: string,
+  branch: string,
+  slug: string,
+): Promise<string | null> {
+  const path = `${CMS_PATHS.blog}/${slug}.md`;
+  try {
+    const { sha } = await publisher.getFileText(owner, repo, path, { branch });
+    return sha?.trim() || null;
+  } catch (e) {
+    if (e instanceof RequestError && e.status === 404) return null;
+    throw e;
+  }
+}
+
 async function blogPathExists(
   publisher: GithubPublisher,
   owner: string,
@@ -85,14 +103,8 @@ async function blogPathExists(
   branch: string,
   slug: string,
 ): Promise<boolean> {
-  const path = `${CMS_PATHS.blog}/${slug}.md`;
-  try {
-    await publisher.getFileText(owner, repo, path, { branch });
-    return true;
-  } catch (e) {
-    if (e instanceof RequestError && e.status === 404) return false;
-    throw e;
-  }
+  const sha = await getBlogMarkdownShaIfExists(publisher, owner, repo, branch, slug);
+  return sha !== null;
 }
 
 function inferImageExt(contentType: string, buf: Buffer): string | null {
@@ -745,9 +757,11 @@ export const POST: APIRoute = async (context) => {
       );
 
       let target: { path: string; slug: string };
-      let didReplace = false;
+      /** Só preenchido quando a API do GitHub exige `sha` (atualização de ficheiro existente). */
+      let existingFileSha: string | undefined;
       if (replaceExisting) {
-        didReplace = await blogPathExists(publisher, owner, repo, branch, slugIn);
+        const sha = await getBlogMarkdownShaIfExists(publisher, owner, repo, branch, slugIn);
+        existingFileSha = sha ?? undefined;
         target = { path: `${CMS_PATHS.blog}/${slugIn}.md`, slug: slugIn };
       } else if (allowDuplicates) {
         target = await uniqueBlogPath(publisher, owner, repo, branch, slugIn);
@@ -755,6 +769,7 @@ export const POST: APIRoute = async (context) => {
         target = { path: `${CMS_PATHS.blog}/${slugIn}.md`, slug: slugIn };
       }
       const { path, slug } = target;
+      const didReplace = replaceExisting && Boolean(existingFileSha);
       await publisher.createOrUpdateFile(
         owner,
         repo,
@@ -763,7 +778,7 @@ export const POST: APIRoute = async (context) => {
         didReplace
           ? `content(blog): atualizar importação «${title}» (${slug})`
           : `content(blog): importar «${title}» (${slug})`,
-        { branch },
+        { branch, sha: existingFileSha },
       );
       if (didReplace) {
         replaced.push(slug);
