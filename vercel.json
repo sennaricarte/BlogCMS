@@ -1,5 +1,17 @@
 {
   "framework": "astro",
   "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "redirects": [
+    {
+      "source": "/blog/:slug",
+      "destination": "/:slug",
+      "permanent": true
+    },
+    {
+      "source": "/blog/:slug/",
+      "destination": "/:slug/",
+      "permanent": true
+    }
+  ]
 }

@@ -81,7 +81,6 @@ const TEMPLATE_EXCLUDED_PREFIXES = [
  * Mantemos apenas o que Ã© necessÃ¡rio para executar e editar o CMS/site.
  */
 const TEMPLATE_EXCLUDED_EXACT_FILES = new Set([
-  "vercel.json",
   ".vscode/launch.json",
   "src/middleware.ts",
   "src/lib/publisher.ts",
