@@ -1,7 +1,7 @@
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import { normalizeLegacyBlogPostMarkdownLinks } from "./blog-post-links";
-import { ADMIN_REPO_ASSET_PATH } from "./admin-editor-image-urls";
+import { ADMIN_REPO_ASSET_PATH, normalizeEditorImagesForSave } from "./admin-editor-image-urls";
 import { githubRawAssetToMarkdownRelative, isRawGithubBlogOrCmsPreviewUrl, MEDIA_MARKDOWN_RELATIVE_PREFIX, isRawGithubMediaPath } from "./github-raw-url";
 import { preprocessHtmlForTurndown } from "./html-preprocess-turndown";
 
@@ -78,12 +78,8 @@ turndown.addRule("rawMediaDiv", {
 turndown.use(gfm);
 
 /**
- * Imagens servidas de `raw.githubusercontent.com/.../src/assets/media/...` (pré-visualização
- * no admin) passam a caminho relativo no `.md` (mesmo padrão que `heroImage` em `src/assets/blog/`).
- */
-/**
- * Pré-visualização no admin: imagens apontam para {@link ADMIN_REPO_ASSET_PATH}; no .md guardamos
- * `../../assets/blog/…`, `/assets/blog/…` (public) ou `/assets/cms/…`.
+ * Pré-visualização no admin: `repo-asset` ou raw GitHub; no .md ficam caminhos relativos
+ * (`../../assets/blog/…`, `/assets/blog/…`, `/assets/cms/…`).
  */
 turndown.addRule("imgRepoAssetPreviewToRelative", {
   filter: (node) => {
@@ -241,7 +237,7 @@ export function htmlToMarkdown(html: string): string {
   if (!trimmed) {
     return "";
   }
-  const pre = preprocessHtmlForTurndown(trimmed);
+  const pre = preprocessHtmlForTurndown(normalizeEditorImagesForSave(trimmed));
   let md = turndown.turndown(pre.html).replace(/\n{3,}/g, "\n\n").trim();
   for (let i = 0; i < pre.preservedTables.length; i += 1) {
     const token = `BLOGCMS-TBL-${i}`;

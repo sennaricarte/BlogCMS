@@ -1,5 +1,4 @@
 import { Color, TextStyle } from "@tiptap/extension-text-style";
-import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import Underline from "@tiptap/extension-underline";
@@ -8,14 +7,16 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { uploadCmsMediaFile } from "../../lib/cms-media-upload";
-import { cleanPastedHtml } from "../../lib/docs-paste";
-import { htmlToMarkdown } from "../../lib/html-to-markdown";
-import { markdownToHtmlForEditor } from "../../lib/markdown-to-html";
 import {
+  readEditorGithubPatForImagePreview,
   readEditorImagePreviewContext,
   rewriteHtmlImagesForAdminEditor,
   type EditorImagePreviewContext,
 } from "../../lib/admin-editor-image-urls";
+import { cleanPastedHtml } from "../../lib/docs-paste";
+import { htmlToMarkdown } from "../../lib/html-to-markdown";
+import { markdownToHtmlForEditor } from "../../lib/markdown-to-html";
+import { createEditorImagePreviewExtension } from "./tiptap-editor-image";
 import { fixNextImageWithoutAlt, promptAltRequired } from "./image-alt-utils";
 import { MediaGalleryModal } from "./MediaGalleryModal";
 import { MenuBar } from "./MenuBar";
@@ -56,6 +57,9 @@ function buildTiptapContent(
   return markdownToHtmlForEditor(initialMarkdown ?? EMPTY_MD, preview ?? undefined);
 }
 
+/** Ponte lida em cada render: {@link getDisplayUrl} usa contexto + token atualizados. */
+type PreviewBridge = { context: EditorImagePreviewContext | null; token: string | null };
+
 /**
  * TipTap com `immediatelyRender: false` e `getServerSnapshot` do `useEditor` suporta SSR/hidratação
  * no Astro (`client:load`) sem aceder a `document` no 1.º passo. Não utilizar `useEffect` extra para
@@ -67,6 +71,20 @@ export function Editor({
   markdownDebounceMs = DEFAULT_MD_DEBOUNCE,
   imagePreviewContext,
 }: EditorProps) {
+  const previewBridgeRef = useRef<PreviewBridge>({ context: null, token: null });
+  previewBridgeRef.current.context =
+    resolveImagePreviewContext(imagePreviewContext) ?? readEditorImagePreviewContext();
+  previewBridgeRef.current.token = readEditorGithubPatForImagePreview();
+
+  const imagePreviewExtension = useMemo(
+    () =>
+      createEditorImagePreviewExtension({
+        getPreviewContext: () => previewBridgeRef.current.context,
+        getGithubToken: () => previewBridgeRef.current.token,
+      }),
+    [],
+  );
+
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [mediaUploadBusy, setMediaUploadBusy] = useState(false);
   const mediaUploadBusyRef = useRef(false);
@@ -121,10 +139,7 @@ export function Editor({
         autolink: true,
         HTMLAttributes: { rel: "noopener noreferrer nofollow" },
       }),
-      Image.configure({
-        inline: true,
-        allowBase64: true,
-      }),
+      imagePreviewExtension,
       Table.configure({
         resizable: false,
         lastColumnResizable: false,
@@ -147,7 +162,7 @@ export function Editor({
         },
       }),
     ],
-    [],
+    [imagePreviewExtension],
   );
 
   const onUpdate = useCallback(

@@ -1,4 +1,5 @@
 import { ADMIN_CMS_TARGET_KEY } from "./admin-cms-target";
+import { ADMIN_INTEGRATION_STORAGE_KEY } from "./admin-storage";
 import { buildGitHubRawUrl } from "./github-raw-url";
 
 /**
@@ -49,6 +50,103 @@ export function readEditorImagePreviewContext(): EditorImagePreviewContext | nul
     /* ignore — SSR */
   }
   return null;
+}
+
+/**
+ * PAT do GitHub (localStorage) só para anexar `?token=` em URLs `raw.githubusercontent.com`
+ * (repos privados). O token fica visível nas DevTools — alternativa: repo público ou proxy.
+ */
+export function readEditorGithubPatForImagePreview(): string | null {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(ADMIN_INTEGRATION_STORAGE_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as { GITHUB_PERSONAL_TOKEN?: string };
+    return j.GITHUB_PERSONAL_TOKEN?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function appendTokenForRawGithubOnly(url: string, githubToken: string | null | undefined): string {
+  if (!githubToken?.trim() || !url.includes("raw.githubusercontent.com")) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}token=${encodeURIComponent(githubToken.trim())}`;
+}
+
+/**
+ * URL de pré-visualização no editor: `raw.githubusercontent.com/.../public/assets/...` (ou `src/assets/blog/...`)
+ * a partir de caminhos canónicos `/assets/…` ou `../../assets/blog/…`. Com token opcional para repo privado.
+ */
+export function getDisplayUrl(
+  src: string,
+  ctx: EditorImagePreviewContext | null | undefined,
+  githubToken?: string | null,
+): string {
+  const s = (src || "").trim();
+  if (!s) return s;
+  if (s.startsWith("data:")) return s;
+  if (/^https?:\/\//i.test(s)) {
+    return appendTokenForRawGithubOnly(s, githubToken ?? null);
+  }
+  const dec = decodeSrcForMatch(s);
+  const hit = matchEditorAssetSrc(dec);
+  if (!hit) return s;
+  let base: string;
+  if (ctx) {
+    const raw = githubRawUrlForMatch(ctx, hit);
+    base = raw ?? repoAssetUrlForMatch(hit);
+  } else {
+    base = repoAssetUrlForMatch(hit);
+  }
+  return appendTokenForRawGithubOnly(base, githubToken ?? null);
+}
+
+function canonicalPathForEditorAssetMatch(m: { kind: "src-blog" | "public-blog" | "cms"; rel: string }): string {
+  if (m.kind === "src-blog") {
+    return `../../assets/blog/${m.rel}`;
+  }
+  if (m.kind === "public-blog") {
+    return `/assets/blog/${m.rel}`;
+  }
+  return `/assets/cms/${m.rel}`;
+}
+
+function matchAttrInTag(attrs: string, name: string): string | null {
+  const quoted = new RegExp(`\\b${name}\\s*=\\s*(["'])((?:(?!\\1).)*)\\1`, "i");
+  const qm = quoted.exec(attrs);
+  if (qm?.[2] != null) return qm[2].trim();
+  const bare = new RegExp(`\\b${name}\\s*=\\s*([^\\s>]+)`, "i");
+  const bm = bare.exec(attrs);
+  if (bm?.[1]) return bm[1].replace(/^["']|["']$/g, "").trim();
+  return null;
+}
+
+/**
+ * Antes do Turndown: repõe `src` a partir de `data-src` (pré-visualização) para não gravar URL raw no .md.
+ */
+export function normalizeEditorImagesForSave(html: string): string {
+  if (!html || !/<img\b/i.test(html)) return html;
+  return html.replace(/<img\b([^>]*?)\s*\/?>/gi, (full, attrs: string) => {
+    const data = matchAttrInTag(attrs, "data-src");
+    if (!data) return full;
+    let canon = data;
+    try {
+      canon = decodeURIComponent(data);
+    } catch {
+      /* manter data */
+    }
+    if (!canon.startsWith("/assets/") && !canon.startsWith("..")) return full;
+    let rest = attrs
+      .replace(/\sdata-src\s*=\s*(["'])((?:(?!\1).)*)\1/gi, "")
+      .replace(/\sdata-src\s*=\s*[^\s>]+/gi, "");
+    rest = rest
+      .replace(/\bsrc\s*=\s*(["'])((?:(?!\1).)*)\1/gi, "")
+      .replace(/\bsrc\s*=\s*[^\s>]+/gi, "");
+    const q = '"';
+    const safe = canon.replace(/"/g, "&quot;");
+    return `<img src=${q}${safe}${q}${rest.trim() ? ` ${rest.trim()}` : ""}>`;
+  });
 }
 
 /**
@@ -149,29 +247,25 @@ function repoAssetUrlForMatch(m: { kind: AssetKind; rel: string }): string {
   return repoAssetForRelPath("cms", m.rel);
 }
 
-function tryRepoDisplaySrc(src: string, preview: EditorImagePreviewContext | null | undefined): string | null {
-  const dec = decodeSrcForMatch(src);
-  const hit = matchEditorAssetSrc(dec);
-  if (!hit) return null;
-  if (preview) {
-    const raw = githubRawUrlForMatch(preview, hit);
-    if (raw) return raw;
-  }
-  return repoAssetUrlForMatch(hit);
-}
-
 export function rewriteHtmlImagesForAdminEditor(
   html: string,
   previewContext?: EditorImagePreviewContext | null,
 ): string {
   if (!html || !html.toLowerCase().includes("<img")) return html;
+  const token =
+    typeof localStorage !== "undefined" ? readEditorGithubPatForImagePreview() : null;
   return html.replace(/<img\b([^>]*?)\s*\/?>/gi, (_full, attrs: string) => {
     const sm = matchImgSrcAttr(attrs);
     if (!sm) return `<img${attrs}>`;
-    const displaySrc = tryRepoDisplaySrc(sm.raw, previewContext);
-    if (!displaySrc) return `<img${attrs}>`;
+    const dec = decodeSrcForMatch(sm.raw);
+    const hit = matchEditorAssetSrc(dec);
+    if (!hit) return `<img${attrs}>`;
+    const canon = canonicalPathForEditorAssetMatch(hit);
+    const displaySrc = getDisplayUrl(sm.raw, previewContext ?? null, token);
     const newAttrs =
-      attrs.slice(0, sm.start) + `src=${sm.quote}${displaySrc}${sm.quote}` + attrs.slice(sm.start + sm.len);
+      attrs.slice(0, sm.start) +
+      `src=${sm.quote}${displaySrc}${sm.quote} data-src=${sm.quote}${canon}${sm.quote}` +
+      attrs.slice(sm.start + sm.len);
     return `<img${newAttrs}>`;
   });
 }
