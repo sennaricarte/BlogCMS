@@ -1,7 +1,7 @@
 ---
 import HeroCover from "../components/blog/HeroCover.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { getPublicBlogPosts } from "../lib/blog";
+import { blogPostHref, getPublicBlogPosts } from "../lib/blog";
 import { getCategoryDisplayName, getTagDisplayName, tagToSlug } from "../lib/taxonomies";
 
 const includeDrafts = false;
@@ -27,7 +27,7 @@ const latest = sorted.slice(0, 5);
           {latest.map((post, index) => (
             <li>
               <article class="group flex flex-col gap-4 border-b border-slate-200 pb-8 last:border-0 sm:flex-row sm:items-stretch">
-                <a href={`/blog/${post.id}/`} class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200" aria-hidden="true" tabindex={-1}>
+                <a href={blogPostHref(post.id)} class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200" aria-hidden="true" tabindex={-1}>
                   <HeroCover
                     src={post.data.heroImage}
                     alt=""
@@ -41,7 +41,7 @@ const latest = sorted.slice(0, 5);
                 <div class="min-w-0 flex-1">
                   <h3 class="text-xl font-semibold text-slate-900">
                     <a
-                      href={`/blog/${post.id}/`}
+                      href={blogPostHref(post.id)}
                       class="text-[var(--client-color-primary)] decoration-transparent underline-offset-2 hover:underline"
                     >
                       {post.data.title}

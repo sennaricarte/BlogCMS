@@ -1,18 +1,21 @@
 ---
-import BlogPostLayout from "../../layouts/BlogPostLayout.astro";
-import { getPublicBlogPosts } from "../../lib/blog";
+import { blogPostHref, getPublicBlogPosts } from "../../lib/blog";
 
+/**
+ * Legado: URLs `/blog/slug/` → 301 para `/slug/` (estrutura canónica à raiz).
+ */
 export async function getStaticPaths() {
   const includeDrafts = import.meta.env.DEV;
   const posts = await getPublicBlogPosts(includeDrafts);
   return posts.map((post) => ({
     params: { slug: post.id },
-    props: { post },
   }));
 }
 
-const { post } = Astro.props;
-const canonicalPath = new URL(Astro.url.pathname, Astro.url).pathname;
+const raw = Astro.params.slug;
+const id = typeof raw === "string" ? raw : Array.isArray(raw) ? raw.join("/") : "";
+if (!id) {
+  return Astro.redirect("/blog/", 302);
+}
+return Astro.redirect(blogPostHref(id), 301);
 ---
-
-<BlogPostLayout post={post} canonicalPath={canonicalPath} />

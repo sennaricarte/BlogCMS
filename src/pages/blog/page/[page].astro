@@ -1,7 +1,7 @@
 ---
 import HeroCover from "../../../components/blog/HeroCover.astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
-import { BLOG_PER_PAGE, getPublicBlogPosts, pageCount, paginate } from "../../../lib/blog";
+import { BLOG_PER_PAGE, blogPostHref, getPublicBlogPosts, pageCount, paginate } from "../../../lib/blog";
 
 export async function getStaticPaths() {
   const includeDrafts = import.meta.env.DEV;
@@ -41,7 +41,7 @@ const pageTitle = pageNum > 1 ? `Blog (p. ${pageNum})` : "Blog";
       {items.map((post, index) => (
         <li>
           <article class="group flex flex-col gap-4 sm:flex-row sm:items-start">
-            <a href={`/blog/${post.id}/`} class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200" aria-hidden="true" tabindex={-1}>
+            <a href={blogPostHref(post.id)} class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200" aria-hidden="true" tabindex={-1}>
               <HeroCover
                 src={post.data.heroImage}
                 alt=""
@@ -55,7 +55,7 @@ const pageTitle = pageNum > 1 ? `Blog (p. ${pageNum})` : "Blog";
             <div class="min-w-0 flex-1">
               <h2 class="text-xl font-semibold leading-snug text-slate-900">
                 <a
-                  href={`/blog/${post.id}/`}
+                  href={blogPostHref(post.id)}
                   class="text-[var(--client-color-primary)] decoration-transparent underline-offset-2 hover:underline"
                 >
                   {post.data.title}

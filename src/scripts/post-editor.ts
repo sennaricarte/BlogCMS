@@ -327,7 +327,7 @@ function getPublicSiteBase(): string {
 }
 
 /**
- * Prévia da URL pública: site + /blog/ + slug.
+ * Prévia da URL pública: site + caminho do slug à raiz (ex. `/meu-artigo/`).
  */
 function syncSeoSlugPreview() {
   const slugIn = el<HTMLInputElement>("f-slug");
@@ -336,10 +336,10 @@ function syncSeoSlugPreview() {
   const base = getPublicSiteBase();
   const s = slugIn ? slugRe(slugIn.value, "artigo") : "";
   if (!s) {
-    prev.textContent = base ? `${base}/blog/…/` : "/blog/…/";
+    prev.textContent = base ? `${base}/…/` : "/…/";
     return;
   }
-  prev.textContent = `${base}/blog/${s}/`;
+  prev.textContent = `${base}/${s}/`;
 }
 
 function setSeoItem(

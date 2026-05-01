@@ -2,6 +2,11 @@ import { getCollection, type CollectionEntry } from "astro:content";
 
 export const BLOG_PER_PAGE = 5;
 
+/** URL pública do artigo (à raiz do site, sem prefixo `/blog`). */
+export function blogPostHref(postId: string): string {
+  return `/${postId}/`;
+}
+
 type BlogEntry = CollectionEntry<"blog">;
 
 export function isVisiblePost(entry: BlogEntry, includeDrafts: boolean): boolean {

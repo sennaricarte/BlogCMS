@@ -4,7 +4,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import HeroCover from "../../components/blog/HeroCover.astro";
 import ArticleBreadcrumbs from "../../components/seo/ArticleBreadcrumbs.astro";
 import siteConfig from "../../data/site-config.json";
-import { getPublicBlogPosts } from "../../lib/blog";
+import { blogPostHref, getPublicBlogPosts } from "../../lib/blog";
 import {
   getCategoryBySlug,
   getCategoryDisplayName,
@@ -55,7 +55,7 @@ const listJsonLd = {
     "@type": "ListItem",
     position: i + 1,
     name: p.data.title,
-    url: new URL(`/blog/${p.id}/`, siteBase + "/").toString(),
+    url: new URL(blogPostHref(p.id), siteBase + "/").toString(),
   })),
 } as const;
 
@@ -85,7 +85,7 @@ const breadcrumbs = [
           <li>
             <article class="flex flex-col gap-4 border-b border-slate-200 pb-8 last:border-0 sm:flex-row sm:items-stretch">
               <a
-                href={`/blog/${post.id}/`}
+                href={blogPostHref(post.id)}
                 class="block shrink-0 overflow-hidden rounded-lg ring-1 ring-slate-200"
                 aria-hidden="true"
                 tabindex={-1}
@@ -98,7 +98,7 @@ const breadcrumbs = [
                 />
               </a>
               <div class="min-w-0 flex-1">
-                <a href={`/blog/${post.id}/`} class="group">
+                <a href={blogPostHref(post.id)} class="group">
                   <h2 class="text-xl font-semibold text-slate-900 group-hover:text-[var(--client-color-primary)]">
                     {post.data.title}
                   </h2>
@@ -112,7 +112,7 @@ const breadcrumbs = [
                   </time>
                 </p>
                 <a
-                  href={`/blog/${post.id}/`}
+                  href={blogPostHref(post.id)}
                   class="mt-2 inline-block text-sm font-medium text-[var(--client-color-primary)] hover:underline"
                 >
                   Ler artigo

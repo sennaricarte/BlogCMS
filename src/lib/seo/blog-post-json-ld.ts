@@ -4,7 +4,7 @@ import type { ClientConfig } from "../publisher";
 export type BlogSeoContext = {
   post: CollectionEntry<"blog">;
   siteBase: string;
-  /** Caminho canónico, ex. `/blog/slug-do-post/` */
+  /** Caminho canónico, ex. `/slug-do-post/` (à raiz do site) */
   canonicalPath: string;
   /** URL absoluta da imagem de destaque (og / hero) */
   heroImageAbsoluteUrl: string;
