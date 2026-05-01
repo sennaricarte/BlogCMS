@@ -2,7 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 
 const K_INTEGR = "blogcms-admin-integration";
 const K_CMS = "blogcms-cms-target";
-const IMPORTER_UI_VERSION = "importador-ui 2026-04-30 · json-tab-ui";
+const LS_REPLACE_EXISTING = "blogcms-import-replace-existing";
+const IMPORTER_UI_VERSION = "importador-ui 2026-05-01 · substituir-reimportação";
 
 type IntegrationLs = { GITHUB_PERSONAL_TOKEN?: string };
 type CmsTargetLs = { githubRepoFullName?: string; branch?: string };
@@ -97,6 +98,13 @@ export function ContentImportPanel() {
   const [loadingAllBatches, setLoadingAllBatches] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; err: boolean } | null>(null);
+  const [replaceExistingImports, setReplaceExistingImports] = useState(() => {
+    try {
+      return typeof localStorage !== "undefined" && localStorage.getItem(LS_REPLACE_EXISTING) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   const [credsTick, setCredsTick] = useState(0);
   const credsOk = useMemo(() => {
@@ -989,6 +997,7 @@ export function ContentImportPanel() {
           githubRepoFullName,
           branch: (target.branch || "main").trim() || "main",
           allowDuplicates: false,
+          replaceExisting: replaceExistingImports,
           posts: picked.map((r) => ({
             slug: r.slug,
             title: r.title,
@@ -1010,13 +1019,17 @@ export function ContentImportPanel() {
         ok?: boolean;
         error?: string;
         created?: string[];
+        replaced?: string[];
         skipped?: Array<{ slug: string; reason: string }>;
         errors?: Array<{ slug: string; error: string }>;
         message?: string;
       };
       const parts: string[] = [];
       if (j.message) parts.push(j.message);
-      if (Array.isArray(j.created) && j.created.length) parts.push(`Slugs: ${j.created.join(", ")}.`);
+      const newSlugs = j.created ?? [];
+      const repSlugs = j.replaced ?? [];
+      if (newSlugs.length > 0) parts.push(`Novos: ${newSlugs.join(", ")}.`);
+      if (repSlugs.length > 0) parts.push(`Substituídos: ${repSlugs.join(", ")}.`);
       if (Array.isArray(j.errors) && j.errors.length) {
         parts.push(
           j.errors.map((e) => `${e.slug}: ${e.error}`).join(" | "),
@@ -1025,14 +1038,17 @@ export function ContentImportPanel() {
       if (Array.isArray(j.skipped) && j.skipped.length) {
         parts.push(`Ignorados: ${j.skipped.map((s) => `${s.slug} (${s.reason})`).join(", ")}.`);
       }
+      const writtenCount = newSlugs.length + repSlugs.length;
       setMessage({
         text: parts.join(" ") || j.error || "Resposta inesperada.",
-        err: !j.ok && (!j.created || j.created.length === 0),
+        err: !j.ok && writtenCount === 0,
       });
-      if ((Array.isArray(j.created) && j.created.length > 0) || (Array.isArray(j.skipped) && j.skipped.length > 0)) {
-        const createdSet = new Set(j.created);
+      if (writtenCount > 0 || (Array.isArray(j.skipped) && j.skipped.length > 0)) {
+        const committedSet = new Set([...newSlugs, ...repSlugs]);
         const skippedSet = new Set((j.skipped || []).map((s) => s.slug));
-        setRows((prev) => prev.filter((r) => !r.selected || (!createdSet.has(r.slug) && !skippedSet.has(r.slug))));
+        setRows((prev) =>
+          prev.filter((r) => !r.selected || (!committedSet.has(r.slug) && !skippedSet.has(r.slug))),
+        );
       }
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : "Falha de rede.", err: true });
@@ -1425,6 +1441,31 @@ export function ContentImportPanel() {
 
       {rows.length > 0 && (
         <section aria-labelledby="imp-list-heading" className="space-y-4">
+          <label className="flex max-w-2xl cursor-pointer items-start gap-2 text-sm text-zinc-700">
+            <input
+              type="checkbox"
+              checked={replaceExistingImports}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setReplaceExistingImports(v);
+                try {
+                  localStorage.setItem(LS_REPLACE_EXISTING, v ? "1" : "0");
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-zinc-900"
+              aria-describedby="imp-replace-hint"
+            />
+            <span>
+              <span className="font-medium text-zinc-900">Substituir artigos já importados</span>
+              <span id="imp-replace-hint" className="mt-0.5 block text-xs text-zinc-600">
+                Com esta opção ativa, se já existir um artigo com o mesmo slug no GitHub, o ficheiro é{" "}
+                <strong>atualizado</strong> com o conteúdo desta importação (em vez de ser ignorado). A preferência fica
+                guardada neste dispositivo.
+              </span>
+            </span>
+          </label>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 id="imp-list-heading" className="text-base font-semibold text-zinc-900">
               Artigos para importar ({rows.length})

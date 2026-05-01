@@ -185,5 +185,12 @@ export function htmlToMarkdown(html: string): string {
     return "";
   }
   const pre = preprocessHtmlForTurndown(trimmed);
-  return turndown.turndown(pre).replace(/\n{3,}/g, "\n\n").trim();
+  let md = turndown.turndown(pre.html).replace(/\n{3,}/g, "\n\n").trim();
+  for (let i = 0; i < pre.preservedTables.length; i += 1) {
+    const token = `BLOGCMS-TBL-${i}`;
+    const chunk = pre.preservedTables[i]?.trim();
+    if (!chunk) continue;
+    md = md.split(token).join(`\n\n${chunk}\n\n`);
+  }
+  return md.replace(/\n{3,}/g, "\n\n").trim();
 }

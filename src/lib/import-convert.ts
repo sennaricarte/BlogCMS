@@ -2,6 +2,27 @@ import * as cheerio from "cheerio";
 import { stripNoiseFromHtmlFragment } from "./import-html-clean";
 import { htmlToMarkdown } from "./html-to-markdown";
 
+/** Servidor (sem DOM): preserva `<table>` antes do Turndown, como em `preprocessHtmlForTurndown`. */
+function preserveOuterTablesCheerio(fragment: string): { html: string; tables: string[] } {
+  const tables: string[] = [];
+  const wrapped = `<div id="__import_root">${fragment}</div>`;
+  const $ = cheerio.load(wrapped, { decodeEntities: false });
+  const root = $("#__import_root");
+  if (root.length === 0) {
+    return { html: fragment, tables };
+  }
+  root.find("table").each((_, el) => {
+    const $el = $(el);
+    if ($el.parents("table").length > 0) {
+      return;
+    }
+    const slot = tables.length;
+    tables.push($.html($el));
+    $el.replaceWith(`<p>BLOGCMS-TBL-${slot}</p>`);
+  });
+  return { html: root.html() ?? fragment, tables };
+}
+
 function scoreCandidateHtml(html: string): number {
   const text = stripHtmlToText(html);
   if (!text) return 0;
@@ -121,7 +142,15 @@ export function extractMetaFromPage(fullPageHtml: string): { title: string; desc
 
 export function articleHtmlToMarkdown(html: string): string {
   const cleaned = stripNoiseFromHtmlFragment(html);
-  return htmlToMarkdown(cleaned);
+  const { html: withPlaceholders, tables } = preserveOuterTablesCheerio(cleaned);
+  let md = htmlToMarkdown(withPlaceholders);
+  for (let i = 0; i < tables.length; i += 1) {
+    const token = `BLOGCMS-TBL-${i}`;
+    const chunk = tables[i]?.trim();
+    if (!chunk) continue;
+    md = md.split(token).join(`\n\n${chunk}\n\n`);
+  }
+  return md.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /** Tenta descobrir links de artigos numa página de listagem/home. */

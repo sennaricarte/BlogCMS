@@ -61,6 +61,18 @@ function depthUnderRoot(el: Element, root: HTMLElement): number {
   return d;
 }
 
+/** `table` aninhada numa célula: só a raiz da árvore de tabelas deve ser extraída. */
+function isOutermostTableInFragment(table: Element, root: HTMLElement): boolean {
+  let p: Element | null = table.parentElement;
+  while (p && p !== root) {
+    if (p.tagName === "TABLE") {
+      return false;
+    }
+    p = p.parentElement;
+  }
+  return true;
+}
+
 /** Exportado para reutilizar na colagem GDocs (`cleanPastedHtml`). */
 export function unwrapBoldCoveringMostOfTree(root: HTMLElement, threshold = 0.9) {
   const totalLen = Math.max(
@@ -93,20 +105,29 @@ export function unwrapBoldCoveringMostOfTree(root: HTMLElement, threshold = 0.9)
   }
 }
 
+export type PreprocessForTurndownResult = {
+  html: string;
+  /** HTML completo de cada `<table>` (só raízes), para reinserir no `.md` após o Turndown. */
+  preservedTables: string[];
+};
+
 /**
  * Pré-processamento antes do Turndown: regex, remoção de `font-weight` em `style`,
  * unbraid de negrito “quase global” e saneamento de estilos (mantém cores).
+ * Tabelas HTML são extraídas para placeholders: o `turndown-plugin-gfm` por vezes achata
+ * grelhas vindas de exportações (Word/Lovable) em parágrafos.
  */
-export function preprocessHtmlForTurndown(html: string): string {
+export function preprocessHtmlForTurndown(html: string): PreprocessForTurndownResult {
+  const preservedTables: string[] = [];
   let out = (html || "").trim();
   if (!out) {
-    return "";
+    return { html: "", preservedTables };
   }
   out = stripOutermostBoldWrapperHtmlString(out);
   out = removeFontWeightFromStyleAttributesInHtmlString(out);
 
   if (typeof document === "undefined" || typeof DOMParser === "undefined") {
-    return out;
+    return { html: out, preservedTables };
   }
 
   try {
@@ -114,12 +135,24 @@ export function preprocessHtmlForTurndown(html: string): string {
     const doc = new DOMParser().parseFromString(wrapped, "text/html");
     const root = doc.getElementById("__turndown_root");
     if (!root) {
-      return out;
+      return { html: out, preservedTables };
     }
     unwrapBoldCoveringMostOfTree(root, 0.9);
     applyNonColorStyleStripToTree(root);
-    return root.innerHTML;
+
+    const tables = Array.from(root.querySelectorAll("table")).filter((t) =>
+      isOutermostTableInFragment(t, root),
+    );
+    for (const t of tables) {
+      const slot = preservedTables.length;
+      preservedTables.push(t.outerHTML);
+      const ph = doc.createElement("p");
+      ph.textContent = `BLOGCMS-TBL-${slot}`;
+      t.replaceWith(ph);
+    }
+
+    return { html: root.innerHTML, preservedTables };
   } catch {
-    return out;
+    return { html: out, preservedTables };
   }
 }

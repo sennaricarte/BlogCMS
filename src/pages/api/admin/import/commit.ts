@@ -645,6 +645,8 @@ export const POST: APIRoute = async (context) => {
     githubRepoFullName?: string;
     branch?: string;
     allowDuplicates?: boolean;
+    /** Se `true`, grava sempre em `blog/{slug}.md`: ficheiros já existentes são substituídos. Ignora a resolução de caminhos de `allowDuplicates`. */
+    replaceExisting?: boolean;
     posts?: ImportPost[];
   };
   try {
@@ -674,9 +676,11 @@ export const POST: APIRoute = async (context) => {
 
   const branch = (body.branch ?? "main").trim() || "main";
   const allowDuplicates = body.allowDuplicates === true;
+  const replaceExisting = body.replaceExisting === true;
   const publisher = new GithubPublisher({ token });
 
   const created: string[] = [];
+  const replaced: string[] = [];
   const errors: Array<{ slug: string; error: string }> = [];
   const skipped: Array<{ slug: string; reason: string }> = [];
   const seenInBatch = new Set<string>();
@@ -689,7 +693,7 @@ export const POST: APIRoute = async (context) => {
     }
     seenInBatch.add(slugIn);
 
-    if (!allowDuplicates) {
+    if (!allowDuplicates && !replaceExisting) {
       const exists = await blogPathExists(publisher, owner, repo, branch, slugIn);
       if (exists) {
         skipped.push({ slug: slugIn, reason: "Já existe no repositório." });
@@ -740,19 +744,32 @@ export const POST: APIRoute = async (context) => {
         },
       );
 
-      const target = allowDuplicates
-        ? await uniqueBlogPath(publisher, owner, repo, branch, slugIn)
-        : { path: `${CMS_PATHS.blog}/${slugIn}.md`, slug: slugIn };
+      let target: { path: string; slug: string };
+      let didReplace = false;
+      if (replaceExisting) {
+        didReplace = await blogPathExists(publisher, owner, repo, branch, slugIn);
+        target = { path: `${CMS_PATHS.blog}/${slugIn}.md`, slug: slugIn };
+      } else if (allowDuplicates) {
+        target = await uniqueBlogPath(publisher, owner, repo, branch, slugIn);
+      } else {
+        target = { path: `${CMS_PATHS.blog}/${slugIn}.md`, slug: slugIn };
+      }
       const { path, slug } = target;
       await publisher.createOrUpdateFile(
         owner,
         repo,
         path,
         text,
-        `content(blog): importar «${title}» (${slug})`,
+        didReplace
+          ? `content(blog): atualizar importação «${title}» (${slug})`
+          : `content(blog): importar «${title}» (${slug})`,
         { branch },
       );
-      created.push(slug);
+      if (didReplace) {
+        replaced.push(slug);
+      } else {
+        created.push(slug);
+      }
     } catch (e) {
       errors.push({
         slug: slugIn,
@@ -761,18 +778,28 @@ export const POST: APIRoute = async (context) => {
     }
   }
 
+  const written = created.length + replaced.length;
+  let summary: string;
+  if (written > 0) {
+    const parts: string[] = [];
+    if (created.length > 0) parts.push(`${created.length} novo(s)`);
+    if (replaced.length > 0) parts.push(`${replaced.length} substituído(s)`);
+    summary = `${parts.join(", ")} no ramo ${branch}.`;
+    if (skipped.length > 0) summary += ` ${skipped.length} ignorado(s).`;
+  } else if (skipped.length > 0) {
+    summary = `Nenhum artigo gravado. ${skipped.length} ignorado(s).`;
+  } else {
+    summary = "Nenhum artigo foi gravado.";
+  }
+
   return json(
     {
       ok: errors.length === 0,
       created,
+      replaced,
       skipped,
       errors,
-      message:
-        created.length > 0
-          ? `${created.length} artigo(s) criado(s) no ramo ${branch}.${skipped.length > 0 ? ` ${skipped.length} repetido(s) ignorado(s).` : ""}`
-          : skipped.length > 0
-            ? `Nenhum artigo novo criado. ${skipped.length} repetido(s) foram ignorado(s).`
-            : "Nenhum artigo foi criado.",
+      message: summary,
     },
     errors.length === body.posts!.length ? 502 : 200,
     auth.responseHeaders,

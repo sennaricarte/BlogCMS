@@ -43,4 +43,18 @@
   .post-body :where(code) {
     @apply rounded bg-slate-100 px-1 py-0.5 font-mono text-sm text-slate-800;
   }
+  .post-body table {
+    @apply my-6 w-full border-collapse text-left text-sm;
+  }
+  .post-body th,
+  .post-body td {
+    @apply border border-slate-200 px-3 py-2 align-top text-slate-800;
+  }
+  .post-body thead th,
+  .post-body th {
+    @apply bg-slate-50 font-semibold text-slate-900;
+  }
+  .post-body tbody tr:nth-child(even) {
+    @apply bg-slate-50/60;
+  }
 }
