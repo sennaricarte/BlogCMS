@@ -1,16 +1,21 @@
 import type { APIRoute } from "astro";
 import { Buffer } from "node:buffer";
-import { detectImageKindFromBuffer, MAX_HERO_IMAGE_BYTES } from "../../../../lib/validate-hero-image";
-import { processCmsImageBuffer } from "../../../../lib/process-cms-image";
+import { commitProcessedCmsMediaToGithub } from "../../../../lib/commit-cms-media-github";
 import { seoSanitizedStorageFileName } from "../../../../lib/media-filename";
+import { processCmsImageBuffer } from "../../../../lib/process-cms-image";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
 import { getCmsStorageBucketName, getSupabaseServiceClient } from "../../../../lib/supabase-service";
+import { detectImageKindFromBuffer, MAX_HERO_IMAGE_BYTES } from "../../../../lib/validate-hero-image";
 
 export const prerender = false;
 
 type Body = {
   contentBase64?: string;
   originalFileName?: string;
+  /** Se presente com `githubRepoFullName`, a imagem vai para `public/assets/cms/` no repositório do cliente. */
+  GITHUB_PERSONAL_TOKEN?: string;
+  githubRepoFullName?: string;
+  branch?: string;
 };
 
 function json(
@@ -80,14 +85,50 @@ export const POST: APIRoute = async (context) => {
     return json({ ok: false, error: msg }, 400, auth.responseHeaders);
   }
 
+  const ghToken = body.GITHUB_PERSONAL_TOKEN?.trim();
+  const ghRepo = body.githubRepoFullName?.trim();
+  const ghBranch = (body.branch ?? "main").trim() || "main";
+
+  if (ghToken && ghRepo) {
+    try {
+      const { fileName, publicUrl } = await commitProcessedCmsMediaToGithub({
+        token: ghToken,
+        githubRepoFullName: ghRepo,
+        branch: ghBranch,
+        processed,
+      });
+      return json(
+        {
+          ok: true,
+          fileName,
+          publicUrl,
+          relativeMarkdown: publicUrl,
+        },
+        200,
+        auth.responseHeaders,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao enviar para o GitHub.";
+      return json({ ok: false, error: msg }, 502, auth.responseHeaders);
+    }
+  }
+
   const fromName = body.originalFileName?.trim() || `imagem.${processed.ext}`;
 
   let service;
   try {
     service = getSupabaseServiceClient();
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Supabase (serviço) não configurado.";
-    return json({ ok: false, error: msg }, 503, auth.responseHeaders);
+  } catch {
+    return json(
+      {
+        ok: false,
+        error:
+          "Para gravar no repositório do cliente: abre /admin/settings/, preenche o token e o GitHub alvo, recarrega esta página (Ctrl+Shift+F5) e tenta de novo. " +
+          "A rota legada Supabase exige SUPABASE_SERVICE_ROLE_KEY apenas se não enviares credenciais GitHub no pedido.",
+      },
+      503,
+      auth.responseHeaders,
+    );
   }
 
   const bucket = getCmsStorageBucketName();

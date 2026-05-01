@@ -68,6 +68,7 @@ export async function listCmsMediaFiles(): Promise<
     const res = await fetch("/api/admin/cms/list-client-media", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({
         GITHUB_PERSONAL_TOKEN: creds.token,
         githubRepoFullName: creds.githubRepoFullName,
@@ -110,15 +111,16 @@ export async function uploadCmsMediaFile(
   }
   try {
     const b64 = await fileToBase64Content(file);
-    const res = await fetch("/api/admin/cms/upload-client-media", {
+    const res = await fetch("/api/admin/media/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({
+        contentBase64: b64,
+        originalFileName: file.name,
         GITHUB_PERSONAL_TOKEN: creds.token,
         githubRepoFullName: creds.githubRepoFullName,
         branch: creds.branch,
-        contentBase64: b64,
-        originalFileName: file.name,
       }),
     });
     const j = (await res.json()) as {

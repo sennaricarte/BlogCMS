@@ -9,7 +9,7 @@ export function getSupabaseServiceClient(): SupabaseClient {
   const key = (import.meta.env.SUPABASE_SERVICE_ROLE_KEY as string | undefined)?.trim();
   if (!key) {
     throw new Error(
-      "Configura SUPABASE_SERVICE_ROLE_KEY no .env (Settings → API → service_role) para uploads na Central de Mídia.",
+      "SUPABASE_SERVICE_ROLE_KEY em falta (legado: Central de Mídia só em Storage). O painel actual envia imagens para o GitHub do cliente via /api/admin/media/upload com credenciais no corpo.",
     );
   }
   const pub = readSupabasePublicConfig();
