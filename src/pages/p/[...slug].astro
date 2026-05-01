@@ -72,14 +72,27 @@ const jsonLdData = buildPageJsonLdGraph({
         </div>
       )
     }
-    {(!hasBlocks || hasMarkdown) && (
-      <div
-        class={`prose prose-slate max-w-none prose-headings:scroll-mt-20 prose-a:text-[var(--client-color-primary)] ${
-          hasBlocks ? "mt-12" : "mt-10"
-        }`}
-      >
-        <Content />
-      </div>
-    )}
+    {
+      hasMarkdown && (
+        <div
+          class={`prose prose-slate max-w-none prose-headings:scroll-mt-20 prose-a:text-[var(--client-color-primary)] ${
+            hasBlocks ? "mt-12" : "mt-10"
+          }`}
+        >
+          <Content />
+        </div>
+      )
+    }
+    {
+      !hasBlocks && !hasMarkdown && (
+        <p class="mt-10 rounded-lg border border-amber-100 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+          Esta página ainda não tem conteúdo visível: não há blocos nem texto no corpo Markdown. Edita em{" "}
+          <a href="/admin/pages/" class="font-medium text-[var(--client-color-primary)] underline">
+            Admin → Páginas
+          </a>{" "}
+          e volta a publicar.
+        </p>
+      )
+    }
   </div>
 </BaseLayout>

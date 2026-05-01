@@ -25,6 +25,14 @@ const sorted = [...rows].sort((a, b) => b.data.pubDate.getTime() - a.data.pubDat
     </a>
     <p class="text-xs text-slate-500" id="pg-remote-hint" role="status" aria-live="polite"></p>
   </div>
+  <p class="mb-4 max-w-2xl text-xs leading-relaxed text-slate-600">
+    A lista abaixo vem do <strong class="font-medium text-slate-800">repositório e ramo</strong> que configuraste em
+    <a href="/admin/settings/" class="text-[var(--client-color-primary)] hover:underline">Configurações</a>. O domínio
+    público (ex.: Vercel) só gerá cada URL <code class="rounded bg-slate-100 px-1 font-mono text-[0.7rem]">/p/slug/</code>
+    quando esse <strong class="font-medium text-slate-800">mesmo</strong> repositório e ramo forem deployados com o
+    ficheiro <code class="rounded bg-slate-100 px-1 font-mono text-[0.7rem]">src/content/pages/slug.md</code>. Se «Ver»
+    abrir 404 ou sem conteúdo, confirma o projecto de deploy, se o commit chegou ao GitHub e se o último build terminou.
+  </p>
 
   <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" data-cms-table-wrap>
     <table class="min-w-full divide-y divide-slate-200 text-left text-sm" data-cms-table>
@@ -133,7 +141,10 @@ const sorted = [...rows].sort((a, b) => b.data.pubDate.getTime() - a.data.pubDat
           el.textContent = (j && j.error) || "Não foi possível listar.";
           return;
         }
-        var pgBase = "Lista alinhada com o repositório (" + j.items.length + " itens).";
+        var pgBase =
+          "Lista alinhada com o GitHub (" +
+          j.items.length +
+          " itens). O site público só reflecte estas páginas após deploy do mesmo repo/ramo; 404 em «Ver» = ainda não há build com esse ficheiro (ou repositório diferente do da Vercel).";
         if (j.parseErrors && j.parseErrors.length) {
           var pgErr = j.parseErrors[0];
           el.textContent =
