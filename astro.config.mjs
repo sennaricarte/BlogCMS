@@ -2,9 +2,25 @@
 import vercel from '@astrojs/vercel';
 import react from '@astrojs/react';
 import { defineConfig } from 'astro/config';
+import { existsSync } from 'node:fs';
 import { rehypeLazyMarkdownImages } from './src/rehype/lazy-markdown-images.mjs';
 
 import tailwindcss from '@tailwindcss/vite';
+
+/** Pastas servidas por `/api/admin/cms/repo-asset` na Vercel (NFT não as traça sozinhas). */
+function vercelIncludeAssetDirs() {
+  const out = [];
+  if (existsSync('src/assets/blog')) {
+    out.push('src/assets/blog');
+  }
+  if (existsSync('public/assets/blog')) {
+    out.push('public/assets/blog');
+  }
+  if (existsSync('public/assets/cms')) {
+    out.push('public/assets/cms');
+  }
+  return out;
+}
 
 // https://astro.build/config
 // Defina `site` (ou `SITE` no build) para URLs canônicas e Open Graph absolutas em produção.
@@ -16,7 +32,9 @@ export default defineConfig({
    * estático; páginas/API com `export const prerender = false` passam a ser servidas no servidor
    * (Admin e `/api/*`). Em produção na Vercel usa-se `@astrojs/vercel` (serverless).
    */
-  adapter: vercel(),
+  adapter: vercel({
+    includeFiles: vercelIncludeAssetDirs(),
+  }),
   markdown: {
     rehypePlugins: [rehypeLazyMarkdownImages],
   },

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
 import type { APIRoute } from "astro";
-import { isSafeEditorAssetFileName } from "../../../../lib/admin-editor-image-urls";
+import { isSafeEditorImageRepoRelPath } from "../../../../lib/admin-editor-image-urls";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
 
 export const prerender = false;
@@ -34,7 +34,7 @@ export const GET: APIRoute = async (context) => {
   const scope = url.searchParams.get("scope");
   const rawFile = url.searchParams.get("file") || "";
   const file = decodeURIComponent(rawFile.trim());
-  if (!isSafeEditorAssetFileName(file)) {
+  if (!isSafeEditorImageRepoRelPath(file)) {
     return new Response(null, { status: 400, headers: auth.responseHeaders });
   }
   if (scope !== "blog" && scope !== "cms" && scope !== "blog-public") {
