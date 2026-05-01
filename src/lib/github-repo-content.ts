@@ -1,3 +1,4 @@
+import { RequestError } from "@octokit/request-error";
 import { createGitHubClient } from "./github";
 
 export { parseOwnerRepo } from "./github-parse-repo";
@@ -46,6 +47,36 @@ export async function getRepoFileText(
     return { text, sha: f.sha };
   }
   throw new Error("Ficheiro sem conteúdo base64 (formato inesperado).");
+}
+
+/** SHA do blob (para `createOrUpdateFileContents` em atualizações) ou `null` se 404. */
+export async function getRepoFileShaIfExists(
+  token: string,
+  owner: string,
+  repo: string,
+  path: string,
+  options?: { branch?: string; signal?: AbortSignal },
+): Promise<string | null> {
+  const octokit = createGitHubClient(token);
+  const ref = options?.branch?.trim() || "main";
+  try {
+    const { data } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref,
+      request: { signal: options?.signal },
+    });
+    if (Array.isArray(data) || data.type !== "file") {
+      return null;
+    }
+    return data.sha || null;
+  } catch (e) {
+    if (e instanceof RequestError && e.status === 404) {
+      return null;
+    }
+    throw e;
+  }
 }
 
 export async function listRepoPath(

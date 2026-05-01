@@ -32,13 +32,24 @@ function slugifyFileName(s: string): string {
     .slice(0, 80) || "artigo-importado";
 }
 
+/** URL canónica (sem `#fragment`) para chaves estáveis em Map/Set e pedidos HTTP. */
+function canonicalImageUrl(href: string): string {
+  try {
+    const u = new URL(href.trim());
+    u.hash = "";
+    return u.href;
+  } catch {
+    return href.trim();
+  }
+}
+
 function toAbsoluteUrlOrNull(input: string): string | null {
   const v = (input || "").trim();
   if (!v) return null;
   try {
     const u = new URL(v);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    return u.toString();
+    return canonicalImageUrl(u.href);
   } catch {
     return null;
   }
@@ -179,23 +190,49 @@ function refererFromImageUrl(imageUrl: string): string | null {
   }
 }
 
-/** Várias tentativas: Referer da página, origem da imagem, sem Referer. */
+/** CDNs (ex. Supabase Storage) frequentemente recusam pedidos com Referer de outro site. */
+function shouldFetchImageWithoutRefererFirst(url: string): boolean {
+  try {
+    const h = new URL(url).hostname.toLowerCase();
+    return h.endsWith(".supabase.co") || h.includes("supabase.co");
+  } catch {
+    return /supabase\.co\//i.test(url);
+  }
+}
+
+/** Várias tentativas: Referer da página, origem da imagem, sem Referer; Supabase primeiro sem Referer. */
 async function fetchImageForImport(url: string, refererPage?: string | null): Promise<DownloadedImage | null> {
   const pageRef = (refererPage || "").trim() || null;
   const originRef = refererFromImageUrl(url);
+  const noRefFirst = shouldFetchImageWithoutRefererFirst(url);
 
-  let img = await tryFetchImageOnce(url, pageRef);
-  if (img) return img;
-
+  const order: Array<string | null> = [];
+  if (noRefFirst) {
+    order.push(null);
+  }
+  if (pageRef) {
+    order.push(pageRef);
+  }
   if (originRef && originRef !== pageRef) {
-    img = await tryFetchImageOnce(url, originRef);
-    if (img) return img;
+    order.push(originRef);
+  }
+  if (!noRefFirst) {
+    order.push(null);
   }
 
-  if (pageRef || originRef) {
-    img = await tryFetchImageOnce(url, null);
+  const tried = new Set<string>();
+  for (const ref of order) {
+    const key = ref === null ? "\0" : ref;
+    if (tried.has(key)) {
+      continue;
+    }
+    tried.add(key);
+    const img = await tryFetchImageOnce(url, ref);
+    if (img) {
+      return img;
+    }
   }
-  return img;
+  return null;
 }
 
 async function uploadFeaturedToGithub(
@@ -212,7 +249,11 @@ async function uploadFeaturedToGithub(
   const heroImage = `/assets/blog/${fileName}`;
   const message = `content(assets): imagem destacada ${fileName}`;
   try {
-    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, img.buf, message, { branch });
+    const existingSha = await publisher.getFileShaIfExists(owner, repo, repoPath, { branch });
+    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, img.buf, message, {
+      branch,
+      sha: existingSha ?? undefined,
+    });
     return heroImage;
   } catch (e) {
     console.warn("[import-media] Falha ao enviar imagem destacada para o GitHub", {
@@ -233,7 +274,7 @@ function resolveMaybeAbsoluteImageUrl(rawUrl: string, sourceUrl?: string): strin
   try {
     const u = new URL(rawUrl, base);
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    return u.toString();
+    return canonicalImageUrl(u.toString());
   } catch {
     return null;
   }
@@ -262,7 +303,11 @@ async function uploadToGithubStorage(
   const fileName = `${baseName}.${img.ext}`;
   const repoPath = `public/assets/blog/${fileName}`;
   try {
-    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, img.buf, `content(assets): imagem ${fileName}`, { branch });
+    const existingSha = await publisher.getFileShaIfExists(owner, repo, repoPath, { branch });
+    await publisher.createOrUpdateFileBytes(owner, repo, repoPath, img.buf, `content(assets): imagem ${fileName}`, {
+      branch,
+      sha: existingSha ?? undefined,
+    });
   } catch (e) {
     console.warn("[import-media] Falha ao enviar imagem do corpo para o GitHub", {
       sourceUrl: img.sourceUrl,
@@ -510,9 +555,26 @@ async function processArticleAssets(params: {
   const ogOrTw = extractOgOrTwitterImage(articleHtml, sourceUrl);
   // Prioridade para capa vinda do XML/WordPress (_thumbnail_id -> attachment_url).
   const featuredCandidate = resolveMaybeAbsoluteImageUrl(featuredImageUrl || "", sourceUrl) || ogOrTw;
+  const xmlUrls = (Array.isArray(xmlAttachmentUrls) ? xmlAttachmentUrls : [])
+    .map((u) => {
+      const s = String(u).trim();
+      if (!s) return null;
+      return resolveMaybeAbsoluteImageUrl(s, sourceUrl) || toAbsoluteUrlOrNull(s);
+    })
+    .filter((x): x is string => Boolean(x));
+
+  const preferredFileByUrl = new Map<string, string>();
+  if (xmlAttachmentFileNameByUrl) {
+    for (const [rawKey, name] of Object.entries(xmlAttachmentFileNameByUrl)) {
+      const ck =
+        resolveMaybeAbsoluteImageUrl(String(rawKey), sourceUrl) || toAbsoluteUrlOrNull(String(rawKey).trim());
+      if (ck) preferredFileByUrl.set(ck, name);
+    }
+  }
+
   const allAssetUrls = Array.from(
     new Set([
-      ...(Array.isArray(xmlAttachmentUrls) ? xmlAttachmentUrls : []),
+      ...xmlUrls,
       ...markdownRefs.map((r) => r.abs),
       ...htmlImgRefs.map((r) => r.abs),
       ...(featuredCandidate ? [featuredCandidate] : []),
@@ -528,7 +590,8 @@ async function processArticleAssets(params: {
       return false;
     }
     const idx = indexByUrl.get(assetUrl) || 1;
-    const preferredName = xmlAttachmentFileNameByUrl?.[assetUrl];
+    const preferredName =
+      preferredFileByUrl.get(assetUrl) ?? xmlAttachmentFileNameByUrl?.[assetUrl];
     const local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, idx, img, preferredName);
     if (!local) {
       return false;

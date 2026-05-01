@@ -4,6 +4,7 @@ import {
   createOrUpdateRepoFile,
   createOrUpdateRepoFileBytes,
   deleteRepoFile,
+  getRepoFileShaIfExists,
   getRepoFileText,
   listRepoPath,
 } from "./github-repo-content";
@@ -91,6 +92,15 @@ export class GithubPublisher {
     options?: { branch?: string; signal?: AbortSignal },
   ) {
     return getRepoFileText(this.token, owner, repo, path, options);
+  }
+
+  getFileShaIfExists(
+    owner: string,
+    repo: string,
+    path: string,
+    options?: { branch?: string; signal?: AbortSignal },
+  ): Promise<string | null> {
+    return getRepoFileShaIfExists(this.token, owner, repo, path, options);
   }
 
   listPath(
