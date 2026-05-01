@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { XMLParser } from "fast-xml-parser";
 import { Buffer } from "node:buffer";
 import { articleHtmlToMarkdown } from "../../../../lib/import-convert";
+import { normalizeImportedMarkdownBody } from "../../../../lib/normalize-import-markdown";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
 
 export const prerender = false;
@@ -199,7 +200,7 @@ export const POST: APIRoute = async (context) => {
       const title = xmlString(p.title) || `post-${offset + i + 1}`;
       const bodyHtml = xmlString(p["content:encoded"]);
       const excerptHtml = xmlString(p["excerpt:encoded"]);
-      const markdown = articleHtmlToMarkdown(bodyHtml);
+      const markdown = normalizeImportedMarkdownBody(articleHtmlToMarkdown(bodyHtml));
       const slugRaw = xmlString(p["wp:post_name"]);
       const slug = slugify(slugRaw || title);
       const pubRaw = xmlString(p["wp:post_date"]) || xmlString(p.pubDate);

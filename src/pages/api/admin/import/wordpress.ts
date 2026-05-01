@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
 import { articleHtmlToMarkdown } from "../../../../lib/import-convert";
+import { normalizeImportedMarkdownBody } from "../../../../lib/normalize-import-markdown";
 import {
   normalizeWpSiteUrl,
   resolveWpImportDescription,
@@ -88,7 +89,7 @@ export const POST: APIRoute = async (context) => {
   const posts = (raw as WpRestPost[]).map((p) => {
     const title = stripHtmlToText(p.title?.rendered || "", 500) || `post-${p.id}`;
     const bodyHtml = p.content?.rendered || "";
-    const markdown = articleHtmlToMarkdown(bodyHtml);
+    const markdown = normalizeImportedMarkdownBody(articleHtmlToMarkdown(bodyHtml));
     const excerptHtml = p.excerpt?.rendered || "";
     const description = resolveWpImportDescription(p, excerptHtml, bodyHtml, title);
     const pubDate = (p.date || "").slice(0, 10) || new Date().toISOString().slice(0, 10);

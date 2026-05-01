@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { Buffer } from "node:buffer";
 import { articleHtmlToMarkdown } from "../../../../lib/import-convert";
+import { normalizeImportedMarkdownBody } from "../../../../lib/normalize-import-markdown";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
 
 export const prerender = false;
@@ -138,7 +139,8 @@ export const POST: APIRoute = async (context) => {
 
     const markdownRaw = toStr(it.markdown) || toStr(it.markdownBody) || toStr(it.contentMarkdown);
     const htmlRaw = toStr(it.html) || toStr(it.contentHtml) || toStr(it.content);
-    const markdown = markdownRaw || articleHtmlToMarkdown(htmlRaw);
+    const markdownCombined = markdownRaw || articleHtmlToMarkdown(htmlRaw);
+    const markdown = normalizeImportedMarkdownBody(markdownCombined);
     const articleHtml = htmlRaw || "";
 
     const featuredImageUrl = toStr(it.featuredImage) || toStr(it.featuredImageUrl) || toStr(it.coverImage) || undefined;

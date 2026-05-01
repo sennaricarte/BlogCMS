@@ -7,6 +7,7 @@ import {
   extractLikelyArticleLinks,
   extractMetaFromPage,
 } from "../../../../lib/import-convert";
+import { normalizeImportedMarkdownBody } from "../../../../lib/normalize-import-markdown";
 
 export const prerender = false;
 const BATCH_LINK_LIMIT = 500;
@@ -234,7 +235,9 @@ async function extractViaReader(url: string): Promise<ReaderExtract | null> {
 
   const mdIdx = text.indexOf("Markdown Content:");
   if (mdIdx < 0) return null;
-  const markdown = normalizeImportedMarkdown(text.slice(mdIdx + "Markdown Content:".length));
+  const markdown = normalizeImportedMarkdown(
+    normalizeImportedMarkdownBody(text.slice(mdIdx + "Markdown Content:".length)),
+  );
   if (!markdown) return null;
 
   const title =
@@ -332,7 +335,9 @@ export const POST: APIRoute = async (context) => {
   const fragment = extractArticleHtml(html);
   if (fragment) {
     const meta = extractMetaFromPage(html);
-    const markdown = normalizeImportedMarkdown(articleHtmlToMarkdown(fragment));
+    const markdown = normalizeImportedMarkdown(
+      normalizeImportedMarkdownBody(articleHtmlToMarkdown(fragment)),
+    );
     const featuredImage =
       extractMetaImageUrl(html, res.url || url) || extractFirstImageUrlFromHtml(fragment, res.url || url);
     if (isSubstantialMarkdown(markdown)) {

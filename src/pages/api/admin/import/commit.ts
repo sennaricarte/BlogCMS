@@ -4,6 +4,7 @@ import { Buffer } from "node:buffer";
 import * as cheerio from "cheerio";
 import { serializeBlogMarkdown, type BlogFrontmatterInput } from "../../../../lib/cms-matter";
 import { CMS_PATHS } from "../../../../lib/cms-paths";
+import { normalizeImportedMarkdownBody } from "../../../../lib/normalize-import-markdown";
 import { GithubPublisher } from "../../../../lib/github-service";
 import { parseOwnerRepo } from "../../../../lib/github-repo-content";
 import { getSessionUserFromApi } from "../../../../lib/supabase-server-auth";
@@ -588,8 +589,9 @@ export const POST: APIRoute = async (context) => {
       const description = (p.description || title).trim().slice(0, 160);
       const pubDate = (p.pubDate || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
       const markdownBodyRaw = typeof p.markdownBody === "string" ? p.markdownBody : "";
+      const markdownForImport = normalizeImportedMarkdownBody(markdownBodyRaw);
       const processedAssets = await processArticleAssets({
-        markdown: markdownBodyRaw,
+        markdown: markdownForImport,
         articleHtml: p.articleHtml,
         sourceUrl: p.sourceUrl,
         featuredImageUrl: p.featuredImageUrl,
