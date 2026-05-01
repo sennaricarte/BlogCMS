@@ -11,6 +11,7 @@ import { CMS_PATHS } from "../../../../lib/cms-paths";
 import { GithubPublisher } from "../../../../lib/github-service";
 import { parseOwnerRepo } from "../../../../lib/github-repo-content";
 import { isImageFileName } from "../../../../lib/media-filename";
+import { mirrorRepoFileToWorkspaceIfDev, removeRepoFileFromWorkspaceIfDev } from "../../../../lib/cms-dev-mirror";
 
 export const prerender = false;
 
@@ -130,6 +131,7 @@ export const POST: APIRoute = async ({ request }) => {
         body.message?.trim() || "chore(artigo): guardar (CMS BlogCMS)",
         { branch, sha: body.sha },
       );
+      mirrorRepoFileToWorkspaceIfDev(body.path.trim(), text);
       return json({ ok: true, commitSha, sha: content.sha, path: body.path.trim() });
     }
 
@@ -145,6 +147,7 @@ export const POST: APIRoute = async ({ request }) => {
         body.message?.trim() || "chore(página): guardar (CMS BlogCMS)",
         { branch, sha: body.sha },
       );
+      mirrorRepoFileToWorkspaceIfDev(body.path.trim(), text);
       return json({ ok: true, commitSha, sha: content.sha, path: body.path.trim() });
     }
 
@@ -159,6 +162,7 @@ export const POST: APIRoute = async ({ request }) => {
         body.sha.trim(),
         { branch },
       );
+      removeRepoFileFromWorkspaceIfDev(body.path.trim());
       return json({ ok: true, path: body.path.trim() });
     }
 

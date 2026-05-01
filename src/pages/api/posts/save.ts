@@ -4,6 +4,7 @@ import { serializeBlogMarkdown } from "../../../lib/cms-matter";
 import { normalizeLegacyBlogPostMarkdownLinks } from "../../../lib/blog-post-links";
 import { GithubPublisher } from "../../../lib/github-service";
 import { parseOwnerRepo } from "../../../lib/github-repo-content";
+import { mirrorRepoFileToWorkspaceIfDev } from "../../../lib/cms-dev-mirror";
 
 export const prerender = false;
 
@@ -90,6 +91,7 @@ export const POST: APIRoute = async ({ request }) => {
       message,
       { branch, sha: body.sha?.trim() || undefined },
     );
+    mirrorRepoFileToWorkspaceIfDev(body.path.trim(), text);
     return json({ ok: true, sha: content.sha, path: body.path.trim() });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro ao escrever no GitHub.";
