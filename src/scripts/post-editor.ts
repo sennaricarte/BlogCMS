@@ -1,4 +1,3 @@
-import { marked } from "marked";
 import { CMS_PATHS } from "../lib/cms-paths";
 import {
   analyzeSeoContent,
@@ -514,10 +513,15 @@ async function loadRemote() {
   renderTagButtons();
   const bodyIn = el<HTMLInputElement>("f-body");
   if (bodyIn && typeof j.content === "string") {
-    bodyIn.value = j.content;
-    window.dispatchEvent(
-      new CustomEvent("blogcms-post-body", { detail: { markdown: j.content } }),
-    );
+    const md = j.content;
+    bodyIn.value = md;
+    const notifyTipTap = () => {
+      window.dispatchEvent(new CustomEvent("blogcms-post-body", { detail: { markdown: md } }));
+    };
+    notifyTipTap();
+    queueMicrotask(notifyTipTap);
+    setTimeout(notifyTipTap, 120);
+    setTimeout(notifyTipTap, 380);
   }
   setMsg("", false);
   syncSeoTitleCount();
@@ -528,16 +532,8 @@ async function loadRemote() {
   bodyIn?.dispatchEvent(new Event("input"));
 }
 
-function runPreview() {
-  const bodyEl = el<HTMLInputElement>("f-body");
-  const previewEl = el("f-md-preview");
-  if (!bodyEl || !previewEl) return;
-  const raw = bodyEl.value;
-  if (raw.length < 200000) {
-    previewEl.innerHTML = String(marked.parse(raw));
-  } else {
-    previewEl.textContent = "Texto demasiado longo para pré‑visualizar.";
-  }
+/** Atualiza análise SEO a partir do Markdown em #f-body (sem segunda coluna de pré-visualização). */
+function runSeoFromBody() {
   runSeoCheck();
 }
 
@@ -617,7 +613,7 @@ function wire() {
     syncSeoSlugPreview();
   }
 
-  el<HTMLInputElement>("f-body")?.addEventListener("input", runPreview);
+  el<HTMLInputElement>("f-body")?.addEventListener("input", runSeoFromBody);
   if (el("f-delete")) (el("f-delete") as HTMLButtonElement).style.display = createMode ? "none" : "";
   if (createMode) {
     syncSeoSlugPreview();

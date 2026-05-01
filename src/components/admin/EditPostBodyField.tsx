@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Editor } from "./Editor";
 
 const SYNC_EVENT = "blogcms-post-body";
@@ -15,11 +15,12 @@ type Props = {
 };
 
 /**
- * Conteúdo do artigo: TipTap + campo oculto #f-body para o script `post-editor.ts` (pré‑visualização e gravação).
+ * Conteúdo do artigo: TipTap + campo oculto #f-body para o script `post-editor.ts` (SEO e gravação).
  */
 export function EditPostBodyField({ initialMarkdown }: Props) {
   const [md, setMd] = useState(initialMarkdown);
   const [editorKey, setEditorKey] = useState(0);
+  const lastRemoteMarkdownRef = useRef<string | null>(null);
 
   const onChange = useCallback((next: string) => {
     setMd(next);
@@ -31,6 +32,8 @@ export function EditPostBodyField({ initialMarkdown }: Props) {
       const ce = e as CustomEvent<{ markdown?: string }>;
       const next = ce.detail?.markdown;
       if (typeof next !== "string") return;
+      if (lastRemoteMarkdownRef.current === next) return;
+      lastRemoteMarkdownRef.current = next;
       setMd(next);
       setEditorKey((k) => k + 1);
       setHiddenBody(next);

@@ -108,14 +108,25 @@ function inferImageExt(contentType: string, buf: Buffer): string | null {
   return byBytes?.ext || null;
 }
 
-async function fetchImageForImport(url: string): Promise<DownloadedImage | null> {
+async function fetchImageForImport(url: string, refererPage?: string | null): Promise<DownloadedImage | null> {
+  const headers: Record<string, string> = {
+    Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  };
+  const ref = (refererPage || "").trim();
+  if (ref && /^https?:\/\//i.test(ref)) {
+    try {
+      const origin = new URL(ref).origin;
+      headers.Referer = ref;
+      headers.Origin = origin;
+    } catch {
+      /* ignore */
+    }
+  }
   try {
     const r = await fetch(url, {
-      headers: {
-        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      },
+      headers,
       signal: AbortSignal.timeout(30_000),
     });
     if (!r.ok) {
@@ -292,7 +303,7 @@ async function localizeMarkdownImages(params: {
     if (!abs) continue;
     let local = cache.get(abs);
     if (!local) {
-      const img = await fetchImageForImport(abs);
+      const img = await fetchImageForImport(abs, sourceUrl);
       if (!img) continue;
       local = await uploadToGithubStorage(publisher, owner, repo, branch, slugBase, imageIndex, img);
       if (!local) continue;
@@ -418,7 +429,7 @@ async function processArticleAssets(params: {
 
   const uploadedByUrl = new Map<string, string>();
   const tryUploadAsset = async (assetUrl: string): Promise<boolean> => {
-    const img = await fetchImageForImport(assetUrl);
+    const img = await fetchImageForImport(assetUrl, sourceUrl);
     if (!img) {
       return false;
     }
@@ -475,7 +486,7 @@ async function processArticleAssets(params: {
       featuredPath = normalizeLocalAssetPath(localFeatured);
     } else {
       // Tenta rota dedicada de destaque (nome semântico) se o asset foi baixado mas upload numerado não foi usado.
-      const img = await fetchImageForImport(featuredCandidate);
+      const img = await fetchImageForImport(featuredCandidate, sourceUrl);
       if (img) {
         const uploadedFeatured = await uploadFeaturedToGithub(publisher, owner, repo, branch, slugBase, img);
         if (uploadedFeatured) featuredPath = normalizeLocalAssetPath(uploadedFeatured);

@@ -103,9 +103,7 @@ const taxonomiesJson = JSON.stringify(taxonomies);
           </div>
           <div>
             <p class="text-sm font-medium text-slate-800">Conteúdo</p>
-            <p class="mt-0.5 text-xs text-slate-500">
-              Editor rico (TipTap). O arquivo é salvo em Markdown; a pré-visualização de Markdown vem abaixo.
-            </p>
+            <p class="mt-0.5 text-xs text-slate-500">Editor rico (TipTap). O arquivo é salvo em Markdown.</p>
             <input type="hidden" id="f-body" name="body" value="" />
             <div class="mt-2 w-full min-w-0">
               <EditPostBodyField client:load initialMarkdown={entry?.body ?? ""}>
@@ -113,18 +111,6 @@ const taxonomiesJson = JSON.stringify(taxonomies);
                   Carregando o editor…
                 </p>
               </EditPostBodyField>
-            </div>
-          </div>
-          <div
-            class="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm"
-          >
-            <p class="border-b border-slate-200 bg-slate-50/80 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-              Pré‑visualização
-            </p>
-            <div
-              id="f-md-preview"
-              class="prose prose-slate min-h-[12rem] max-w-none p-4 text-sm"
-            >
             </div>
           </div>
         </div>
