@@ -72,13 +72,35 @@ export function resolveMaybeAbsoluteImageUrl(rawUrl: string, sourceUrl?: string)
   }
 }
 
+/** Diretório de imagens de artigos no repositório (alinhado com upload-blog-hero e exemplos em `src/content/blog`). */
+export const REPO_BLOG_ASSETS_DIR = "src/assets/blog";
+
+/**
+ * Referência em frontmatter / Markdown sob `src/content/blog/*.md` → ficheiro em {@link REPO_BLOG_ASSETS_DIR}.
+ */
+export const BLOG_MARKDOWN_ASSET_PREFIX = "../../assets/blog/";
+
 export function normalizeLocalAssetPath(path: string): string {
-  const p = (path || "").trim();
+  const p = (path || "").trim().replace(/^["']|['"]$/g, "");
   if (!p) return p;
-  const noPublic = p.replace(/^\/?public\//i, "/");
-  if (noPublic.startsWith("/assets/")) return noPublic;
-  if (noPublic.startsWith("assets/")) return `/${noPublic}`;
-  return noPublic.startsWith("/") ? noPublic : `/${noPublic}`;
+  if (p.startsWith(BLOG_MARKDOWN_ASSET_PREFIX)) return p;
+
+  const fromSlashAssets = p.match(/^\/?assets\/blog\/(.+)$/i);
+  if (fromSlashAssets?.[1]) {
+    return `${BLOG_MARKDOWN_ASSET_PREFIX}${fromSlashAssets[1].replace(/^\/+/, "")}`;
+  }
+
+  const stripped = p.replace(/^\/?public\//i, "").replace(/^src\//i, "");
+  const fromNested = stripped.match(/^assets\/blog\/(.+)$/i);
+  if (fromNested?.[1]) {
+    return `${BLOG_MARKDOWN_ASSET_PREFIX}${fromNested[1]}`;
+  }
+
+  if (!p.includes("/") && /\.(jpe?g|png|webp|gif|svg|avif)$/i.test(p)) {
+    return `${BLOG_MARKDOWN_ASSET_PREFIX}${p}`;
+  }
+
+  return p;
 }
 
 function inferImageExt(contentType: string, buf: Buffer): string | null {
@@ -211,8 +233,8 @@ export async function uploadFeaturedToGithub(
 ): Promise<string | null> {
   const fileBase = `${slugifyImportFileBase(slugBase)}-destaque`;
   const fileName = `${fileBase}.${img.ext}`;
-  const repoPath = `public/assets/blog/${fileName}`;
-  const heroImage = `/assets/blog/${fileName}`;
+  const repoPath = `${REPO_BLOG_ASSETS_DIR}/${fileName}`;
+  const heroImage = `${BLOG_MARKDOWN_ASSET_PREFIX}${fileName}`;
   const message = `content(assets): imagem destacada ${fileName}`;
   try {
     const existingSha = await publisher.getFileShaIfExists(owner, repo, repoPath, { branch });
@@ -253,7 +275,7 @@ export async function uploadToGithubStorage(
     .toLowerCase();
   const baseName = preferredBase || `${safeSlug}-${index}`;
   const fileName = `${baseName}.${img.ext}`;
-  const repoPath = `public/assets/blog/${fileName}`;
+  const repoPath = `${REPO_BLOG_ASSETS_DIR}/${fileName}`;
   try {
     const existingSha = await publisher.getFileShaIfExists(owner, repo, repoPath, { branch });
     await publisher.createOrUpdateFileBytes(owner, repo, repoPath, img.buf, `content(assets): imagem ${fileName}`, {
@@ -270,5 +292,5 @@ export async function uploadToGithubStorage(
     });
     return null;
   }
-  return `/assets/blog/${fileName}`;
+  return `${BLOG_MARKDOWN_ASSET_PREFIX}${fileName}`;
 }

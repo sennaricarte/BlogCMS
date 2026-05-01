@@ -16,7 +16,7 @@ const blog = defineCollection({
       pubDate: z.coerce.date(),
       updatedDate: z.coerce.date().optional(),
       author: z.string(),
-      /** Asset local (coleção), URL absoluta ou caminho público (`/assets/…`, ex. após migração para `public/assets/blog`). */
+      /** Coleção (`image()` / `../../assets/blog/…`), URL absoluta ou legado `/assets/…` em `public/`. */
       heroImage: z.union([
         image(),
         z.string().url(),

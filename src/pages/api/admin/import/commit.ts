@@ -399,7 +399,8 @@ async function processArticleAssets(params: {
     processedMarkdown = processedMarkdown.trimEnd() + `\n\n![](${local})\n\n`;
   }
 
-  let featuredPath = "/assets/blog/destaque.jpg";
+  const DEFAULT_IMPORT_FEATURED = "../../assets/blog/hero-primeiro.svg";
+  let featuredPath = DEFAULT_IMPORT_FEATURED;
   if (featuredCandidate) {
     const localFeatured = uploadedByUrl.get(featuredCandidate);
     if (localFeatured) {
@@ -414,9 +415,11 @@ async function processArticleAssets(params: {
     }
   }
 
-  if (featuredPath === "/assets/blog/destaque.jpg") {
-    const firstLocalMdImage = processedMarkdown.match(/!\[[^\]]*]\((\/assets\/blog\/[^)\s]+)\)/)?.[1];
-    if (firstLocalMdImage) featuredPath = firstLocalMdImage;
+  if (featuredPath === DEFAULT_IMPORT_FEATURED) {
+    const firstLocalMdImage =
+      processedMarkdown.match(/!\[[^\]]*]\((\.\.\/\.\.\/assets\/blog\/[^)\s]+)\)/)?.[1] ||
+      processedMarkdown.match(/!\[[^\]]*]\((\/assets\/blog\/[^)\s]+)\)/)?.[1];
+    if (firstLocalMdImage) featuredPath = normalizeLocalAssetPath(firstLocalMdImage);
   }
 
   if (warnings.length > 0) {

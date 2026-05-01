@@ -4,8 +4,8 @@ export function isHeroRemoteUrl(src: unknown): src is string {
 }
 
 /**
- * Imagem servida a partir de `public/` (ex.: importação que grava em `public/assets/blog/`).
- * Deve usar `<img src="...">`, não `astro:assets` Image.
+ * Imagem em `public/` referenciada por URL de site (ex.: legado `heroImage: /assets/blog/…`).
+ * Usar `<img>`, não `astro:assets`. Preferir `../../assets/blog/…` + `src/assets/blog/` (importação atual).
  */
 export function isHeroPublicAssetPath(src: unknown): src is string {
   return typeof src === "string" && src.startsWith("/assets/");

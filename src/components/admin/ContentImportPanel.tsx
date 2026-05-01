@@ -1060,7 +1060,7 @@ export function ContentImportPanel() {
   const migrateRemoteBlogImages = async () => {
     if (
       !window.confirm(
-        "Isto vai analisar os artigos já existentes em src/content/blog no GitHub, descarregar imagens com URL externa (por exemplo Supabase), gravá-las em public/assets/blog e atualizar os ficheiros .md com commits separados. Pode demorar vários minutos. Continuar?",
+        "Isto vai analisar os artigos já existentes em src/content/blog no GitHub, descarregar imagens com URL externa (por exemplo Supabase), gravá-las em src/assets/blog (referências ../../assets/blog/ no .md) e atualizar os ficheiros com commits separados. Pode demorar vários minutos. Continuar?",
       )
     ) {
       return;
@@ -1140,7 +1140,7 @@ export function ContentImportPanel() {
           Varre os <code className="rounded bg-violet-100/80 px-1">.md</code> em{" "}
           <code className="rounded bg-violet-100/80 px-1">src/content/blog</code> do repositório configurado. URLs de imagens
           externas (por exemplo <code className="rounded bg-violet-100/80 px-1">*.supabase.co</code>) são descarregadas e
-          guardadas em <code className="rounded bg-violet-100/80 px-1">public/assets/blog</code>; o Markdown e o destaque
+          guardadas em <code className="rounded bg-violet-100/80 px-1">src/assets/blog</code>; o Markdown e o destaque
           passam a apontar para caminhos locais. Usa o mesmo token e repositório das{" "}
           <a className="font-medium underline underline-offset-2" href="/admin/settings/">
             Configurações
@@ -1665,7 +1665,7 @@ export function ContentImportPanel() {
           </div>
           <p className="text-xs text-zinc-500">
             Os ficheiros são criados como rascunho no GitHub; as imagens importadas (corpo e destaque) são guardadas em
-            <code className="rounded bg-zinc-100 px-1">public/assets/blog</code> no repositório do cliente.
+            <code className="rounded bg-zinc-100 px-1">src/assets/blog</code> no repositório do cliente.
           </p>
         </section>
       )}

@@ -4,7 +4,7 @@ import { isHeroPublicAssetPath, isHeroRemoteUrl } from "../../lib/blog-hero-disp
 import BlogImage from "./BlogImage.astro";
 
 export interface Props {
-  /** Coleção (`ImageMetadata`), URL remota ou caminho em `public/` (ex. `/assets/blog/…`). */
+  /** Coleção (`ImageMetadata`), URL remota, legado `/assets/…` em `public/` ou `../../assets/blog/…` (caso normal). */
   src: ImageMetadata | string;
   alt: string;
   width: number;

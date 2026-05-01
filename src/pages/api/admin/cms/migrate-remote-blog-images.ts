@@ -5,6 +5,7 @@ import {
   canonicalImageUrl,
   fetchImageForImport,
   normalizeLocalAssetPath,
+  REPO_BLOG_ASSETS_DIR,
   resolveMaybeAbsoluteImageUrl,
   slugifyImportFileBase,
   toAbsoluteUrlOrNull,
@@ -263,7 +264,7 @@ export const POST: APIRoute = async (context) => {
       postsUpdated,
       imagesMigrated,
       errors,
-      message: `Analisados ${postsScanned} artigo(s); ${postsUpdated} .md atualizado(s); ${imagesMigrated} imagem(ns) gravada(s) em public/assets/blog/.`,
+      message: `Analisados ${postsScanned} artigo(s); ${postsUpdated} .md atualizado(s); ${imagesMigrated} imagem(ns) gravada(s) em ${REPO_BLOG_ASSETS_DIR}/.`,
     }),
     {
       status: 200,
