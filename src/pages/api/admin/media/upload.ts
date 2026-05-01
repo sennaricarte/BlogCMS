@@ -33,7 +33,7 @@ export const POST: APIRoute = async (context) => {
 
   let body: Body;
   try {
-    body = (await request.json()) as Body;
+    body = (await context.request.json()) as Body;
   } catch {
     return json({ ok: false, error: "JSON inválido." }, 400, auth.responseHeaders);
   }
