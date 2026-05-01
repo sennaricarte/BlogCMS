@@ -19,6 +19,7 @@ import {
   LayoutTemplate,
 } from "lucide-react";
 import { buildDefaultContactPageTemplate } from "../../lib/page-templates";
+import { createDefaultBlock } from "../../lib/page-blocks";
 import type { PageBlock } from "../../lib/page-blocks.zod";
 
 type HeroBlock = Extract<PageBlock, { type: "hero" }>;
@@ -873,8 +874,12 @@ export function PageBlocksEditor({
   }, [blocks]);
 
   const add = (t: PageBlock["type"]) => {
-    setBlocks((prev) => [...prev, createDefaultBlock(t)]);
-    setOpenId(null);
+    const nb = createDefaultBlock(t);
+    setBlocks((prev) => [...prev, nb]);
+    setOpenId(nb.id);
+    queueMicrotask(() => {
+      document.getElementById(`page-block-${nb.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   };
 
   const applyContactTemplate = useCallback(() => {
@@ -946,7 +951,10 @@ export function PageBlocksEditor({
 
       <div>
         <h2 className="text-sm font-medium text-slate-800">Adicionar Elemento</h2>
-        <p className="text-xs text-slate-500">Clica num componente para o adicionar ao fim da página. Podes reordenar pelo ícone à esquerda.</p>
+        <p className="text-xs text-slate-500">
+          Clica num componente para o adicionar: o formulário de edição abre logo abaixo e a página desloca-se até ao
+          bloco. O Markdown é a secção «Conteúdo adicional», mais abaixo.
+        </p>
         <ul
           className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3"
           role="list"
@@ -979,8 +987,9 @@ export function PageBlocksEditor({
             {blocks.map((block, i) => (
               <div
                 key={block.id}
+                id={`page-block-${block.id}`}
                 role="listitem"
-                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                className="scroll-mt-24 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
                 onDragOver={onDragOver}
                 onDrop={() => onDrop(i)}
               >
