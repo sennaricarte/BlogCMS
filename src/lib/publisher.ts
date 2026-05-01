@@ -559,9 +559,48 @@ function sanitizeClientPackageJsonBuffer(buffer: Buffer): Buffer {
   return Buffer.from(`${JSON.stringify(parsed, null, 2)}\n`, "utf-8");
 }
 
+/**
+ * Remove `adapter: vercel(...)` (várias linhas) do config do cliente.
+ * O regex antigo só removia `adapter: vercel(),` numa linha; com `vercel({ includeFiles })`
+ * ficava `vercel is not defined` após tirar o import.
+ */
+function stripVercelAdapterFromAstroConfig(text: string): string {
+  const re = /\badapter:\s*vercel\s*\(/;
+  const m = re.exec(text);
+  if (!m || m.index === undefined) {
+    return text;
+  }
+  const openParen = m.index + m[0].length - 1;
+  let depth = 0;
+  let i = openParen;
+  for (; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      depth--;
+      if (depth === 0) {
+        i++;
+        break;
+      }
+    }
+  }
+  let end = i;
+  while (end < text.length && (text[end] === " " || text[end] === "\t")) end++;
+  if (end < text.length && text[end] === ",") end++;
+  while (end < text.length && (text[end] === " " || text[end] === "\t" || text[end] === "\r")) end++;
+  if (end < text.length && text[end] === "\n") end++;
+  return text.slice(0, m.index) + text.slice(end);
+}
+
 function sanitizeClientAstroConfigBuffer(buffer: Buffer): Buffer {
   let text = buffer.toString("utf-8");
+  text = stripVercelAdapterFromAstroConfig(text);
+  text = text.replace(
+    /\r?\n\/\*\* Pastas servidas[\s\S]*?function vercelIncludeAssetDirs\(\) \{[\s\S]*?\}\r?\n\r?\n/,
+    "\n",
+  );
   text = text.replace(/^\s*import\s+vercel\s+from\s+['"]@astrojs\/vercel['"];\r?\n/m, "");
+  text = text.replace(/^\s*import\s+\{\s*existsSync\s*\}\s+from\s+['"]node:fs['"];\r?\n/m, "");
   text = text.replace(/^\s*adapter:\s*vercel\(\),\r?\n/m, "");
   text = text.replace(/^\s*assetsInclude:\s*\[[^\]]*\],\r?\n/m, "");
   text = text.replace(/^\s*['"]@supabase\/ssr['"],\r?\n/gm, "");
