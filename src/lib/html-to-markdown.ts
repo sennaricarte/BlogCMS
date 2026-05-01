@@ -1,5 +1,6 @@
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
+import { ADMIN_REPO_ASSET_PATH } from "./admin-editor-image-urls";
 import { MEDIA_MARKDOWN_RELATIVE_PREFIX, isRawGithubMediaPath } from "./github-raw-url";
 import { preprocessHtmlForTurndown } from "./html-preprocess-turndown";
 
@@ -79,6 +80,43 @@ turndown.use(gfm);
  * Imagens servidas de `raw.githubusercontent.com/.../src/assets/media/...` (pré-visualização
  * no admin) passam a caminho relativo no `.md` (mesmo padrão que `heroImage` em `src/assets/blog/`).
  */
+/**
+ * Pré-visualização no admin: imagens apontam para {@link ADMIN_REPO_ASSET_PATH}; no .md guardamos
+ * `../../assets/blog/…`, `/assets/blog/…` (public) ou `/assets/cms/…`.
+ */
+turndown.addRule("imgRepoAssetPreviewToRelative", {
+  filter: (node) => {
+    if (node.nodeName !== "IMG") return false;
+    const el = node as unknown as HTMLImageElement;
+    const src = (el.getAttribute("src") || "").trim();
+    return src.includes(ADMIN_REPO_ASSET_PATH);
+  },
+  replacement: (content, node) => {
+    const el = node as unknown as HTMLImageElement;
+    const src = (el.getAttribute("src") || "").trim();
+    const alt = (el.getAttribute("alt") || content || "").trim() || "Imagem";
+    try {
+      const u = new URL(src, "https://preview.invalid");
+      const scope = u.searchParams.get("scope");
+      const file = u.searchParams.get("file");
+      if (!file) return `![${alt}](${src})`;
+      const decoded = decodeURIComponent(file);
+      if (scope === "blog") {
+        return `![${alt}](../../assets/blog/${decoded})`;
+      }
+      if (scope === "blog-public") {
+        return `![${alt}](/assets/blog/${decoded})`;
+      }
+      if (scope === "cms") {
+        return `![${alt}](/assets/cms/${decoded})`;
+      }
+    } catch {
+      /* ignore */
+    }
+    return `![${alt}](${src})`;
+  },
+});
+
 turndown.addRule("imgGithubMediaToRelative", {
   filter: (node) => {
     if (node.nodeName !== "IMG") {

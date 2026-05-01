@@ -1,4 +1,5 @@
 import { marked } from "marked";
+import { rewriteHtmlImagesForAdminEditor } from "./admin-editor-image-urls";
 
 /**
  * Converte Markdown (corpo de artigo) em HTML para carregar o editor (TipTap).
@@ -10,7 +11,8 @@ export function markdownToHtmlForEditor(markdown: string): string {
     return "<p></p>";
   }
   try {
-    return String(marked.parse(raw));
+    const html = String(marked.parse(raw));
+    return rewriteHtmlImagesForAdminEditor(html);
   } catch {
     return "<p></p>";
   }
