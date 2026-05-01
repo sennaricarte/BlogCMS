@@ -23,7 +23,7 @@
     @apply mt-10 scroll-mt-24 text-2xl;
   }
   .post-body h3 {
-    @apply mt-8 text-xl;
+    @apply mt-8 scroll-mt-24 text-xl;
   }
   .post-body p {
     @apply my-4;

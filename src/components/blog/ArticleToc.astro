@@ -1,0 +1,40 @@
+---
+import type { TocItem } from "../../lib/blog-toc";
+
+export interface Props {
+  items: TocItem[];
+}
+
+const { items } = Astro.props;
+---
+
+{
+  items.length > 0 && (
+    <nav
+      class="rounded-2xl border border-slate-200/90 bg-slate-50 px-5 py-6 sm:px-6"
+      aria-labelledby="article-toc-heading"
+    >
+      <h2
+        id="article-toc-heading"
+        class="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600"
+      >
+        <svg class="h-4 w-4 shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.01v-.01H3.75V6.75Zm0 5.25h.01v-.01H3.75V12Zm0 5.25h.01v-.01H3.75v-.01Z" />
+        </svg>
+        Neste artigo
+      </h2>
+      <ol class="list-decimal space-y-2.5 pl-5 text-slate-800 marker:font-normal marker:text-slate-400 sm:pl-6">
+        {items.map((item) => (
+          <li class:list={{ "ml-0": item.depth === 2, "ml-2 border-l border-slate-200/80 pl-4 text-[0.9375rem] text-slate-700 sm:ml-3": item.depth === 3 }}>
+            <a
+              href={`#${item.id}`}
+              class="font-normal text-inherit transition hover:text-[var(--client-color-primary)] focus:outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-[var(--client-color-primary)] focus-visible:ring-offset-2"
+            >
+              {item.text}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}

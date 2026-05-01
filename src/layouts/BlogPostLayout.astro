@@ -2,12 +2,15 @@
 import { getImage, type ImageMetadata } from "astro:assets";
 import { render } from "astro:content";
 import type { CollectionEntry } from "astro:content";
+import ArticleShare from "../components/blog/ArticleShare.astro";
+import ArticleToc from "../components/blog/ArticleToc.astro";
 import HeroCover from "../components/blog/HeroCover.astro";
 import ArticleBreadcrumbs from "../components/seo/ArticleBreadcrumbs.astro";
 import siteConfig from "../data/site-config.json";
 import { isHeroPublicAssetPath, isHeroRemoteUrl } from "../lib/blog-hero-display";
 import { getCategoryDisplayName, getTagDisplayName, tagToSlug } from "../lib/taxonomies";
 import type { ClientConfig } from "../lib/publisher";
+import { extractTocFromMarkdown } from "../lib/blog-toc";
 import { buildBlogPostJsonLdGraph, getBreadcrumbItems } from "../lib/seo/blog-post-json-ld";
 import BaseLayout from "./BaseLayout.astro";
 
@@ -25,6 +28,7 @@ const siteBase =
   (siteConfig as { siteUrl?: string }).siteUrl?.replace(/\/$/, "") ||
   Astro.url.origin;
 const baseForUrl = siteBase.endsWith("/") ? siteBase : siteBase + "/";
+const articleShareUrl = new URL(canonicalPath, baseForUrl).href;
 
 const hero = d.heroImage;
 const openGraphImageUrl = isHeroRemoteUrl(hero)
@@ -56,6 +60,7 @@ const seoCtx = {
 };
 const jsonLdData = buildBlogPostJsonLdGraph(seoCtx) as Record<string, unknown>;
 const breadcrumbItems = getBreadcrumbItems(seoCtx);
+const tocItems = extractTocFromMarkdown(typeof post.body === "string" ? post.body : "");
 ---
 
 <BaseLayout
@@ -127,8 +132,14 @@ const breadcrumbItems = getBreadcrumbItems(seoCtx);
         class="h-auto w-full max-h-[min(24rem,50vh)] rounded-lg object-cover object-center shadow-sm sm:max-h-none"
       />
     </figure>
+    {tocItems.length > 0 && (
+      <div class="mb-10">
+        <ArticleToc items={tocItems} />
+      </div>
+    )}
     <div class="post-body pt-2 leading-relaxed text-slate-800">
       <Content />
     </div>
+    <ArticleShare url={articleShareUrl} title={d.title} />
   </article>
 </BaseLayout>
