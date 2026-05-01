@@ -13,6 +13,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
+    "check": "node --max-old-space-size=8192 ./node_modules/astro/bin/astro.mjs check --minimumSeverity warning",
+    "check:with-hints": "node --max-old-space-size=8192 ./node_modules/astro/bin/astro.mjs check",
+    "check:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "test:deploy": "tsx scripts/test-deploy.ts"
   },
   "dependencies": {

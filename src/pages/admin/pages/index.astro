@@ -133,7 +133,21 @@ const sorted = [...rows].sort((a, b) => b.data.pubDate.getTime() - a.data.pubDat
           el.textContent = (j && j.error) || "Não foi possível listar.";
           return;
         }
-        el.textContent = "Lista alinhada com o repositório (" + j.items.length + " itens).";
+        var pgBase = "Lista alinhada com o repositório (" + j.items.length + " itens).";
+        if (j.parseErrors && j.parseErrors.length) {
+          var pgErr = j.parseErrors[0];
+          el.textContent =
+            pgBase +
+            " Aviso: " +
+            pgErr.file +
+            " — " +
+            pgErr.error +
+            (j.parseErrors.length > 1 ? " (+" + (j.parseErrors.length - 1) + " ficheiros com erro)." : "");
+          el.setAttribute("title", j.parseErrors.map(function (x) { return x.file + ": " + x.error; }).join("\n"));
+        } else {
+          el.textContent = pgBase;
+          el.removeAttribute("title");
+        }
         tbody.textContent = "";
         for (var i = 0; i < j.items.length; i++) {
           var p = j.items[i];

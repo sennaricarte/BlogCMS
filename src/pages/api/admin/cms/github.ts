@@ -184,42 +184,59 @@ export const POST: APIRoute = async ({ request }) => {
         author: string;
         seoAlert: boolean;
       }> = [];
+      const parseErrors: Array<{ file: string; error: string }> = [];
 
       for (const f of mds) {
         const p = `${CMS_PATHS.blog}/${f.name}`;
-        const { text, sha } = await publisher.getFileText(owner, repo, p, { branch });
-        const parsed = parseMarkdownFile(text);
-        const d = parsed.data as Record<string, unknown>;
-        const title = typeof d.title === "string" ? d.title : f.name;
-        const description = typeof d.description === "string" ? d.description : "";
-        let pubDate = "";
-        const pd = d.pubDate;
-        if (pd instanceof Date) pubDate = pd.toISOString();
-        else if (typeof pd === "string") pubDate = new Date(pd).toISOString();
-        const draft = Boolean(d.draft);
-        const category = typeof d.category === "string" && d.category.trim() ? d.category.trim() : undefined;
-        const author =
-          typeof d.author === "string" && d.author.trim() ? d.author.trim() : "—";
-        const hasDesc = typeof d.description === "string" && d.description.trim().length > 0;
-        const hasHero = typeof d.heroImage === "string" && d.heroImage.trim().length > 0;
-        const seoAlert = !hasDesc || !hasHero;
-        entries.push({
-          slug: f.name.replace(/\.md$/i, ""),
-          fileName: f.name,
-          title,
-          description,
-          pubDate: pubDate || new Date(0).toISOString(),
-          draft,
-          path: p,
-          sha,
-          category,
-          author,
-          seoAlert,
-        });
+        try {
+          const { text, sha } = await publisher.getFileText(owner, repo, p, { branch });
+          const parsed = parseMarkdownFile(text);
+          const d = parsed.data as Record<string, unknown>;
+          const title = typeof d.title === "string" ? d.title : f.name;
+          const description = typeof d.description === "string" ? d.description : "";
+          let pubDate = "";
+          const pd = d.pubDate;
+          if (pd instanceof Date) pubDate = pd.toISOString();
+          else if (typeof pd === "string") pubDate = new Date(pd).toISOString();
+          const draft = Boolean(d.draft);
+          const category = typeof d.category === "string" && d.category.trim() ? d.category.trim() : undefined;
+          const author =
+            typeof d.author === "string" && d.author.trim() ? d.author.trim() : "—";
+          const hasDesc = typeof d.description === "string" && d.description.trim().length > 0;
+          const hasHero = typeof d.heroImage === "string" && d.heroImage.trim().length > 0;
+          const seoAlert = !hasDesc || !hasHero;
+          entries.push({
+            slug: f.name.replace(/\.md$/i, ""),
+            fileName: f.name,
+            title,
+            description,
+            pubDate: pubDate || new Date(0).toISOString(),
+            draft,
+            path: p,
+            sha,
+            category,
+            author,
+            seoAlert,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          parseErrors.push({ file: f.name, error: msg });
+        }
       }
 
       entries.sort((a, b) => (a.pubDate < b.pubDate ? 1 : -1));
-      return json({ ok: true, items: entries });
+      if (entries.length === 0 && parseErrors.length > 0) {
+        return json({
+          ok: false,
+          error: parseErrors.map((p) => `${p.file}: ${p.error}`).join(" "),
+          parseErrors,
+        });
+      }
+      return json({
+        ok: true,
+        items: entries,
+        ...(parseErrors.length ? { parseErrors } : {}),
+      });
     }
 
     if (action === "listPages") {
@@ -235,32 +252,49 @@ export const POST: APIRoute = async ({ request }) => {
         path: string;
         sha: string;
       }> = [];
+      const parseErrors: Array<{ file: string; error: string }> = [];
 
       for (const f of mds) {
         const p = `${CMS_PATHS.pages}/${f.name}`;
-        const { text, sha } = await publisher.getFileText(owner, repo, p, { branch });
-        const parsed = parseMarkdownFile(text);
-        const d = parsed.data as Record<string, unknown>;
-        const title = typeof d.title === "string" ? d.title : f.name;
-        const description = typeof d.description === "string" ? d.description : "";
-        let pubDate = "";
-        const pd = d.pubDate;
-        if (pd instanceof Date) pubDate = pd.toISOString();
-        else if (typeof pd === "string") pubDate = new Date(pd).toISOString();
-        const draft = Boolean(d.draft);
-        entries.push({
-          slug: f.name.replace(/\.md$/i, ""),
-          fileName: f.name,
-          title,
-          description,
-          pubDate: pubDate || new Date(0).toISOString(),
-          draft,
-          path: p,
-          sha,
-        });
+        try {
+          const { text, sha } = await publisher.getFileText(owner, repo, p, { branch });
+          const parsed = parseMarkdownFile(text);
+          const d = parsed.data as Record<string, unknown>;
+          const title = typeof d.title === "string" ? d.title : f.name;
+          const description = typeof d.description === "string" ? d.description : "";
+          let pubDate = "";
+          const pd = d.pubDate;
+          if (pd instanceof Date) pubDate = pd.toISOString();
+          else if (typeof pd === "string") pubDate = new Date(pd).toISOString();
+          const draft = Boolean(d.draft);
+          entries.push({
+            slug: f.name.replace(/\.md$/i, ""),
+            fileName: f.name,
+            title,
+            description,
+            pubDate: pubDate || new Date(0).toISOString(),
+            draft,
+            path: p,
+            sha,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          parseErrors.push({ file: f.name, error: msg });
+        }
       }
       entries.sort((a, b) => (a.pubDate < b.pubDate ? 1 : -1));
-      return json({ ok: true, items: entries });
+      if (entries.length === 0 && parseErrors.length > 0) {
+        return json({
+          ok: false,
+          error: parseErrors.map((p) => `${p.file}: ${p.error}`).join(" "),
+          parseErrors,
+        });
+      }
+      return json({
+        ok: true,
+        items: entries,
+        ...(parseErrors.length ? { parseErrors } : {}),
+      });
     }
 
     if (action === "listMedia") {

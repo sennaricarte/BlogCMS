@@ -180,7 +180,21 @@ function seoNeedsAttentionFromFile(id: string): boolean {
           el.textContent = (j && j.error) || "Não foi possível listar a partir do GitHub.";
           return;
         }
-        el.textContent = "Lista alinhada com o repositório remoto (" + j.items.length + " itens).";
+        var baseMsg = "Lista alinhada com o repositório remoto (" + j.items.length + " itens).";
+        if (j.parseErrors && j.parseErrors.length) {
+          var pe = j.parseErrors[0];
+          el.textContent =
+            baseMsg +
+            " Aviso: " +
+            pe.file +
+            " — " +
+            pe.error +
+            (j.parseErrors.length > 1 ? " (+" + (j.parseErrors.length - 1) + " ficheiros com erro)." : "");
+          el.setAttribute("title", j.parseErrors.map(function (x) { return x.file + ": " + x.error; }).join("\n"));
+        } else {
+          el.textContent = baseMsg;
+          el.removeAttribute("title");
+        }
         tbody.textContent = "";
         for (var i = 0; i < j.items.length; i++) {
           var p = j.items[i];

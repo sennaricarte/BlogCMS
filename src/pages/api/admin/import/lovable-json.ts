@@ -48,11 +48,13 @@ function isHttpUrl(v: string): boolean {
   }
 }
 
-function extractImageUrlsFromMarkdown(md: string): string[] {
+function extractImageUrlsFromMarkdown(md: string, sourceUrl?: string): string[] {
   const out = new Set<string>();
   for (const m of (md || "").matchAll(/!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
     const u = toStr(m[1]);
-    if (isHttpUrl(u)) out.add(u);
+    const abs = toAbsoluteImageUrlCandidate(u, sourceUrl);
+    if (abs) out.add(abs);
+    else if (isHttpUrl(u)) out.add(u);
   }
   return Array.from(out);
 }
@@ -65,6 +67,162 @@ function fileNameFromUrl(url: string): string {
   } catch {
     return "imagem";
   }
+}
+
+/**
+ * Evita passar Markdown pelo Turndown (o resultado aparece no site como texto com `**` e `##` literais).
+ */
+function looksLikeHtml(s: string): boolean {
+  const t = s.trim();
+  if (t.length < 2) return false;
+  if (/^```/.test(t)) return false;
+  if (
+    /<\s*(p|div|article|section|main|span|ul|ol|li|h[1-6]|table|thead|tbody|tr|td|th|blockquote|pre|a|img|br|hr|strong|em|b|i)\b[\s>/]/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  if (/<\s*(img|br|hr|input|meta|link)\b[^>]*>/i.test(t)) return true;
+  if (
+    /<[a-zA-Z][a-zA-Z0-9:-]*(?:\s[^>]*)?>[\s\S]*<\s*\/\s*[a-zA-Z][a-zA-Z0-9:-]*\s*>/i.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function toAbsoluteImageUrlCandidate(raw: string, sourceUrl?: string): string | null {
+  const t = (raw || "").trim();
+  if (!t) return null;
+  if (t.startsWith("//")) {
+    try {
+      return new URL(`https:${t}`).toString();
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const u = new URL(t);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    /* relativo */
+  }
+  const base = (sourceUrl || "").trim();
+  if (!base) return null;
+  try {
+    const u = new URL(t, base);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function stringField(it: Record<string, unknown>, key: string): string {
+  const v = it[key];
+  if (typeof v === "string") return toStr(v);
+  if (v && typeof v === "object" && "url" in v) {
+    return toStr((v as { url?: unknown }).url);
+  }
+  return "";
+}
+
+/**
+ * Corpo do artigo: campos explícitos de Markdown vs HTML; nunca assumir que `content` é HTML.
+ */
+function resolveMarkdownAndArticleHtml(it: Record<string, unknown>): { markdown: string; articleHtml: string } {
+  const mdExplicit =
+    stringField(it, "markdown") ||
+    stringField(it, "markdownBody") ||
+    stringField(it, "contentMarkdown") ||
+    stringField(it, "body") ||
+    stringField(it, "text");
+  const htmlExplicit =
+    stringField(it, "html") || stringField(it, "contentHtml") || stringField(it, "richText") || stringField(it, "rich_text");
+  const generic = stringField(it, "content");
+
+  if (mdExplicit) {
+    let articleHtml = "";
+    if (htmlExplicit && looksLikeHtml(htmlExplicit)) {
+      articleHtml = htmlExplicit;
+    } else if (generic && looksLikeHtml(generic) && generic !== mdExplicit) {
+      articleHtml = generic;
+    }
+    return { markdown: mdExplicit, articleHtml };
+  }
+
+  if (htmlExplicit) {
+    if (looksLikeHtml(htmlExplicit)) {
+      return { markdown: articleHtmlToMarkdown(htmlExplicit), articleHtml: htmlExplicit };
+    }
+    return { markdown: htmlExplicit, articleHtml: "" };
+  }
+
+  if (generic) {
+    if (looksLikeHtml(generic)) {
+      return { markdown: articleHtmlToMarkdown(generic), articleHtml: generic };
+    }
+    return { markdown: generic, articleHtml: "" };
+  }
+
+  return { markdown: "", articleHtml: "" };
+}
+
+function collectStructuredImageUrls(it: Record<string, unknown>, sourceUrl?: string): string[] {
+  const out: string[] = [];
+  const add = (raw: unknown) => {
+    const s = typeof raw === "string" ? raw.trim() : "";
+    if (!s) return;
+    const abs = toAbsoluteImageUrlCandidate(s, sourceUrl);
+    if (abs) out.push(abs);
+  };
+  const walk = (arr: unknown) => {
+    if (!Array.isArray(arr)) return;
+    for (const el of arr) {
+      if (typeof el === "string") add(el);
+      else if (el && typeof el === "object") {
+        const o = el as Record<string, unknown>;
+        add(o.url);
+        add(o.src);
+        add(o.href);
+        const nestedImage = stringField(o, "image");
+        if (nestedImage) add(nestedImage);
+        if (typeof o.imageUrl === "string") add(o.imageUrl);
+      }
+    }
+  };
+  walk(it.images);
+  walk(it.imageUrls);
+  walk(it.photos);
+  walk(it.gallery);
+  walk(it.media);
+  walk(it.attachments);
+  add(it.image);
+  add(it.thumbnail);
+  add(it.thumbnailUrl);
+  if (typeof it.imageUrl === "string") add(it.imageUrl);
+  return [...new Set(out)];
+}
+
+function coalesceFeaturedImageUrl(it: Record<string, unknown>): string | undefined {
+  const keys = [
+    "featuredImage",
+    "featuredImageUrl",
+    "coverImage",
+    "cover",
+    "heroImage",
+    "hero",
+    "thumbnail",
+    "thumbnailUrl",
+    "banner",
+    "image",
+  ];
+  for (const k of keys) {
+    const s = stringField(it, k);
+    if (s) return s;
+  }
+  return undefined;
 }
 
 function resolveInputItems(parsed: unknown): Array<Record<string, unknown>> {
@@ -137,20 +295,35 @@ export const POST: APIRoute = async (context) => {
     const d = pubRaw ? new Date(pubRaw) : null;
     const pubDate = d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
 
-    const markdownRaw = toStr(it.markdown) || toStr(it.markdownBody) || toStr(it.contentMarkdown);
-    const htmlRaw = toStr(it.html) || toStr(it.contentHtml) || toStr(it.content);
-    const markdownCombined = markdownRaw || articleHtmlToMarkdown(htmlRaw);
-    const markdown = normalizeImportedMarkdownBody(markdownCombined);
-    const articleHtml = htmlRaw || "";
-
-    const featuredImageUrl = toStr(it.featuredImage) || toStr(it.featuredImageUrl) || toStr(it.coverImage) || undefined;
     const sourceUrl = toStr(it.sourceUrl) || toStr(it.url) || undefined;
+    const { markdown: markdownCombinedRaw, articleHtml } = resolveMarkdownAndArticleHtml(it);
+    const markdown = normalizeImportedMarkdownBody(markdownCombinedRaw);
+
+    const featuredRaw = coalesceFeaturedImageUrl(it);
+    const featuredImageUrl = featuredRaw
+      ? toAbsoluteImageUrlCandidate(featuredRaw, sourceUrl) || featuredRaw
+      : undefined;
+
     const description = toStr(it.description) || title.slice(0, 160);
     const category = toStr(it.category) || undefined;
     const tags = arr(it.tags).map((v) => String(v).trim()).filter(Boolean);
-    const internalImages = arr(it.internalImages).map((v) => String(v).trim()).filter((u) => isHttpUrl(u));
-    const markdownImages = extractImageUrlsFromMarkdown(markdown);
-    const allAttachmentUrls = Array.from(new Set([...(featuredImageUrl ? [featuredImageUrl] : []), ...internalImages, ...markdownImages]));
+    const internalFromArr = arr(it.internalImages)
+      .map((v) => String(v).trim())
+      .map((u) => toAbsoluteImageUrlCandidate(u, sourceUrl) || (isHttpUrl(u) ? u : null))
+      .filter((u): u is string => u != null);
+    const structuredImages = collectStructuredImageUrls(it, sourceUrl);
+    const internalImages = [...new Set([...internalFromArr, ...structuredImages])];
+    const markdownImages = extractImageUrlsFromMarkdown(markdown, sourceUrl);
+
+    const allAttachmentUrls = Array.from(
+      new Set(
+        [
+          ...(featuredImageUrl ? [toAbsoluteImageUrlCandidate(featuredImageUrl, sourceUrl) || featuredImageUrl] : []),
+          ...internalImages,
+          ...markdownImages,
+        ].filter((u): u is string => typeof u === "string" && u.length > 0),
+      ),
+    );
     const xmlAttachmentFileNameByUrl = Object.fromEntries(allAttachmentUrls.map((u) => [u, fileNameFromUrl(u)]));
 
     return {
