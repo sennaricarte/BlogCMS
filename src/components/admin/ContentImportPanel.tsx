@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 const K_INTEGR = "blogcms-admin-integration";
 const K_CMS = "blogcms-cms-target";
-const IMPORTER_UI_VERSION = "importador-ui 2026-04-30 · 775eb6c";
+const IMPORTER_UI_VERSION = "importador-ui 2026-04-30 · json-tab-ui";
 
 type IntegrationLs = { GITHUB_PERSONAL_TOKEN?: string };
 type CmsTargetLs = { githubRepoFullName?: string; branch?: string };
@@ -1203,6 +1203,75 @@ export function ContentImportPanel() {
             <p className="text-xs text-zinc-600" role="status">
               Descobertos {wpXmlTotal} post(s) no XML. Carregados na lista: {rows.length}.{" "}
               {wpXmlHasMore ? "Há mais lotes disponíveis." : "Todos os lotes foram carregados."}
+            </p>
+          )}
+        </section>
+      )}
+
+      {tab === "json" && (
+        <section aria-labelledby="imp-json-heading" className="space-y-4">
+          <h2 id="imp-json-heading" className="text-base font-semibold text-zinc-900">
+            Importar JSON (Lovable / export)
+          </h2>
+          <p className="text-sm text-zinc-600">
+            Envie um ficheiro <code className="rounded bg-zinc-100 px-1">.json</code> com um array de artigos ou chaves
+            como <code className="rounded bg-zinc-100 px-1">posts</code>, <code className="rounded bg-zinc-100 px-1">articles</code> ou{" "}
+            <code className="rounded bg-zinc-100 px-1">data.posts</code>. O servidor processa em lotes e prepara a
+            pré-visualização para gravar no GitHub.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="lovable-json-file" className="block text-sm font-medium text-zinc-700">
+                Arquivo JSON
+              </label>
+              <input
+                id="lovable-json-file"
+                type="file"
+                accept=".json,application/json"
+                aria-describedby="imp-json-file-hint"
+                onChange={(e) => void onSelectLovableJsonFile(e.target.files?.[0] || null)}
+                className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-zinc-800 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-900/10"
+              />
+              <p id="imp-json-file-hint" className="sr-only">
+                Escolha um ficheiro JSON exportado do Lovable ou com a mesma estrutura de lista de artigos.
+              </p>
+              {lovableJsonFileName && (
+                <p className="mt-1 text-xs text-zinc-600" role="status">
+                  Selecionado: {lovableJsonFileName}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={busy || !lovableJsonBase64}
+              onClick={() => void fetchLovableJsonBatch(true)}
+              className="inline-flex min-h-10 items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? "A processar…" : "Carregar lote"}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !lovableJsonBase64 || !lovableJsonHasMore}
+              onClick={() => void fetchLovableJsonBatch(false)}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Carregar próximo lote de artigos do JSON"
+            >
+              {busy ? "A carregar…" : `Próximo lote (${JSON_BATCH_SIZE})`}
+            </button>
+            <button
+              type="button"
+              disabled={busy || !lovableJsonBase64}
+              onClick={() => void fetchAllLovableJsonBatches()}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Carregar todos os lotes do JSON"
+            >
+              {busy ? "A carregar…" : "Carregar todos"}
+            </button>
+          </div>
+          {lovableJsonTotal > 0 && (
+            <p className="text-xs text-zinc-600" role="status">
+              Descobertos {lovableJsonTotal} artigo(s) no JSON. Carregados na lista: {rows.length}.{" "}
+              {lovableJsonHasMore ? "Há mais lotes disponíveis." : "Todos os lotes foram carregados."}
             </p>
           )}
         </section>
