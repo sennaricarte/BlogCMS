@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 const K_INTEGR = "blogcms-admin-integration";
 const K_CMS = "blogcms-cms-target";
 const LS_REPLACE_EXISTING = "blogcms-import-replace-existing";
-const IMPORTER_UI_VERSION = "importador-ui 2026-05-01 · substituir-reimportação";
+const IMPORTER_UI_VERSION = "importador-ui 2026-05-01 · migrar-imagens-remotas-github";
 
 type IntegrationLs = { GITHUB_PERSONAL_TOKEN?: string };
 type CmsTargetLs = { githubRepoFullName?: string; branch?: string };
@@ -1057,6 +1057,70 @@ export function ContentImportPanel() {
     }
   };
 
+  const migrateRemoteBlogImages = async () => {
+    if (
+      !window.confirm(
+        "Isto vai analisar os artigos já existentes em src/content/blog no GitHub, descarregar imagens com URL externa (por exemplo Supabase), gravá-las em public/assets/blog e atualizar os ficheiros .md com commits separados. Pode demorar vários minutos. Continuar?",
+      )
+    ) {
+      return;
+    }
+    setMessage(null);
+    const integ = readLs<IntegrationLs>(K_INTEGR);
+    const target = readLs<CmsTargetLs>(K_CMS);
+    const token = integ?.GITHUB_PERSONAL_TOKEN?.trim();
+    const githubRepoFullName = target?.githubRepoFullName?.trim();
+    if (!token || !githubRepoFullName) {
+      setMessage({
+        text: "Configura o token GitHub e o repositório em /admin/settings/ (integração e alvo do CMS).",
+        err: true,
+      });
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/cms/migrate-remote-blog-images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          GITHUB_PERSONAL_TOKEN: token,
+          githubRepoFullName,
+          branch: (target.branch || "main").trim() || "main",
+          maxPosts: 200,
+        }),
+      });
+      let j: {
+        ok?: boolean;
+        message?: string;
+        postsScanned?: number;
+        postsUpdated?: number;
+        imagesMigrated?: number;
+        errors?: Array<{ path: string; error: string }>;
+        error?: string;
+      };
+      try {
+        j = (await res.json()) as typeof j;
+      } catch {
+        setMessage({ text: `Resposta inválida (HTTP ${res.status}).`, err: true });
+        return;
+      }
+      const errLines =
+        Array.isArray(j.errors) && j.errors.length > 0
+          ? " Detalhes: " + j.errors.map((e) => `${e.path}: ${e.error}`).join(" | ")
+          : "";
+      const postsUpdated = j.postsUpdated ?? 0;
+      setMessage({
+        text: (j.message || j.error || (res.ok ? "Operação concluída." : `Erro HTTP ${res.status}.`)) + errLines,
+        err: !res.ok || (!j.ok && postsUpdated === 0),
+      });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : "Falha de rede.", err: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const selectedCount = rows.filter((r) => r.selected).length;
 
   return (
@@ -1064,6 +1128,41 @@ export function ContentImportPanel() {
       <p className="text-xs text-zinc-500" role="status" aria-label="Versão da interface do importador">
         Versão do importador: <code className="rounded bg-zinc-100 px-1">{IMPORTER_UI_VERSION}</code>
       </p>
+
+      <section
+        aria-labelledby="migrate-remote-images-heading"
+        className="space-y-3 rounded-lg border border-violet-200 bg-violet-50/90 px-4 py-4"
+      >
+        <h2 id="migrate-remote-images-heading" className="text-sm font-semibold text-violet-950">
+          Migrar imagens remotas (artigos já no GitHub)
+        </h2>
+        <p className="text-xs text-violet-900/95">
+          Varre os <code className="rounded bg-violet-100/80 px-1">.md</code> em{" "}
+          <code className="rounded bg-violet-100/80 px-1">src/content/blog</code> do repositório configurado. URLs de imagens
+          externas (por exemplo <code className="rounded bg-violet-100/80 px-1">*.supabase.co</code>) são descarregadas e
+          guardadas em <code className="rounded bg-violet-100/80 px-1">public/assets/blog</code>; o Markdown e o destaque
+          passam a apontar para caminhos locais. Usa o mesmo token e repositório das{" "}
+          <a className="font-medium underline underline-offset-2" href="/admin/settings/">
+            Configurações
+          </a>
+          .
+        </p>
+        <button
+          type="button"
+          disabled={busy || !credsOk}
+          onClick={() => void migrateRemoteBlogImages()}
+          aria-disabled={busy || !credsOk}
+          title={
+            !credsOk
+              ? "Configure o token GitHub e o repositório nas Configurações."
+              : "Analisa até 200 ficheiros por execução."
+          }
+          className="inline-flex min-h-10 items-center justify-center rounded-md bg-violet-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-900 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? "A migrar imagens…" : "Varrer e migrar imagens no repositório"}
+        </button>
+      </section>
+
       {!credsOk && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
           Para gravar no GitHub, define o token e o repositório em{" "}
