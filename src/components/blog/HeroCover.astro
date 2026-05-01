@@ -1,11 +1,51 @@
 ---
-import { type ImageMetadata } from "astro:assets";
+import { isSafeEditorImageRepoRelPath } from "../../lib/admin-editor-image-urls";
 import { isHeroPublicAssetPath, isHeroRemoteUrl } from "../../lib/blog-hero-display";
 import BlogImage from "./BlogImage.astro";
 
+/** Cabeçalho devolvido por `import.meta.glob` / `image()` (campos usados pelo componente Image). */
+type BlogHeroAssetMeta = {
+  src: string;
+  width: number;
+  height: number;
+  format: string;
+};
+
+const blogHeroModules = import.meta.glob<{ default: BlogHeroAssetMeta }>(
+  "../../assets/blog/**/*.{jpeg,jpg,png,gif,webp,svg,avif}",
+  { eager: true, import: "default" },
+);
+
+function resolveRepoRelativeHeroMeta(src: string): BlogHeroAssetMeta | null {
+  const dec = decodeURIComponent(src.trim());
+  const m = /^\.\.\/\.\.\/assets\/blog\/([^?#]+)$/i.exec(dec);
+  if (!m?.[1] || !isSafeEditorImageRepoRelPath(m[1])) {
+    return null;
+  }
+  const rel = m[1];
+  const exact = `../../assets/blog/${rel}`;
+  const direct = blogHeroModules[exact]?.default;
+  if (direct) {
+    return direct;
+  }
+  const tail = rel.includes("/") ? rel.split("/").pop() ?? rel : rel;
+  for (const [path, mod] of Object.entries(blogHeroModules)) {
+    if (path.endsWith(`/${rel}`) || path.endsWith(`/${tail}`)) {
+      return mod.default;
+    }
+  }
+  return null;
+}
+
+/** Metadados de imagem da coleção (image()) ou caminho / URL em string. */
+type HeroSrc =
+  | BlogHeroAssetMeta
+  | string
+  | { src: string; width: number; height: number; format: string };
+
 export interface Props {
-  /** Coleção (`ImageMetadata`), URL remota, legado `/assets/…` em `public/` ou `../../assets/blog/…` (caso normal). */
-  src: ImageMetadata | string;
+  /** Coleção (`image()`), URL remota, legado `/assets/…` em `public/` ou `../../assets/blog/…` (caso normal). */
+  src: HeroSrc;
   alt: string;
   width: number;
   height: number;
@@ -19,22 +59,44 @@ export interface Props {
 }
 
 const props = Astro.props as Props;
-const usePlainImg = isHeroRemoteUrl(props.src) || isHeroPublicAssetPath(props.src);
+const plainHeroSrc =
+  typeof props.src === "string" &&
+  (isHeroRemoteUrl(props.src) || isHeroPublicAssetPath(props.src))
+    ? props.src
+    : null;
+const usePlainImg = plainHeroSrc !== null;
+const repoHeroMeta =
+  typeof props.src === "string" && !usePlainImg ? resolveRepoRelativeHeroMeta(props.src) : null;
+const imgLoading: "eager" | "lazy" =
+  props.loading === "eager" ? "eager" : props.loading === "lazy" ? "lazy" : props.priority ? "eager" : "lazy";
 ---
 
 {
   usePlainImg ? (
     <img
-      src={props.src}
+      src={plainHeroSrc!}
       alt={props.alt}
       width={props.width}
       height={props.height}
       class={props.class}
-      loading={props.loading ?? (props.priority ? "eager" : "lazy")}
+      loading={imgLoading}
       fetchpriority={props.fetchpriority ?? (props.priority ? "high" : "low")}
       decoding={props.decoding ?? "async"}
     />
+  ) : repoHeroMeta ? (
+    <BlogImage {...props} src={repoHeroMeta as never} />
+  ) : typeof props.src === "object" && props.src !== null ? (
+    <BlogImage {...props} src={props.src as never} />
   ) : (
-    <BlogImage {...props} src={props.src as ImageMetadata} />
+    <img
+      src={props.src as string}
+      alt={props.alt}
+      width={props.width}
+      height={props.height}
+      class={props.class}
+      loading={imgLoading}
+      fetchpriority={props.fetchpriority ?? (props.priority ? "high" : "low")}
+      decoding={props.decoding ?? "async"}
+    />
   )
 }

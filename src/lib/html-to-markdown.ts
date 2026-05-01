@@ -232,5 +232,17 @@ export function htmlToMarkdown(html: string): string {
     md = md.split(token).join(`\n\n${chunk}\n\n`);
   }
   md = normalizeLegacyBlogPostMarkdownLinks(md);
+  md = normalizeMarkdownAbsoluteAssetImageUrls(md);
   return md.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Reduz `![](https://site/assets/blog/x)` para `](/assets/blog/x)` ao gravar (consistente com o site). */
+function normalizeMarkdownAbsoluteAssetImageUrls(md: string): string {
+  if (!md || (!md.includes("https://") && !md.includes("http://"))) {
+    return md;
+  }
+  let s = md;
+  s = s.replace(/\]\(https?:\/\/[^/]+\/assets\/blog\/([^)\]\s]+)\)/gi, "](/assets/blog/$1)");
+  s = s.replace(/\]\(https?:\/\/[^/]+\/assets\/cms\/([^)\]\s]+)\)/gi, "](/assets/cms/$1)");
+  return s;
 }

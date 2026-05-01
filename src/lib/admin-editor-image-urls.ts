@@ -74,6 +74,16 @@ function tryRepoDisplaySrc(src: string): string | null {
     return repoAssetForRelPath("cms", cms[1]);
   }
 
+  const absBlog = /^https?:\/\/[^/?#]+\/assets\/blog\/([^?"#]+)$/i.exec(dec);
+  if (absBlog?.[1] && isSafeEditorImageRepoRelPath(absBlog[1])) {
+    return repoAssetForRelPath("blog-public", absBlog[1]);
+  }
+
+  const absCms = /^https?:\/\/[^/?#]+\/assets\/cms\/([^?"#]+)$/i.exec(dec);
+  if (absCms?.[1] && isSafeEditorImageRepoRelPath(absCms[1])) {
+    return repoAssetForRelPath("cms", absCms[1]);
+  }
+
   return null;
 }
 
