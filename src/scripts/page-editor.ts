@@ -200,7 +200,13 @@ async function onSave() {
     } else if (newSlug !== origSlug) {
       window.location.href = "/admin/pages/edit/" + newSlug + "/";
     } else {
-      setMsg("Salvo no GitHub.", false);
+      const isDraft = Boolean(el<HTMLInputElement>("p-draft")?.checked);
+      setMsg(
+        isDraft
+          ? "Salvo no GitHub. Com «Rascunho» activo, /p/… em produção continua em 404 até publicares."
+          : "Salvo no GitHub. A URL pública só reflecte a alteração depois do deploy na Vercel (e com rascunho desmarcado).",
+        false,
+      );
     }
   } catch {
     setMsg("Falha de rede.", true);
