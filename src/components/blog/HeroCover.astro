@@ -1,22 +1,19 @@
 ---
+import { getImage } from "astro:assets";
 import { isSafeEditorImageRepoRelPath } from "../../lib/admin-editor-image-urls";
 import { isHeroPublicAssetPath, isHeroRemoteUrl } from "../../lib/blog-hero-display";
-import BlogImage from "./BlogImage.astro";
 
-/** Cabeçalho devolvido por `import.meta.glob` / `image()` (campos usados pelo componente Image). */
-type BlogHeroAssetMeta = {
-  src: string;
-  width: number;
-  height: number;
-  format: string;
-};
+/**
+ * URLs finais (build: `/_astro/...`) para ficheiros em `src/assets/blog/`.
+ * Usar `?url` evita o default de SVG como componente / formato incompatível com `<Image>`.
+ */
+const blogHeroUrls = import.meta.glob<string>("../../assets/blog/**/*.{jpeg,jpg,png,gif,webp,svg,avif}", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
 
-const blogHeroModules = import.meta.glob<{ default: BlogHeroAssetMeta }>(
-  "../../assets/blog/**/*.{jpeg,jpg,png,gif,webp,svg,avif}",
-  { eager: true, import: "default" },
-);
-
-function resolveRepoRelativeHeroMeta(src: string): BlogHeroAssetMeta | null {
+function resolveRepoRelativeHeroUrl(src: string): string | null {
   const dec = decodeURIComponent(src.trim());
   const m = /^\.\.\/\.\.\/assets\/blog\/([^?#]+)$/i.exec(dec);
   if (!m?.[1] || !isSafeEditorImageRepoRelPath(m[1])) {
@@ -24,24 +21,24 @@ function resolveRepoRelativeHeroMeta(src: string): BlogHeroAssetMeta | null {
   }
   const rel = m[1];
   const exact = `../../assets/blog/${rel}`;
-  const direct = blogHeroModules[exact]?.default;
+  const direct = blogHeroUrls[exact];
   if (direct) {
     return direct;
   }
   const tail = rel.includes("/") ? rel.split("/").pop() ?? rel : rel;
-  for (const [path, mod] of Object.entries(blogHeroModules)) {
+  for (const [path, href] of Object.entries(blogHeroUrls)) {
     if (path.endsWith(`/${rel}`) || path.endsWith(`/${tail}`)) {
-      return mod.default;
+      return href;
     }
   }
   return null;
 }
 
-/** Metadados de imagem da coleção (image()) ou caminho / URL em string. */
+/** Metadados de imagem da coleção (`image()`), URL ou caminho repo-relative em string. */
 type HeroSrc =
-  | BlogHeroAssetMeta
   | string
-  | { src: string; width: number; height: number; format: string };
+  | { src: string; width: number; height: number; format: string }
+  | (() => unknown);
 
 export interface Props {
   /** Coleção (`image()`), URL remota, legado `/assets/…` em `public/` ou `../../assets/blog/…` (caso normal). */
@@ -60,43 +57,76 @@ export interface Props {
 
 const props = Astro.props as Props;
 const plainHeroSrc =
-  typeof props.src === "string" &&
-  (isHeroRemoteUrl(props.src) || isHeroPublicAssetPath(props.src))
+  typeof props.src === "string" && (isHeroRemoteUrl(props.src) || isHeroPublicAssetPath(props.src))
     ? props.src
     : null;
 const usePlainImg = plainHeroSrc !== null;
-const repoHeroMeta =
-  typeof props.src === "string" && !usePlainImg ? resolveRepoRelativeHeroMeta(props.src) : null;
+const repoHeroUrl =
+  typeof props.src === "string" && !usePlainImg ? resolveRepoRelativeHeroUrl(props.src) : null;
+
 const imgLoading: "eager" | "lazy" =
   props.loading === "eager" ? "eager" : props.loading === "lazy" ? "lazy" : props.priority ? "eager" : "lazy";
+const fetchPr = props.fetchpriority ?? (props.priority ? "high" : "low");
+
+let collectionImg: Awaited<ReturnType<typeof getImage>> | null = null;
+const src = props.src as unknown;
+if (typeof src === "function") {
+  try {
+    collectionImg = await getImage({
+      src: src as never,
+      width: props.width,
+      height: props.height,
+      ...(props.quality != null ? { quality: props.quality } : {}),
+    });
+  } catch {
+    collectionImg = null;
+  }
+} else if (typeof src === "object" && src !== null && !Array.isArray(src)) {
+  try {
+    collectionImg = await getImage({
+      src: src as never,
+      width: props.width,
+      height: props.height,
+      ...(props.quality != null ? { quality: props.quality } : {}),
+    });
+  } catch {
+    collectionImg = null;
+  }
+}
+
+const commonImg = {
+  alt: props.alt,
+  width: props.width,
+  height: props.height,
+  class: props.class,
+  loading: imgLoading,
+  fetchpriority: fetchPr,
+  decoding: props.decoding ?? "async",
+  sizes: props.sizes,
+} as const;
 ---
 
 {
   usePlainImg ? (
+    <img src={plainHeroSrc!} {...commonImg} />
+  ) : repoHeroUrl ? (
+    <img src={repoHeroUrl} {...commonImg} />
+  ) : collectionImg ? (
     <img
-      src={plainHeroSrc!}
+      src={collectionImg.src}
       alt={props.alt}
       width={props.width}
       height={props.height}
       class={props.class}
       loading={imgLoading}
-      fetchpriority={props.fetchpriority ?? (props.priority ? "high" : "low")}
+      fetchpriority={fetchPr}
       decoding={props.decoding ?? "async"}
+      sizes={props.sizes}
+      {...(collectionImg.attributes.srcset
+        ? { srcset: collectionImg.attributes.srcset }
+        : {})}
     />
-  ) : repoHeroMeta ? (
-    <BlogImage {...props} src={repoHeroMeta as never} />
-  ) : typeof props.src === "object" && props.src !== null ? (
-    <BlogImage {...props} src={props.src as never} />
-  ) : (
-    <img
-      src={props.src as string}
-      alt={props.alt}
-      width={props.width}
-      height={props.height}
-      class={props.class}
-      loading={imgLoading}
-      fetchpriority={props.fetchpriority ?? (props.priority ? "high" : "low")}
-      decoding={props.decoding ?? "async"}
-    />
-  )
+  ) : typeof props.src === "string" ? (
+    <img src={props.src} {...commonImg} />
+  ) : null
 }
