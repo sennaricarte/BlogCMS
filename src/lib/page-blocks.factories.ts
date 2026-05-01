@@ -16,7 +16,8 @@ export function createDefaultBlock(type: PageBlock["type"]): PageBlock {
         id: newId(),
         type: "hero",
         title: "Título da secção",
-        subtitle: "Subtítulo ou descrição curta.",
+        description: "Subtítulo ou descrição curta.",
+        subtitle: undefined,
       };
     case "contactForm":
       return {

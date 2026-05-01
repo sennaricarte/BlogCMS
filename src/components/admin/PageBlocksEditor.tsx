@@ -21,13 +21,79 @@ import {
 import { buildDefaultContactPageTemplate } from "../../lib/page-templates";
 import type { PageBlock } from "../../lib/page-blocks.zod";
 
+type HeroBlock = Extract<PageBlock, { type: "hero" }>;
+type HeroLayout = NonNullable<HeroBlock["layout"]>;
+
+function heroLayoutLabel(layout: string | undefined): string {
+  switch (layout) {
+    case "splitImageLeft":
+      return "Img ← texto";
+    case "splitImageRight":
+      return "Texto ← img";
+    case "centered":
+      return "Centrado";
+    case "classic":
+    default:
+      return "Clássico";
+  }
+}
+
+/** Textos de exemplo alinhados aos wireframes (substituir no site). */
+function fillHeroModel(layout: HeroLayout, block: HeroBlock): HeroBlock {
+  const phDefault =
+    "Texto de apoio em duas ou três frases sobre a tua oferta ou empresa. Edita para o teu contexto.";
+  if (layout === "centered") {
+    return {
+      ...block,
+      layout: "centered",
+      tagline: "Slogan ou etiqueta",
+      title: "Título principal moderado que pode ocupar duas linhas",
+      description: phDefault,
+      subtitle: undefined,
+      imageSrc: undefined,
+      imageAlt: undefined,
+      primaryButton: { label: "Botão principal", url: "#" },
+      secondaryButton: { label: "Botão secundário", url: "#" },
+    };
+  }
+  if (layout === "splitImageLeft" || layout === "splitImageRight") {
+    return {
+      ...block,
+      layout,
+      tagline: undefined,
+      title: "Título de destaque em duas linhas, como no modelo",
+      description: phDefault,
+      subtitle: undefined,
+      imageSrc: "/favicon.svg",
+      imageAlt: "Imagem ou ilustração do hero",
+      primaryButton: { label: "Botão principal", url: "#" },
+      secondaryButton: { label: "Botão secundário", url: "#" },
+    };
+  }
+  if (layout === "classic") {
+    return {
+      ...block,
+      layout: undefined,
+      tagline: undefined,
+      title: block.title?.trim() || "Título da secção",
+      description: phDefault,
+      subtitle: undefined,
+      imageSrc: undefined,
+      imageAlt: undefined,
+      primaryButton: undefined,
+      secondaryButton: undefined,
+    };
+  }
+  return block;
+}
+
 const BTNS: Array<{
   type: PageBlock["type"];
   label: string;
   description: string;
   icon: typeof Heading;
 }> = [
-  { type: "hero", label: "Título de página", description: "Hero", icon: Heading },
+  { type: "hero", label: "Hero", description: "Clássico · 2 colunas · centrado", icon: Heading },
   { type: "contactForm", label: "Formulário de contacto", description: "Nome, e-mail, assunto, mensagem", icon: Mail },
   { type: "linksList", label: "Lista de links", description: "Botões (estilo link tree)", icon: List },
   { type: "faq", label: "FAQ (SEO)", description: "Perguntas e respostas + schema", icon: HelpCircle },
@@ -41,7 +107,11 @@ const BTNS: Array<{
 ];
 
 function blockSummary(b: PageBlock): string {
-  if (b.type === "hero") return b.title.slice(0, 48) + (b.title.length > 48 ? "…" : "");
+  if (b.type === "hero") {
+    const kind = heroLayoutLabel(b.layout);
+    const t = b.title.slice(0, 40) + (b.title.length > 40 ? "…" : "");
+    return `${kind} · ${t}`;
+  }
   if (b.type === "contactForm") return (b.title || "Formulário").slice(0, 48);
   if (b.type === "linksList") return `${b.links.length} botão(ões)` + (b.title ? ` · ${b.title}` : "");
   if (b.type === "faq")
@@ -65,7 +135,7 @@ function blockSummary(b: PageBlock): string {
 }
 
 function blockKindLabel(b: PageBlock): string {
-  if (b.type === "hero") return "Título de página";
+  if (b.type === "hero") return "Hero";
   if (b.type === "contactForm") return "Formulário de contacto";
   if (b.type === "linksList") return "Lista de links";
   if (b.type === "faq") return "FAQ (SEO)";
@@ -116,18 +186,175 @@ function BlockFields({ block, onChange }: { block: PageBlock; onChange: (b: Page
   const id = block.id;
 
   if (block.type === "hero") {
+    const layout = block.layout ?? "classic";
+    const bodyValue = (block.description || block.subtitle || "").trim();
+    const showImageFields = layout === "splitImageLeft" || layout === "splitImageRight";
+    const showTagline = layout === "centered";
+
     return (
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="space-y-4">
+        <div>
+          <p className="text-xs font-medium text-slate-600">Modelos (wireframe)</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Cada botão aplica o layout e textos de exemplo; ajusta URLs e imagem a seguir.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(
+              [
+                ["classic", "Clássico"] as const,
+                ["splitImageLeft", "Img à esquerda"] as const,
+                ["splitImageRight", "Img à direita"] as const,
+                ["centered", "Centrado"] as const,
+              ]
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 hover:border-[var(--client-color-primary)] hover:bg-white"
+                onClick={() => onChange(fillHeroModel(key, block))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor={`${id}-layout`} className="block text-xs font-medium text-slate-600">
+            Layout actual
+          </label>
+          <select
+            id={`${id}-layout`}
+            value={layout}
+            onChange={(e) => {
+              const v = e.target.value as HeroLayout;
+              onChange({ ...block, layout: v === "classic" ? undefined : v });
+            }}
+            className="mt-0.5 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm"
+          >
+            <option value="classic">Clássico — caixa com título e texto</option>
+            <option value="splitImageLeft">Duas colunas — imagem à esquerda</option>
+            <option value="splitImageRight">Duas colunas — imagem à direita</option>
+            <option value="centered">Centrado — slogan, título e botões</option>
+          </select>
+        </div>
+
+        {showTagline && (
+          <InputRow
+            id={`${id}-tag`}
+            label="Slogan ou etiqueta (linha pequena acima do título)"
+            value={block.tagline || ""}
+            onChange={(tagline) => onChange({ ...block, tagline: tagline.trim() ? tagline : undefined })}
+          />
+        )}
+
         <div className="sm:col-span-2">
           <InputRow id={`${id}-t`} label="Título" value={block.title} onChange={(title) => onChange({ ...block, title })} />
         </div>
-        <div className="sm:col-span-2">
-          <InputRow
-            id={`${id}-s`}
-            label="Subtítulo (opcional)"
-            value={block.subtitle || ""}
-            onChange={(subtitle) => onChange({ ...block, subtitle: subtitle || undefined })}
+
+        <div>
+          <label htmlFor={`${id}-desc`} className="block text-xs font-medium text-slate-600">
+            Texto de apoio (parágrafo)
+          </label>
+          <textarea
+            id={`${id}-desc`}
+            value={bodyValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              onChange({
+                ...block,
+                description: v.trim() ? v : undefined,
+                subtitle: undefined,
+              });
+            }}
+            rows={layout === "centered" ? 4 : 3}
+            className="mt-0.5 w-full rounded border border-slate-200 px-2 py-1.5 text-sm"
+            placeholder="Descrição ou subtítulo visível no hero."
           />
+          {layout === "classic" && !block.description && (
+            <p className="mt-1 text-xs text-slate-400">Em páginas antigas, o campo «subtítulo» foi unificado aqui ao gravar.</p>
+          )}
+        </div>
+
+        {showImageFields && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <InputRow
+                id={`${id}-img`}
+                label="URL ou caminho da imagem (ex. /media/foto.jpg)"
+                value={block.imageSrc || ""}
+                onChange={(imageSrc) => onChange({ ...block, imageSrc: imageSrc.trim() ? imageSrc : undefined })}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <InputRow
+                id={`${id}-imgalt`}
+                label="Texto alternativo (alt)"
+                value={block.imageAlt || ""}
+                onChange={(imageAlt) => onChange({ ...block, imageAlt: imageAlt.trim() ? imageAlt : undefined })}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+          <p className="text-xs font-medium text-slate-600">Botões (opcional)</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <InputRow
+              id={`${id}-p1`}
+              label="Botão principal — texto"
+              value={block.primaryButton?.label || ""}
+              onChange={(label) =>
+                onChange({
+                  ...block,
+                  primaryButton: label.trim()
+                    ? { label, url: block.primaryButton?.url || "#" }
+                    : undefined,
+                })
+              }
+            />
+            <InputRow
+              id={`${id}-u1`}
+              label="Botão principal — URL"
+              value={block.primaryButton?.url || ""}
+              onChange={(url) =>
+                onChange({
+                  ...block,
+                  primaryButton:
+                    block.primaryButton?.label || url.trim()
+                      ? { label: block.primaryButton?.label || "Botão", url: url.trim() || "#" }
+                      : undefined,
+                })
+              }
+            />
+            <InputRow
+              id={`${id}-p2`}
+              label="Botão secundário — texto"
+              value={block.secondaryButton?.label || ""}
+              onChange={(label) =>
+                onChange({
+                  ...block,
+                  secondaryButton: label.trim()
+                    ? { label, url: block.secondaryButton?.url || "#" }
+                    : undefined,
+                })
+              }
+            />
+            <InputRow
+              id={`${id}-u2`}
+              label="Botão secundário — URL"
+              value={block.secondaryButton?.url || ""}
+              onChange={(url) =>
+                onChange({
+                  ...block,
+                  secondaryButton:
+                    block.secondaryButton?.label || url.trim()
+                      ? { label: block.secondaryButton?.label || "Botão", url: url.trim() || "#" }
+                      : undefined,
+                })
+              }
+            />
+          </div>
         </div>
       </div>
     );

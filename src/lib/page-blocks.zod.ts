@@ -5,6 +5,11 @@ const linkButtonZod = z.object({
   url: z.string(),
 });
 
+const heroButtonZod = z.object({
+  label: z.string(),
+  url: z.string(),
+});
+
 const faqItemZod = z.object({
   question: z.string(),
   answer: z.string(),
@@ -15,8 +20,21 @@ export const pageBlockZod = z.discriminatedUnion("type", [
   z.object({
     id: z.string(),
     type: z.literal("hero"),
+    /**
+     * classic — título + subtítulo (legado).
+     * splitImageLeft — imagem à esquerda, texto e CTAs à direita.
+     * splitImageRight — texto e CTAs à esquerda, imagem à direita.
+     * centered — tagline, título, texto e CTAs centrados.
+     */
+    layout: z.enum(["classic", "splitImageLeft", "splitImageRight", "centered"]).optional(),
+    tagline: z.string().optional(),
     title: z.string(),
+    description: z.string().optional(),
     subtitle: z.string().optional(),
+    imageSrc: z.string().optional(),
+    imageAlt: z.string().optional(),
+    primaryButton: heroButtonZod.optional(),
+    secondaryButton: heroButtonZod.optional(),
   }),
   z.object({
     id: z.string(),

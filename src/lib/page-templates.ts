@@ -11,7 +11,8 @@ export function buildDefaultContactPageTemplate(): PageBlock[] {
       id: newBlockId(),
       type: "hero",
       title: "Entre em Contato",
-      subtitle: "Estamos prontos para tirar suas dúvidas e ajudar no seu projeto.",
+      description: "Estamos prontos para tirar suas dúvidas e ajudar no seu projeto.",
+      subtitle: undefined,
     },
     {
       id: newBlockId(),
