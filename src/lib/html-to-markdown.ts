@@ -1,5 +1,6 @@
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
+import { normalizeLegacyBlogPostMarkdownLinks } from "./blog-post-links";
 import { ADMIN_REPO_ASSET_PATH } from "./admin-editor-image-urls";
 import { MEDIA_MARKDOWN_RELATIVE_PREFIX, isRawGithubMediaPath } from "./github-raw-url";
 import { preprocessHtmlForTurndown } from "./html-preprocess-turndown";
@@ -230,5 +231,6 @@ export function htmlToMarkdown(html: string): string {
     if (!chunk) continue;
     md = md.split(token).join(`\n\n${chunk}\n\n`);
   }
+  md = normalizeLegacyBlogPostMarkdownLinks(md);
   return md.replace(/\n{3,}/g, "\n\n").trim();
 }

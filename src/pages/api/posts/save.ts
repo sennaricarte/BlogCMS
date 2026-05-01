@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import type { BlogFrontmatterInput } from "../../../lib/cms-matter";
 import { serializeBlogMarkdown } from "../../../lib/cms-matter";
+import { normalizeLegacyBlogPostMarkdownLinks } from "../../../lib/blog-post-links";
 import { GithubPublisher } from "../../../lib/github-service";
 import { parseOwnerRepo } from "../../../lib/github-repo-content";
 
@@ -76,7 +77,7 @@ export const POST: APIRoute = async ({ request }) => {
   if (d.category?.trim()) d.category = d.category.trim();
   else delete d.category;
 
-  const text = serializeBlogMarkdown(body.blog.body, d);
+  const text = serializeBlogMarkdown(normalizeLegacyBlogPostMarkdownLinks(body.blog.body), d);
   const publisher = new GithubPublisher({ token });
   const message = (body.message || "").trim() || "content(blog): guardar (CMS)";
 
