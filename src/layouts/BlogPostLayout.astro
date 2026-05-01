@@ -5,6 +5,7 @@ import type { CollectionEntry } from "astro:content";
 import HeroCover from "../components/blog/HeroCover.astro";
 import ArticleBreadcrumbs from "../components/seo/ArticleBreadcrumbs.astro";
 import siteConfig from "../data/site-config.json";
+import { isHeroPublicAssetPath, isHeroRemoteUrl } from "../lib/blog-hero-display";
 import { getCategoryDisplayName, getTagDisplayName, tagToSlug } from "../lib/taxonomies";
 import type { ClientConfig } from "../lib/publisher";
 import { buildBlogPostJsonLdGraph, getBreadcrumbItems } from "../lib/seo/blog-post-json-ld";
@@ -25,19 +26,21 @@ const siteBase =
   Astro.url.origin;
 const baseForUrl = siteBase.endsWith("/") ? siteBase : siteBase + "/";
 
-const heroIsRemoteUrl = typeof d.heroImage === "string" && /^https?:\/\//i.test(d.heroImage);
-const openGraphImageUrl = heroIsRemoteUrl
-  ? d.heroImage
-  : new URL(
-      (
-        await getImage({
-          src: d.heroImage as ImageMetadata,
-          width: 1200,
-          height: 630,
-        })
-      ).src,
-      baseForUrl,
-    ).toString();
+const hero = d.heroImage;
+const openGraphImageUrl = isHeroRemoteUrl(hero)
+  ? hero
+  : isHeroPublicAssetPath(hero)
+    ? new URL(hero.replace(/^\//, ""), baseForUrl).toString()
+    : new URL(
+        (
+          await getImage({
+            src: hero as ImageMetadata,
+            width: 1200,
+            height: 630,
+          })
+        ).src,
+        baseForUrl,
+      ).toString();
 
 const datePublished = d.pubDate.toISOString();
 const dateModified = (d.updatedDate ?? d.pubDate).toISOString();
