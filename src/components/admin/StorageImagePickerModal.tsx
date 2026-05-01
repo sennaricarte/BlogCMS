@@ -1,5 +1,6 @@
 import { Images, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { listCmsMediaFiles } from "../../lib/cms-media-upload";
 import { isImageFileName } from "../../lib/media-filename";
 
 type Item = { name: string; path: string; url: string };
@@ -13,7 +14,7 @@ type Props = {
 };
 
 /**
- * Escolhe uma imagem já existente no bucket (mesma origem que a Central de mídia).
+ * Escolhe uma imagem já existente em `public/assets/cms/` no repositório GitHub do cliente.
  */
 export function StorageImagePickerModal({ open, onClose, onSelect, title }: Props) {
   const [items, setItems] = useState<Item[]>([]);
@@ -25,15 +26,14 @@ export function StorageImagePickerModal({ open, onClose, onSelect, title }: Prop
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/media/list", { credentials: "same-origin" });
-      const j = (await res.json()) as { ok?: boolean; error?: string; items?: Item[] };
-      if (!j.ok) {
-        setErr(j.error || "Não foi possível carregar a biblioteca de imagens.");
+      const r = await listCmsMediaFiles();
+      if (!r.ok) {
+        setErr(r.error);
         setItems([]);
         return;
       }
       const out: Item[] = [];
-      for (const it of j.items || []) {
+      for (const it of r.items || []) {
         if (!it.name || !isImageFileName(it.name)) continue;
         out.push({ name: it.name, path: it.path, url: it.url });
       }

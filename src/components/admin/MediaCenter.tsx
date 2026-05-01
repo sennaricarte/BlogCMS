@@ -1,7 +1,7 @@
 import { ImagePlus, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminPagination } from "./AdminPagination";
-import { uploadCmsMediaFile } from "../../lib/cms-media-upload";
+import { uploadCmsMediaFile, listCmsMediaFiles } from "../../lib/cms-media-upload";
 import { isImageFileName } from "../../lib/media-filename";
 
 type ListItem = { name: string; path: string; url: string };
@@ -24,19 +24,14 @@ export function MediaCenter() {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/media/list", { credentials: "same-origin" });
-      const j = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        items?: ListItem[];
-      };
-      if (!j.ok) {
-        setErr(j.error || "Não foi possível carregar a biblioteca de imagens.");
+      const r = await listCmsMediaFiles();
+      if (!r.ok) {
+        setErr(r.error);
         setList([]);
         return;
       }
       const out: ListItem[] = [];
-      for (const it of j.items || []) {
+      for (const it of r.items || []) {
         if (!it.name || !isImageFileName(it.name)) {
           continue;
         }
@@ -119,8 +114,10 @@ export function MediaCenter() {
         </p>
       )}
       <p className="text-sm text-zinc-600">
-        As imagens são otimizadas automaticamente (tamanho e formato adequados à web) e ficam guardadas na biblioteca
-        do site, para reutilizares em artigos e noutros sítios do painel.
+        As imagens são optimizadas (tamanho WebP até 1920px; SVG mantém-se) e gravadas em{" "}
+        <code className="rounded bg-zinc-100 px-1 font-mono text-xs">public/assets/cms/</code> no repositório GitHub
+        configurado em Definições — o mesmo sítio que o deploy serve em{" "}
+        <code className="rounded bg-zinc-100 px-1 font-mono text-xs">/assets/cms/…</code>.
       </p>
 
       <div
@@ -154,7 +151,10 @@ export function MediaCenter() {
           />
           Escolher ficheiro
         </label>
-        <p className="mt-2 text-xs text-zinc-500">JPG/PNG são convertidos para WebP. O nome do ficheiro é sanitizado (apenas a-z, 0-9, hifens) antes do envio.</p>
+        <p className="mt-2 text-xs text-zinc-500">
+          JPG/PNG/GIF são normalmente convertidos para WebP. O ficheiro fica no GitHub do cliente após guardares também
+          o restante conteúdo que precises de publicar.
+        </p>
       </div>
 
       {upMsg && <p className="text-sm text-emerald-800">{upMsg}</p>}
@@ -203,7 +203,10 @@ export function MediaCenter() {
         </h2>
         {loading && <p className="mt-2 text-sm text-zinc-500">Carregando…</p>}
         {!loading && list.length === 0 && !err && (
-          <p className="mt-2 text-sm text-zinc-500">Ainda não há imagens no bucket ou a lista não pôde ser carregada.</p>
+          <p className="mt-2 text-sm text-zinc-500">
+            Ainda não há imagens em <span className="font-mono text-xs">public/assets/cms/</span> ou a pasta ainda não
+            existe — envia uma imagem acima.
+          </p>
         )}
         <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {pagedMedia.map((it) => (
