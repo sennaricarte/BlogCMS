@@ -1,11 +1,55 @@
+import { ADMIN_CMS_TARGET_KEY } from "./admin-cms-target";
+import { buildGitHubRawUrl } from "./github-raw-url";
+
 /**
  * No painel, o TipTap corre em URLs como `/admin/posts/edit/slug/`.
  * Caminhos `../../assets/blog/…` (válidos no .md para Astro) resolvem mal no browser → imagens partidas.
- * Reescreve temporariamente para `/api/admin/cms/repo-asset` (autenticado); o Turndown reverte ao gravar.
+ * Com {@link EditorImagePreviewContext}: reescreve-se para `raw.githubusercontent.com/…` (só visualização).
+ * Sem contexto: mantém `/api/admin/cms/repo-asset` (autenticado); o Turndown reverte ao gravar.
  *
  * `blog` → `src/assets/blog/` · `blog-public` → `public/assets/blog/` · `cms` → `public/assets/cms/`
  */
 export const ADMIN_REPO_ASSET_PATH = "/api/admin/cms/repo-asset";
+
+/** Dono/repo + ramo para montar URLs raw de pré-visualização no editor (não altera o Markdown guardado). */
+export type EditorImagePreviewContext = {
+  githubRepoFullName: string;
+  branch: string;
+};
+
+/**
+ * Lê o repositório alvo do CMS (localStorage) ou `PUBLIC_GITHUB_*` no build.
+ * Não exige token — só owner/repo para URLs públicas raw.
+ */
+export function readEditorImagePreviewContext(): EditorImagePreviewContext | null {
+  if (typeof localStorage !== "undefined") {
+    try {
+      const targetRaw = localStorage.getItem(ADMIN_CMS_TARGET_KEY);
+      if (targetRaw) {
+        const target = JSON.parse(targetRaw) as { githubRepoFullName?: string; branch?: string };
+        const githubRepoFullName = target.githubRepoFullName?.trim();
+        if (githubRepoFullName && !githubRepoFullName.includes("owner/")) {
+          return {
+            githubRepoFullName,
+            branch: (target.branch || "main").trim() || "main",
+          };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    const envRepo = import.meta.env.PUBLIC_GITHUB_REPO_FULL_NAME?.trim();
+    if (envRepo && !envRepo.includes("owner/")) {
+      const branch = import.meta.env.PUBLIC_GITHUB_BRANCH?.trim() || "main";
+      return { githubRepoFullName: envRepo, branch: branch || "main" };
+    }
+  } catch {
+    /* ignore — SSR */
+  }
+  return null;
+}
 
 /**
  * Caminho relativo seguro dentro de `src/assets/blog`, `public/assets/blog` ou `public/assets/cms`:
@@ -51,48 +95,80 @@ function repoAssetForRelPath(scope: "blog" | "blog-public" | "cms", relPath: str
   return `${ADMIN_REPO_ASSET_PATH}?scope=${scope}&file=${encodeURIComponent(relPath)}`;
 }
 
-function tryRepoDisplaySrc(src: string): string | null {
-  const dec = decodeSrcForMatch(src);
+type AssetKind = "src-blog" | "public-blog" | "cms";
 
+function matchEditorAssetSrc(dec: string): { kind: AssetKind; rel: string } | null {
   const ddot = /^\.\.\/\.\.\/assets\/blog\/([^?"#]+)$/i.exec(dec);
   if (ddot?.[1] && isSafeEditorImageRepoRelPath(ddot[1])) {
-    return repoAssetForRelPath("blog", ddot[1]);
+    return { kind: "src-blog", rel: ddot[1] };
   }
-
   const sdot = /^\.\.\/assets\/blog\/([^?"#]+)$/i.exec(dec);
   if (sdot?.[1] && isSafeEditorImageRepoRelPath(sdot[1])) {
-    return repoAssetForRelPath("blog", sdot[1]);
+    return { kind: "src-blog", rel: sdot[1] };
   }
-
   const blogPublic = /^\/assets\/blog\/([^?"#]+)$/i.exec(dec);
   if (blogPublic?.[1] && isSafeEditorImageRepoRelPath(blogPublic[1])) {
-    return repoAssetForRelPath("blog-public", blogPublic[1]);
+    return { kind: "public-blog", rel: blogPublic[1] };
   }
-
   const cms = /^\/assets\/cms\/([^?"#]+)$/i.exec(dec);
   if (cms?.[1] && isSafeEditorImageRepoRelPath(cms[1])) {
-    return repoAssetForRelPath("cms", cms[1]);
+    return { kind: "cms", rel: cms[1] };
   }
-
   const absBlog = /^https?:\/\/[^/?#]+\/assets\/blog\/([^?"#]+)$/i.exec(dec);
   if (absBlog?.[1] && isSafeEditorImageRepoRelPath(absBlog[1])) {
-    return repoAssetForRelPath("blog-public", absBlog[1]);
+    return { kind: "public-blog", rel: absBlog[1] };
   }
-
   const absCms = /^https?:\/\/[^/?#]+\/assets\/cms\/([^?"#]+)$/i.exec(dec);
   if (absCms?.[1] && isSafeEditorImageRepoRelPath(absCms[1])) {
-    return repoAssetForRelPath("cms", absCms[1]);
+    return { kind: "cms", rel: absCms[1] };
   }
-
   return null;
 }
 
-export function rewriteHtmlImagesForAdminEditor(html: string): string {
+function githubRawUrlForMatch(ctx: EditorImagePreviewContext, m: { kind: AssetKind; rel: string }): string | null {
+  try {
+    if (m.kind === "src-blog") {
+      return buildGitHubRawUrl(ctx.githubRepoFullName, ctx.branch, `src/assets/blog/${m.rel}`);
+    }
+    if (m.kind === "public-blog") {
+      return buildGitHubRawUrl(ctx.githubRepoFullName, ctx.branch, `public/assets/blog/${m.rel}`);
+    }
+    return buildGitHubRawUrl(ctx.githubRepoFullName, ctx.branch, `public/assets/cms/${m.rel}`);
+  } catch {
+    return null;
+  }
+}
+
+function repoAssetUrlForMatch(m: { kind: AssetKind; rel: string }): string {
+  if (m.kind === "src-blog") {
+    return repoAssetForRelPath("blog", m.rel);
+  }
+  if (m.kind === "public-blog") {
+    return repoAssetForRelPath("blog-public", m.rel);
+  }
+  return repoAssetForRelPath("cms", m.rel);
+}
+
+function tryRepoDisplaySrc(src: string, preview: EditorImagePreviewContext | null | undefined): string | null {
+  const dec = decodeSrcForMatch(src);
+  const hit = matchEditorAssetSrc(dec);
+  if (!hit) return null;
+  if (preview) {
+    const raw = githubRawUrlForMatch(preview, hit);
+    if (raw) return raw;
+  }
+  return repoAssetUrlForMatch(hit);
+}
+
+export function rewriteHtmlImagesForAdminEditor(
+  html: string,
+  previewContext?: EditorImagePreviewContext | null,
+): string {
   if (!html || !html.toLowerCase().includes("<img")) return html;
   return html.replace(/<img\b([^>]*?)\s*\/?>/gi, (_full, attrs: string) => {
     const sm = matchImgSrcAttr(attrs);
     if (!sm) return `<img${attrs}>`;
-    const displaySrc = tryRepoDisplaySrc(sm.raw);
+    const displaySrc = tryRepoDisplaySrc(sm.raw, previewContext);
     if (!displaySrc) return `<img${attrs}>`;
     const newAttrs =
       attrs.slice(0, sm.start) + `src=${sm.quote}${displaySrc}${sm.quote}` + attrs.slice(sm.start + sm.len);

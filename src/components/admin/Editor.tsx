@@ -11,6 +11,11 @@ import { uploadCmsMediaFile } from "../../lib/cms-media-upload";
 import { cleanPastedHtml } from "../../lib/docs-paste";
 import { htmlToMarkdown } from "../../lib/html-to-markdown";
 import { markdownToHtmlForEditor } from "../../lib/markdown-to-html";
+import {
+  readEditorImagePreviewContext,
+  rewriteHtmlImagesForAdminEditor,
+  type EditorImagePreviewContext,
+} from "../../lib/admin-editor-image-urls";
 import { fixNextImageWithoutAlt, promptAltRequired } from "./image-alt-utils";
 import { MediaGalleryModal } from "./MediaGalleryModal";
 import { MenuBar } from "./MenuBar";
@@ -27,13 +32,28 @@ export type EditorProps = {
    * @default 120
    */
   markdownDebounceMs?: number;
+  /**
+   * Sobrepõe repo/ramo para URLs raw de pré-visualização. Por omissão: localStorage (`blogcms-cms-target`)
+   * ou `PUBLIC_GITHUB_REPO_FULL_NAME` / `PUBLIC_GITHUB_BRANCH`.
+   */
+  imagePreviewContext?: EditorImagePreviewContext | null;
 };
 
 const EMPTY_MD = "";
 const DEFAULT_MD_DEBOUNCE = 120;
 
-function buildTiptapContent(initialMarkdown: string | undefined): string {
-  return markdownToHtmlForEditor(initialMarkdown ?? EMPTY_MD);
+function resolveImagePreviewContext(
+  prop: EditorImagePreviewContext | null | undefined,
+): EditorImagePreviewContext | null | undefined {
+  if (prop !== undefined) return prop;
+  return readEditorImagePreviewContext();
+}
+
+function buildTiptapContent(
+  initialMarkdown: string | undefined,
+  preview: EditorImagePreviewContext | null | undefined,
+): string {
+  return markdownToHtmlForEditor(initialMarkdown ?? EMPTY_MD, preview ?? undefined);
 }
 
 /**
@@ -41,7 +61,12 @@ function buildTiptapContent(initialMarkdown: string | undefined): string {
  * no Astro (`client:load`) sem aceder a `document` no 1.º passo. Não utilizar `useEffect` extra para
  * “só no cliente”: dessincronizava a hidratação e deixava o texto “A carregar editor…” para sempre.
  */
-export function Editor({ initialMarkdown = "", onChange, markdownDebounceMs = DEFAULT_MD_DEBOUNCE }: EditorProps) {
+export function Editor({
+  initialMarkdown = "",
+  onChange,
+  markdownDebounceMs = DEFAULT_MD_DEBOUNCE,
+  imagePreviewContext,
+}: EditorProps) {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [mediaUploadBusy, setMediaUploadBusy] = useState(false);
   const mediaUploadBusyRef = useRef(false);
@@ -73,7 +98,7 @@ export function Editor({ initialMarkdown = "", onChange, markdownDebounceMs = DE
 
   const initialContentRef = useRef<string | null>(null);
   if (initialContentRef.current === null) {
-    initialContentRef.current = buildTiptapContent(initialMarkdown);
+    initialContentRef.current = buildTiptapContent(initialMarkdown, resolveImagePreviewContext(imagePreviewContext));
   }
 
   /**
@@ -146,7 +171,13 @@ export function Editor({ initialMarkdown = "", onChange, markdownDebounceMs = DE
         "aria-label": "Corpo do artigo",
         spellCheck: "true" as const,
       },
-      transformPastedHTML: (html: string) => cleanPastedHtml(html),
+      transformPastedHTML: (html: string) => {
+        const cleaned = cleanPastedHtml(html);
+        return rewriteHtmlImagesForAdminEditor(
+          cleaned,
+          resolveImagePreviewContext(imagePreviewContext) ?? undefined,
+        );
+      },
       handlePaste: (_view: unknown, event: ClipboardEvent) => {
         const ed = editorRef.current;
         if (!ed) return false;

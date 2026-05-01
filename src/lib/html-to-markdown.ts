@@ -2,7 +2,7 @@ import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import { normalizeLegacyBlogPostMarkdownLinks } from "./blog-post-links";
 import { ADMIN_REPO_ASSET_PATH } from "./admin-editor-image-urls";
-import { MEDIA_MARKDOWN_RELATIVE_PREFIX, isRawGithubMediaPath } from "./github-raw-url";
+import { githubRawAssetToMarkdownRelative, isRawGithubBlogOrCmsPreviewUrl, MEDIA_MARKDOWN_RELATIVE_PREFIX, isRawGithubMediaPath } from "./github-raw-url";
 import { preprocessHtmlForTurndown } from "./html-preprocess-turndown";
 
 const turndown = new TurndownService({
@@ -115,6 +115,24 @@ turndown.addRule("imgRepoAssetPreviewToRelative", {
       /* ignore */
     }
     return `![${alt}](${src})`;
+  },
+});
+
+/** Pré-visualização raw GitHub (editor): reverte para `/assets/blog/…`, `../../assets/blog/…` ou `/assets/cms/…`. */
+turndown.addRule("imgGithubRawBlogCmsToRelative", {
+  filter: (node) => {
+    if (node.nodeName !== "IMG") return false;
+    const el = node as unknown as HTMLImageElement;
+    const href = (el.getAttribute("src") || "").trim();
+    return isRawGithubBlogOrCmsPreviewUrl(href);
+  },
+  replacement: (content, node) => {
+    const el = node as unknown as HTMLImageElement;
+    const href = (el.getAttribute("src") || "").trim();
+    const alt = (el.getAttribute("alt") || content || "").trim() || "Imagem";
+    const rel = githubRawAssetToMarkdownRelative(href);
+    if (!rel) return `![${alt}](${href})`;
+    return `![${alt}](${rel})`;
   },
 });
 
