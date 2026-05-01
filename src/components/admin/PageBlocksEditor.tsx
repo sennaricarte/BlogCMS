@@ -20,7 +20,21 @@ import {
 } from "lucide-react";
 import { buildDefaultContactPageTemplate } from "../../lib/page-templates";
 import { createDefaultBlock } from "../../lib/page-blocks";
+import { fileToBase64Content } from "../../lib/cms-media-upload";
 import type { PageBlock } from "../../lib/page-blocks.zod";
+
+const K_INTEGR = "blogcms-admin-integration";
+const K_CMS = "blogcms-cms-target";
+
+function readPageEditorLs<T>(key: string): T | null {
+  try {
+    const r = localStorage.getItem(key);
+    if (!r) return null;
+    return JSON.parse(r) as T;
+  } catch {
+    return null;
+  }
+}
 
 type HeroBlock = Extract<PageBlock, { type: "hero" }>;
 type HeroLayout = NonNullable<HeroBlock["layout"]>;
@@ -183,7 +197,18 @@ function InputRow({
   );
 }
 
-function BlockFields({ block, onChange }: { block: PageBlock; onChange: (b: PageBlock) => void }) {
+function BlockFields({
+  block,
+  onChange,
+  heroImageUploadBusy = false,
+  onHeroImageFile,
+}: {
+  block: PageBlock;
+  onChange: (b: PageBlock) => void;
+  heroImageUploadBusy?: boolean;
+  /** Envio para GitHub (public/assets/blog); preenche `imageSrc` com /assets/blog/… */
+  onHeroImageFile?: (file: File) => void;
+}) {
   const id = block.id;
 
   if (block.type === "hero") {
@@ -278,14 +303,41 @@ function BlockFields({ block, onChange }: { block: PageBlock; onChange: (b: Page
         </div>
 
         {showImageFields && (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-3 sm:col-span-2">
             <div className="sm:col-span-2">
               <InputRow
                 id={`${id}-img`}
-                label="URL ou caminho da imagem (ex. /media/foto.jpg)"
+                label="URL ou caminho da imagem (ex. /assets/blog/foto.jpg)"
                 value={block.imageSrc || ""}
                 onChange={(imageSrc) => onChange({ ...block, imageSrc: imageSrc.trim() ? imageSrc : undefined })}
               />
+            </div>
+            <div className="sm:col-span-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2">
+              <label htmlFor={`${id}-img-file`} className="block text-xs font-medium text-slate-600">
+                Enviar imagem para o repositório
+              </label>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Grava em <code className="rounded bg-white px-0.5 font-mono text-[0.65rem]">public/assets/blog/</code> e
+                actualiza o campo acima com <code className="rounded bg-white px-0.5 font-mono text-[0.65rem]">/assets/blog/…</code>
+                (token e repositório nas Configurações).
+              </p>
+              <input
+                id={`${id}-img-file`}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml,.jpg,.jpeg,.png,.webp,.gif,.svg"
+                disabled={!onHeroImageFile || heroImageUploadBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f && onHeroImageFile) onHeroImageFile(f);
+                }}
+                className="mt-2 block w-full max-w-md text-xs file:mr-2 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-slate-900 disabled:opacity-50"
+              />
+              {heroImageUploadBusy && (
+                <p className="mt-1 text-xs text-slate-600" role="status">
+                  A enviar para o GitHub…
+                </p>
+              )}
             </div>
             <div className="sm:col-span-2">
               <InputRow
@@ -823,6 +875,7 @@ export function PageBlocksEditor({
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [heroImageUploadBlockId, setHeroImageUploadBlockId] = useState<string | null>(null);
 
   const writeHidden = useCallback(
     (next: PageBlock[]) => {
@@ -872,6 +925,63 @@ export function PageBlocksEditor({
   useEffect(() => {
     onChangeRef.current?.(blocks);
   }, [blocks]);
+
+  const handleHeroImageFile = useCallback(async (blockId: string, file: File) => {
+    const integ = readPageEditorLs<{ GITHUB_PERSONAL_TOKEN?: string }>(K_INTEGR);
+    const target = readPageEditorLs<{ githubRepoFullName?: string; branch?: string }>(K_CMS);
+    const token = integ?.GITHUB_PERSONAL_TOKEN?.trim();
+    const repo = target?.githubRepoFullName?.trim();
+    if (!token) {
+      window.alert("Configura o token GitHub em /admin/settings/.");
+      return;
+    }
+    if (!repo) {
+      window.alert("Configura o repositório alvo (CMS) em /admin/settings/.");
+      return;
+    }
+    let contentBase64: string;
+    try {
+      contentBase64 = await fileToBase64Content(file);
+    } catch {
+      window.alert("Não foi possível ler o ficheiro de imagem.");
+      return;
+    }
+    setHeroImageUploadBlockId(blockId);
+    try {
+      const res = await fetch("/api/admin/cms/upload-blog-hero", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          GITHUB_PERSONAL_TOKEN: token,
+          githubRepoFullName: repo,
+          branch: (target?.branch || "main").trim() || "main",
+          contentBase64,
+          target: "pageBlockPublic",
+        }),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string; imageSrc?: string };
+      if (!res.ok || !j.ok || !j.imageSrc) {
+        window.alert(j.error || "Falha ao enviar a imagem para o GitHub.");
+        return;
+      }
+      const baseAlt = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "Imagem do hero";
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId && b.type === "hero"
+            ? {
+                ...b,
+                imageSrc: j.imageSrc,
+                imageAlt: (b.imageAlt || "").trim() ? b.imageAlt : baseAlt,
+              }
+            : b,
+        ),
+      );
+    } catch {
+      window.alert("Erro de rede ao enviar a imagem.");
+    } finally {
+      setHeroImageUploadBlockId(null);
+    }
+  }, []);
 
   const add = (t: PageBlock["type"]) => {
     const nb = createDefaultBlock(t);
@@ -1064,6 +1174,14 @@ export function PageBlocksEditor({
                     <BlockFields
                       block={block}
                       onChange={(b) => setBlocks((prev) => prev.map((x) => (x.id === b.id ? b : x)))}
+                      heroImageUploadBusy={heroImageUploadBlockId === block.id}
+                      onHeroImageFile={
+                        block.type === "hero"
+                          ? (f) => {
+                              void handleHeroImageFile(block.id, f);
+                            }
+                          : undefined
+                      }
                     />
                   </div>
                 )}

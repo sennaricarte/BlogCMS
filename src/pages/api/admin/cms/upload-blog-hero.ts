@@ -15,6 +15,11 @@ type Body = {
   branch?: string;
   /** Base64 do ficheiro (sem prefixo `data:image/...;base64,`). */
   contentBase64?: string;
+  /**
+   * `blogHero` (default) — `src/assets/blog/` + caminho `../../assets/blog/…` (artigos .md).
+   * `pageBlockPublic` — `public/assets/blog/` + URL `/assets/blog/…` (bloco Hero em páginas, `<img>`).
+   */
+  target?: "blogHero" | "pageBlockPublic";
 };
 
 function json(o: Record<string, unknown>, status = 200) {
@@ -86,11 +91,31 @@ export const POST: APIRoute = async ({ request }) => {
     );
   }
 
-  const base = `hero-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const target = body.target === "pageBlockPublic" ? "pageBlockPublic" : "blogHero";
+  const base = `${target === "pageBlockPublic" ? "page-hero" : "hero"}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const publisher = new GithubPublisher({ token });
+
+  if (target === "pageBlockPublic") {
+    const repoPath = `public/assets/blog/${base}.${kind.ext}`;
+    const imageSrc = `/assets/blog/${base}.${kind.ext}`;
+    const message = `content(assets): imagem hero (página) ${base}.${kind.ext}`;
+    try {
+      await publisher.createOrUpdateFileBytes(owner, repo, repoPath, buf, message, { branch });
+      return json({
+        ok: true,
+        repoPath,
+        imageSrc,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao enviar para o GitHub.";
+      return json({ ok: false, error: msg }, 502);
+    }
+  }
+
   const repoPath = `src/assets/blog/${base}.${kind.ext}`;
   const heroImage = `../../assets/blog/${base}.${kind.ext}`;
 
-  const publisher = new GithubPublisher({ token });
   const message = `content(assets): imagem de destaque ${base}.${kind.ext}`;
 
   try {
