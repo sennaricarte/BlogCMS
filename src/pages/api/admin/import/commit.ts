@@ -108,7 +108,7 @@ function inferImageExt(contentType: string, buf: Buffer): string | null {
   return byBytes?.ext || null;
 }
 
-async function fetchImageForImport(url: string, refererPage?: string | null): Promise<DownloadedImage | null> {
+async function tryFetchImageOnce(url: string, refererPage?: string | null): Promise<DownloadedImage | null> {
   const headers: Record<string, string> = {
     Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
     "User-Agent":
@@ -117,9 +117,8 @@ async function fetchImageForImport(url: string, refererPage?: string | null): Pr
   const ref = (refererPage || "").trim();
   if (ref && /^https?:\/\//i.test(ref)) {
     try {
-      const origin = new URL(ref).origin;
       headers.Referer = ref;
-      headers.Origin = origin;
+      headers.Origin = new URL(ref).origin;
     } catch {
       /* ignore */
     }
@@ -130,10 +129,11 @@ async function fetchImageForImport(url: string, refererPage?: string | null): Pr
       signal: AbortSignal.timeout(30_000),
     });
     if (!r.ok) {
-      console.warn("[import-media] Falha ao baixar imagem da origem", {
+      console.warn("[import-media] Falha ao descarregar imagem", {
         url,
         status: r.status,
         statusText: r.statusText,
+        referer: ref || "(nenhum)",
       });
       return null;
     }
@@ -152,10 +152,38 @@ async function fetchImageForImport(url: string, refererPage?: string | null): Pr
   } catch (e) {
     console.warn("[import-media] Erro no download da imagem", {
       url,
+      referer: ref || "(nenhum)",
       error: e instanceof Error ? e.message : String(e),
     });
     return null;
   }
+}
+
+function refererFromImageUrl(imageUrl: string): string | null {
+  try {
+    return new URL(imageUrl).origin + "/";
+  } catch {
+    return null;
+  }
+}
+
+/** Várias tentativas: Referer da página, origem da imagem, sem Referer. */
+async function fetchImageForImport(url: string, refererPage?: string | null): Promise<DownloadedImage | null> {
+  const pageRef = (refererPage || "").trim() || null;
+  const originRef = refererFromImageUrl(url);
+
+  let img = await tryFetchImageOnce(url, pageRef);
+  if (img) return img;
+
+  if (originRef && originRef !== pageRef) {
+    img = await tryFetchImageOnce(url, originRef);
+    if (img) return img;
+  }
+
+  if (pageRef || originRef) {
+    img = await tryFetchImageOnce(url, null);
+  }
+  return img;
 }
 
 async function uploadFeaturedToGithub(
@@ -245,19 +273,45 @@ function normalizeLocalAssetPath(path: string): string {
   return noPublic.startsWith("/") ? noPublic : `/${noPublic}`;
 }
 
+function pickAttrFromTagBlob(attrs: string, name: string): string {
+  const quoted = new RegExp(`\\b${name}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i").exec(attrs);
+  if (quoted?.[2] != null) return quoted[2].trim();
+  const unquoted = new RegExp(`\\b${name}\\s*=\\s*([^\\s>]+)`, "i").exec(attrs);
+  return (unquoted?.[1] || "").trim();
+}
+
+/** Obtém URL da primeira candidata (lazy-load, srcset, etc.). */
+function pickImgUrlFromTag(tag: string): string {
+  const inner = tag.replace(/^<\s*img\b/i, "").replace(/\/?\s*>$/i, "");
+  let raw =
+    pickAttrFromTagBlob(inner, "src") ||
+    pickAttrFromTagBlob(inner, "data-src") ||
+    pickAttrFromTagBlob(inner, "data-lazy-src") ||
+    pickAttrFromTagBlob(inner, "data-original") ||
+    pickAttrFromTagBlob(inner, "data-zoom-image");
+  if (!raw) {
+    const ss = pickAttrFromTagBlob(inner, "srcset");
+    if (ss) raw = ss.split(",")[0]?.trim().split(/\s+/)[0]?.trim() || "";
+  }
+  return raw;
+}
+
+function pickAltFromImgTag(tag: string): string {
+  const q = /\balt\s*=\s*(["'])([\s\S]*?)\1/i.exec(tag);
+  if (q?.[2] != null) return q[2].trim();
+  return (pickAttrFromTagBlob(tag.replace(/^<\s*img\b/i, "").replace(/\/?\s*>$/i, ""), "alt") || "").trim();
+}
+
 function normalizeMarkdownImageHtml(markdown: string, sourceUrl?: string): string {
   let out = markdown || "";
-  // Remove wrapper <figure> mantendo conteúdo interno.
   out = out.replace(/<figure[^>]*>([\s\S]*?)<\/figure>/gi, "$1");
-  // Converte <img ...> em sintaxe Markdown limpa.
-  out = out.replace(/<img\b[^>]*>/gi, (tag) => {
-    const srcRaw = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1]?.trim() || "";
+  out = out.replace(/<img\b[^>]*\/?>/gi, (tag) => {
+    const srcRaw = pickImgUrlFromTag(tag);
     if (!srcRaw) return "";
-    const alt = (tag.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1] || "").trim();
+    const alt = pickAltFromImgTag(tag);
     const abs = resolveMaybeAbsoluteImageUrl(srcRaw, sourceUrl) || srcRaw;
     return `![${alt}](${abs})`;
   });
-  // Remove links que envolvem imagens ([![...](...)](url) ou <a>![...]</a>).
   out = out.replace(/\[(!\[[^\]]*\]\([^)]+\))\]\([^)]+\)/g, "$1");
   out = out.replace(/<a\b[^>]*>\s*(!\[[^\]]*\]\([^)]+\))\s*<\/a>/gi, "$1");
   return out;
@@ -316,6 +370,8 @@ async function localizeMarkdownImages(params: {
   return output;
 }
 
+type HtmlImgRef = { raw: string; abs: string; alt: string };
+
 function collectImageRefsFromMarkdown(markdown: string, sourceUrl?: string): Array<{ raw: string; abs: string }> {
   const imageRegex = /!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
   const out: Array<{ raw: string; abs: string }> = [];
@@ -327,38 +383,65 @@ function collectImageRefsFromMarkdown(markdown: string, sourceUrl?: string): Arr
   return out;
 }
 
-function collectImageRefsFromHtml(articleHtml?: string, sourceUrl?: string): Array<{ raw: string; abs: string }> {
+/** Imagens presentes no HTML do artigo (incl. lazy-load), para upload + inserção no .md. */
+function extractImageRefsFromArticleHtml(articleHtml?: string, sourceUrl?: string): HtmlImgRef[] {
   const html = (articleHtml || "").trim();
   if (!html) return [];
-  try {
-    const $ = cheerio.load(html, { decodeEntities: true });
-    const out: Array<{ raw: string; abs: string }> = [];
-    $("img[src]").each((_, el) => {
-      const raw = ($(el).attr("src") || "").trim();
-      if (!raw) return;
-      const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
-      if (!abs) return;
-      out.push({ raw, abs });
-    });
-    return out;
-  } catch {
-    return [];
+  const byAbs = new Map<string, HtmlImgRef>();
+
+  const push = (raw: string, alt: string) => {
+    const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
+    if (!abs || byAbs.has(abs)) return;
+    const safeAlt = (alt || "Imagem").replace(/[\[\]]/g, "").slice(0, 200);
+    byAbs.set(abs, { raw, abs, alt: safeAlt });
+  };
+
+  for (const m of html.matchAll(/<img\b[^>]*\/?>/gi)) {
+    const tag = m[0];
+    const raw = pickImgUrlFromTag(tag);
+    if (!raw) continue;
+    push(raw, pickAltFromImgTag(tag));
   }
+
+  try {
+    const $ = cheerio.load(html);
+    $("img").each((_, el) => {
+      const $el = $(el);
+      let raw = ($el.attr("src") || "").trim();
+      if (!raw) raw = ($el.attr("data-src") || "").trim();
+      if (!raw) raw = ($el.attr("data-lazy-src") || "").trim();
+      if (!raw) {
+        const ss = ($el.attr("srcset") || "").trim();
+        if (ss) raw = ss.split(",")[0]?.trim().split(/\s+/)[0] || "";
+      }
+      if (!raw) return;
+      const alt = ($el.attr("alt") || "").trim();
+      push(raw, alt);
+    });
+  } catch {
+    /* já coberto pelo regex */
+  }
+
+  return Array.from(byAbs.values());
 }
 
-function collectImageRefsFromHtmlRegex(articleHtml?: string, sourceUrl?: string): Array<{ raw: string; abs: string }> {
-  const html = (articleHtml || "").trim();
-  if (!html) return [];
-  const out: Array<{ raw: string; abs: string }> = [];
-  const srcRegex = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
-  for (const m of html.matchAll(srcRegex)) {
-    const raw = (m[1] || "").trim();
-    if (!raw) continue;
-    const abs = resolveMaybeAbsoluteImageUrl(raw, sourceUrl);
-    if (!abs) continue;
-    out.push({ raw, abs });
+/** Insere no Markdown as imagens que só existiam no HTML (o upload já correu em `uploadedByUrl`). */
+function mergeHtmlImagesIntoMarkdown(
+  md: string,
+  htmlRefs: HtmlImgRef[],
+  markdownAbsKeys: Set<string>,
+  uploadedByUrl: Map<string, string>,
+): string {
+  const appendix: string[] = [];
+  for (const ref of htmlRefs) {
+    if (markdownAbsKeys.has(ref.abs)) continue;
+    const local = uploadedByUrl.get(ref.abs);
+    if (!local) continue;
+    const altEsc = ref.alt.replace(/[[\]]/g, "").slice(0, 200);
+    appendix.push(`\n\n![${altEsc}](${local})\n\n`);
   }
-  return out;
+  if (appendix.length === 0) return md;
+  return md.trimEnd() + appendix.join("");
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -370,7 +453,7 @@ function extractOgOrTwitterImage(articleHtml?: string, sourceUrl?: string): stri
   const html = (articleHtml || "").trim();
   if (!html) return null;
   try {
-    const $ = cheerio.load(html, { decodeEntities: true });
+    const $ = cheerio.load(html);
     const og = $('meta[property="og:image"]').attr("content")?.trim();
     const tw = $('meta[name="twitter:image"]').attr("content")?.trim();
     return resolveMaybeAbsoluteImageUrl(og || tw || "", sourceUrl);
@@ -408,11 +491,10 @@ async function processArticleAssets(params: {
   const warnings: string[] = [];
   let processedMarkdown = normalizeMarkdownImageHtml(markdown, sourceUrl);
 
-  // 1) Coleta URLs (corpo em Markdown + todas <img> por regex/DOM + destaque) e processa em fila serial.
-  const markdownRefs = collectImageRefsFromMarkdown(markdown, sourceUrl);
-  const htmlRefsRegex = collectImageRefsFromHtmlRegex(articleHtml, sourceUrl);
-  const htmlRefsDom = collectImageRefsFromHtml(articleHtml, sourceUrl);
-  const htmlRefs = [...htmlRefsRegex, ...htmlRefsDom];
+  // Referências no corpo Markdown (incl. <img> convertidos acima) + HTML completo (imagens só no HTML).
+  const markdownRefs = collectImageRefsFromMarkdown(processedMarkdown, sourceUrl);
+  const markdownAbsKeys = new Set(markdownRefs.map((r) => r.abs));
+  const htmlImgRefs = extractImageRefsFromArticleHtml(articleHtml, sourceUrl);
   const ogOrTw = extractOgOrTwitterImage(articleHtml, sourceUrl);
   // Prioridade para capa vinda do XML/WordPress (_thumbnail_id -> attachment_url).
   const featuredCandidate = resolveMaybeAbsoluteImageUrl(featuredImageUrl || "", sourceUrl) || ogOrTw;
@@ -420,7 +502,7 @@ async function processArticleAssets(params: {
     new Set([
       ...(Array.isArray(xmlAttachmentUrls) ? xmlAttachmentUrls : []),
       ...markdownRefs.map((r) => r.abs),
-      ...htmlRefs.map((r) => r.abs),
+      ...htmlImgRefs.map((r) => r.abs),
       ...(featuredCandidate ? [featuredCandidate] : []),
     ]),
   );
@@ -471,14 +553,34 @@ async function processArticleAssets(params: {
     failed: Math.max(0, totalDetected - totalUploaded),
   });
 
-  // 2) Reescreve Markdown apenas para assets confirmados no GitHub.
+  // 2) Reescreve Markdown para imagens que já estavam em sintaxe Markdown no ficheiro.
   for (const ref of markdownRefs) {
     const local = uploadedByUrl.get(ref.abs);
     if (!local) continue;
     processedMarkdown = replaceImageReferenceInMarkdown(processedMarkdown, ref.raw, ref.abs, local);
   }
 
-  // 3) Determina destaque com prioridade featured explícito -> og/twitter -> primeira imagem local -> fallback obrigatório.
+  // 3) Imagens que só existiam no HTML: após upload, acrescenta ao Markdown (antes ignorávamos o corpo).
+  processedMarkdown = mergeHtmlImagesIntoMarkdown(
+    processedMarkdown,
+    htmlImgRefs,
+    markdownAbsKeys,
+    uploadedByUrl,
+  );
+
+  const xmlOnly = (Array.isArray(xmlAttachmentUrls) ? xmlAttachmentUrls : []).filter((u) => {
+    if (!u || typeof u !== "string") return false;
+    if (featuredCandidate && u === featuredCandidate) return false;
+    if (markdownAbsKeys.has(u)) return false;
+    if (htmlImgRefs.some((h) => h.abs === u)) return false;
+    return true;
+  });
+  for (const u of xmlOnly) {
+    const local = uploadedByUrl.get(u);
+    if (!local) continue;
+    processedMarkdown = processedMarkdown.trimEnd() + `\n\n![](${local})\n\n`;
+  }
+
   let featuredPath = "/assets/blog/destaque.jpg";
   if (featuredCandidate) {
     const localFeatured = uploadedByUrl.get(featuredCandidate);
