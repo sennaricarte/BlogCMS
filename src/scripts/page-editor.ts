@@ -32,14 +32,22 @@ function setMsg(text: string, isErr: boolean) {
 
 function slugRe(s: string) {
   if (!s) return "pagina";
-  return s
+  let t = s
+    .trim()
+    .replace(/^\/+|\/+$/g, "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "pagina";
+    .replace(/['"]/g, "");
+  // Evitar colar o caminho completo: /p/teste2/ ou p/teste2/ → teste2
+  if (t.startsWith("p/")) t = t.slice(2);
+  t = t.replace(/^\/+|\/+$/g, "");
+  return (
+    t
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "pagina"
+  );
 }
 
 let fileSha = "";
@@ -125,6 +133,14 @@ function wire() {
   if (t && s && a) {
     t.addEventListener("input", () => {
       if (a.checked) s.value = slugRe(t.value);
+    });
+  }
+  if (s) {
+    s.addEventListener("blur", () => {
+      const v = s.value.trim();
+      if (!v) return;
+      const n = slugRe(v);
+      if (n !== v) s.value = n;
     });
   }
   if (createMode) {
